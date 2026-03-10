@@ -23,6 +23,7 @@ namespace PhalanxChronicle.Data
         [SerializeField] private int defense = 5;
         [SerializeField] private int moveRange = 3;
         [SerializeField] private int attackRange = 1;
+        [SerializeField] private int maxMana = 20;
 
         public string DisplayName => displayName;
 
@@ -47,7 +48,8 @@ namespace PhalanxChronicle.Data
                 attack,
                 defense,
                 moveRange,
-                attackRange);
+                attackRange,
+                maxMana);
         }
 
         public static UnitDefinition CreateRuntime(
@@ -67,7 +69,8 @@ namespace PhalanxChronicle.Data
             int attack,
             int defense,
             int moveRange,
-            int attackRange)
+            int attackRange,
+            int maxMana = 20)
         {
             UnitDefinition definition = CreateInstance<UnitDefinition>();
             definition.unitId = unitId;
@@ -87,6 +90,7 @@ namespace PhalanxChronicle.Data
             definition.defense = defense;
             definition.moveRange = moveRange;
             definition.attackRange = attackRange;
+            definition.maxMana = maxMana;
             return definition;
         }
     }

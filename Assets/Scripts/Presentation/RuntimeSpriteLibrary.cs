@@ -7,12 +7,16 @@ namespace PhalanxChronicle.Presentation
     public static class RuntimeSpriteLibrary
     {
         private static readonly Dictionary<string, Sprite> unitSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> weaponSprites = new Dictionary<string, Sprite>();
 
         private static Sprite whiteSprite;
         private static Sprite tileSprite;
         private static Sprite frameSprite;
         private static Sprite bannerSprite;
         private static Sprite slashSprite;
+        private static Sprite ringSprite;
+        private static Sprite sparkSprite;
+        private static Sprite arrowSprite;
         private static Font defaultFont;
 
         public static Sprite WhiteSprite
@@ -37,6 +41,12 @@ namespace PhalanxChronicle.Presentation
 
         public static Sprite SlashSprite => slashSprite ??= CreateSlashSprite();
 
+        public static Sprite RingSprite => ringSprite ??= CreateRingSprite();
+
+        public static Sprite SparkSprite => sparkSprite ??= CreateSparkSprite();
+
+        public static Sprite ArrowSprite => arrowSprite ??= CreateArrowSprite();
+
         public static Font DefaultFont => defaultFont ??= CreateDefaultFont();
 
         public static Sprite GetUnitSprite(string unitId, UnitFaction faction)
@@ -49,6 +59,19 @@ namespace PhalanxChronicle.Presentation
 
             sprite = CreateUnitSprite(unitId, faction);
             unitSprites[key] = sprite;
+            return sprite;
+        }
+
+        public static Sprite GetWeaponSprite(UnitRole role, UnitFaction faction)
+        {
+            string key = role + ":" + faction;
+            if (weaponSprites.TryGetValue(key, out Sprite sprite))
+            {
+                return sprite;
+            }
+
+            sprite = CreateWeaponSprite(role, faction);
+            weaponSprites[key] = sprite;
             return sprite;
         }
 
@@ -133,6 +156,119 @@ namespace PhalanxChronicle.Presentation
 
             texture.Apply();
             return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateRingSprite()
+        {
+            Texture2D texture = CreateTexture(32, 32);
+            Vector2 center = new Vector2(15.5f, 15.5f);
+            Color32 ring = new Color32(255, 255, 255, 255);
+
+            for (int y = 0; y < 32; y++)
+            {
+                for (int x = 0; x < 32; x++)
+                {
+                    float distance = Vector2.Distance(new Vector2(x, y), center);
+                    if (distance >= 10.5f && distance <= 13.2f)
+                    {
+                        texture.SetPixel(x, y, ring);
+                    }
+                }
+            }
+
+            texture.Apply();
+            return CreateSprite(texture, 24f);
+        }
+
+        private static Sprite CreateSparkSprite()
+        {
+            Texture2D texture = CreateTexture(32, 32);
+            Color32 bright = new Color32(255, 255, 255, 255);
+
+            DrawLine(texture, 16, 4, 16, 28, bright, 1);
+            DrawLine(texture, 4, 16, 28, 16, bright, 1);
+            DrawLine(texture, 8, 8, 24, 24, bright, 1);
+            DrawLine(texture, 8, 24, 24, 8, bright, 1);
+            FillRect(texture, 14, 14, 18, 18, bright);
+            texture.Apply();
+            return CreateSprite(texture, 24f);
+        }
+
+        private static Sprite CreateArrowSprite()
+        {
+            Texture2D texture = CreateTexture(32, 32);
+            Color32 bright = new Color32(255, 255, 255, 255);
+
+            FillRect(texture, 14, 5, 17, 20, bright);
+            FillRect(texture, 12, 18, 19, 21, bright);
+            DrawLine(texture, 8, 16, 16, 27, bright, 1);
+            DrawLine(texture, 24, 16, 16, 27, bright, 1);
+            texture.Apply();
+            return CreateSprite(texture, 24f);
+        }
+
+        private static Sprite CreateWeaponSprite(UnitRole role, UnitFaction faction)
+        {
+            Texture2D texture = CreateTexture(32, 32);
+            Color32 outline = new Color32(43, 29, 21, 255);
+            Color32 metal = faction == UnitFaction.Player
+                ? new Color32(233, 224, 200, 255)
+                : new Color32(222, 201, 174, 255);
+            Color32 accent = faction == UnitFaction.Player
+                ? new Color32(100, 158, 233, 255)
+                : new Color32(210, 103, 80, 255);
+            Color32 grip = new Color32(120, 76, 44, 255);
+
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    FillRect(texture, 14, 5, 17, 21, metal);
+                    FillRect(texture, 12, 21, 19, 23, accent);
+                    FillRect(texture, 15, 23, 16, 27, grip);
+                    FillRect(texture, 18, 14, 24, 17, accent);
+                    StrokeRect(texture, 14, 5, 17, 21, outline);
+                    StrokeRect(texture, 12, 21, 19, 23, outline);
+                    StrokeRect(texture, 18, 14, 24, 17, outline);
+                    break;
+                case UnitRole.Guardian:
+                    DrawLine(texture, 10, 5, 21, 25, metal, 1);
+                    DrawLine(texture, 8, 6, 19, 26, metal, 1);
+                    FillRect(texture, 18, 20, 27, 26, accent);
+                    FillRect(texture, 7, 4, 13, 10, metal);
+                    StrokeRect(texture, 18, 20, 27, 26, outline);
+                    StrokeRect(texture, 7, 4, 13, 10, outline);
+                    break;
+                case UnitRole.Ranger:
+                    DrawLine(texture, 11, 5, 11, 26, accent, 1);
+                    DrawLine(texture, 20, 5, 20, 26, accent, 1);
+                    DrawLine(texture, 11, 5, 20, 15, metal, 1);
+                    DrawLine(texture, 11, 26, 20, 15, metal, 1);
+                    DrawLine(texture, 15, 8, 15, 23, outline, 1);
+                    break;
+                case UnitRole.Scout:
+                    DrawLine(texture, 9, 6, 16, 23, metal, 1);
+                    DrawLine(texture, 16, 23, 20, 27, grip, 1);
+                    DrawLine(texture, 23, 6, 16, 23, metal, 1);
+                    DrawLine(texture, 16, 23, 12, 27, grip, 1);
+                    DrawLine(texture, 8, 7, 15, 24, outline, 1);
+                    DrawLine(texture, 24, 7, 17, 24, outline, 1);
+                    break;
+                case UnitRole.Raider:
+                    DrawLine(texture, 7, 6, 24, 26, grip, 1);
+                    DrawLine(texture, 9, 4, 26, 24, grip, 1);
+                    FillRect(texture, 19, 20, 29, 28, metal);
+                    StrokeRect(texture, 19, 20, 29, 28, outline);
+                    FillRect(texture, 15, 14, 18, 17, accent);
+                    break;
+                default:
+                    FillRect(texture, 13, 6, 18, 24, metal);
+                    FillRect(texture, 12, 24, 19, 27, grip);
+                    StrokeRect(texture, 13, 6, 18, 24, outline);
+                    break;
+            }
+
+            texture.Apply();
+            return CreateSprite(texture, 24f);
         }
 
         private static Sprite CreateUnitSprite(string unitId, UnitFaction faction)
@@ -285,6 +421,56 @@ namespace PhalanxChronicle.Presentation
             }
 
             texture.SetPixel(x, y, color);
+        }
+
+        private static void DrawLine(Texture2D texture, int x0, int y0, int x1, int y1, Color color, int thickness)
+        {
+            int deltaX = Mathf.Abs(x1 - x0);
+            int stepX = x0 < x1 ? 1 : -1;
+            int deltaY = -Mathf.Abs(y1 - y0);
+            int stepY = y0 < y1 ? 1 : -1;
+            int error = deltaX + deltaY;
+
+            while (true)
+            {
+                PlotPixel(texture, x0, y0, color, thickness);
+                if (x0 == x1 && y0 == y1)
+                {
+                    break;
+                }
+
+                int errorTimesTwo = error * 2;
+                if (errorTimesTwo >= deltaY)
+                {
+                    error += deltaY;
+                    x0 += stepX;
+                }
+
+                if (errorTimesTwo <= deltaX)
+                {
+                    error += deltaX;
+                    y0 += stepY;
+                }
+            }
+        }
+
+        private static void PlotPixel(Texture2D texture, int x, int y, Color color, int thickness)
+        {
+            int radius = Mathf.Max(0, thickness - 1);
+            for (int offsetY = -radius; offsetY <= radius; offsetY++)
+            {
+                for (int offsetX = -radius; offsetX <= radius; offsetX++)
+                {
+                    int pixelX = x + offsetX;
+                    int pixelY = y + offsetY;
+                    if (pixelX < 0 || pixelX >= texture.width || pixelY < 0 || pixelY >= texture.height)
+                    {
+                        continue;
+                    }
+
+                    texture.SetPixel(pixelX, pixelY, color);
+                }
+            }
         }
 
         private static Color32 GetPaletteColor(UnitFaction faction, int index, Color32[] playerPalette, Color32[] enemyPalette)

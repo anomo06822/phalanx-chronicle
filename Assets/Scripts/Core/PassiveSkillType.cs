@@ -8,5 +8,6 @@ namespace PhalanxChronicle.Core
         LongShot = 3,
         RapidMarch = 4,
         ArmorBreak = 5,
+        Vanguard = 6,
     }
 }

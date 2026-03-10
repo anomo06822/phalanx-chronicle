@@ -145,6 +145,10 @@ namespace PhalanxChronicle.Core
                     return EvaluatePowerStrike(context, enemyUnit, destination, target);
                 case ActiveSkillType.Volley:
                     return EvaluateVolley(context, enemyUnit, destination, target);
+                case ActiveSkillType.GreenDragonSlash:
+                    return EvaluateGreenDragonSlash(context, enemyUnit, destination, target);
+                case ActiveSkillType.WarCry:
+                    return EvaluateWarCry(context, enemyUnit, destination);
                 default:
                     return new SkillEvaluation(0f, new HashSet<string>());
             }
@@ -229,6 +233,70 @@ namespace PhalanxChronicle.Core
             return new SkillEvaluation(reward, defeatedUnitIds);
         }
 
+        private static SkillEvaluation EvaluateGreenDragonSlash(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            UnitRuntimeState primaryTarget)
+        {
+            IReadOnlyList<UnitRuntimeState> affectedUnits = BattlePreviewCalculator.GetGreenDragonSlashTargets(
+                context,
+                destination,
+                primaryTarget);
+            int totalDamage = 0;
+            int defeatedCount = 0;
+            HashSet<string> defeatedUnitIds = new HashSet<string>();
+
+            foreach (UnitRuntimeState affectedUnit in affectedUnits)
+            {
+                int rawDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                    context,
+                    enemyUnit,
+                    destination,
+                    affectedUnit,
+                    ActiveSkillRules.GetGreenDragonSlashBonus());
+                int realizedDamage = rawDamage > affectedUnit.CurrentHp ? affectedUnit.CurrentHp : rawDamage;
+                totalDamage += realizedDamage;
+
+                if (rawDamage >= affectedUnit.CurrentHp)
+                {
+                    defeatedCount++;
+                    defeatedUnitIds.Add(affectedUnit.Id);
+                }
+            }
+
+            float reward = 6f +
+                           (totalDamage * SkillDamageWeight) +
+                           (defeatedCount * KillBonus) +
+                           ((affectedUnits.Count - 1) * AdditionalTargetBonus) -
+                           SkillCommitmentPenalty;
+            return new SkillEvaluation(reward, defeatedUnitIds);
+        }
+
+        private static SkillEvaluation EvaluateWarCry(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination)
+        {
+            IReadOnlyList<UnitRuntimeState> affectedUnits = context.GetUnits(UnitFaction.Player)
+                .Where(unit => destination.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(enemyUnit))
+                .OrderBy(unit => destination.ManhattanDistance(unit.Position))
+                .ThenBy(unit => unit.Id)
+                .ToList();
+
+            int freshApplications = affectedUnits.Count(unit => !unit.HasStatus(StatusEffectType.Intimidated));
+            int lethalThreats = affectedUnits.Count(unit =>
+                BattlePreviewCalculator.EstimateAttackDamage(context, unit, unit.Position, enemyUnit) >= enemyUnit.CurrentHp);
+
+            float reward = (freshApplications * StatusBonus) + (affectedUnits.Count * 3f) + (lethalThreats * 12f) - SkillCommitmentPenalty;
+            if (affectedUnits.Count < 2 && lethalThreats == 0)
+            {
+                reward -= 12f;
+            }
+
+            return new SkillEvaluation(reward, new HashSet<string>());
+        }
+
         private float EstimateExposure(
             BattleContext context,
             UnitRuntimeState enemyUnit,
@@ -305,12 +373,19 @@ namespace PhalanxChronicle.Core
                         origin,
                         enemyUnit,
                         ActiveSkillRules.GetPowerStrikeBonus())
-                    : BattlePreviewCalculator.EstimateAttackDamage(
-                        context,
-                        opposingUnit,
-                        origin,
-                        enemyUnit,
-                        ActiveSkillRules.GetVolleyBonus());
+                    : opposingUnit.ActiveSkill == ActiveSkillType.GreenDragonSlash
+                        ? BattlePreviewCalculator.EstimateAttackDamage(
+                            context,
+                            opposingUnit,
+                            origin,
+                            enemyUnit,
+                            ActiveSkillRules.GetGreenDragonSlashBonus())
+                        : BattlePreviewCalculator.EstimateAttackDamage(
+                            context,
+                            opposingUnit,
+                            origin,
+                            enemyUnit,
+                            ActiveSkillRules.GetVolleyBonus());
                 if (skillDamage > bestDamage)
                 {
                     bestDamage = skillDamage;

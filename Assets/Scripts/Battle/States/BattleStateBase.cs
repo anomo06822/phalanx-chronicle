@@ -26,6 +26,10 @@ namespace PhalanxChronicle.Battle.States
         {
         }
 
+        public virtual void OnUnitHovered(Unit unitView, bool isHovered)
+        {
+        }
+
         public virtual void OnCellClicked(GridPosition position)
         {
         }
@@ -39,6 +43,14 @@ namespace PhalanxChronicle.Battle.States
         }
 
         public virtual void OnWaitRequested()
+        {
+        }
+
+        public virtual void OnConfirmRequested()
+        {
+        }
+
+        public virtual void OnBackRequested()
         {
         }
 

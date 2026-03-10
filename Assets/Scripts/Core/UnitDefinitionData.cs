@@ -22,7 +22,47 @@ namespace PhalanxChronicle.Core
             int attack,
             int defense,
             int moveRange,
-            int attackRange)
+            int attackRange) : this(
+                id,
+                displayName,
+                displayNameKey,
+                faction,
+                role,
+                roleNameKey,
+                passiveSkill,
+                passiveSkillNameKey,
+                passiveSkillDescriptionKey,
+                activeSkill,
+                activeSkillNameKey,
+                activeSkillDescriptionKey,
+                maxHp,
+                attack,
+                defense,
+                moveRange,
+                attackRange,
+                20)
+        {
+        }
+
+        public UnitDefinitionData(
+            string id,
+            string displayName,
+            string displayNameKey,
+            UnitFaction faction,
+            UnitRole role,
+            string roleNameKey,
+            PassiveSkillType passiveSkill,
+            string passiveSkillNameKey,
+            string passiveSkillDescriptionKey,
+            ActiveSkillType activeSkill,
+            string activeSkillNameKey,
+            string activeSkillDescriptionKey,
+            int maxHp,
+            int attack,
+            int defense,
+            int moveRange,
+            int attackRange,
+            int maxMana)
         {
             Id = id;
             DisplayName = displayName;
@@ -41,6 +81,7 @@ namespace PhalanxChronicle.Core
             Defense = defense;
             MoveRange = moveRange;
             AttackRange = attackRange;
+            MaxMana = maxMana;
         }
 
         public string Id { get; }
@@ -76,5 +117,7 @@ namespace PhalanxChronicle.Core
         public int MoveRange { get; }
 
         public int AttackRange { get; }
+
+        public int MaxMana { get; }
     }
 }

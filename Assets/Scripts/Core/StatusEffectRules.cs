@@ -6,7 +6,18 @@ namespace PhalanxChronicle.Core
     {
         public static int GetAttackModifier(UnitRuntimeState unit)
         {
-            return unit.HasStatus(StatusEffectType.Inspired) ? 2 : 0;
+            int modifier = 0;
+            if (unit.HasStatus(StatusEffectType.Inspired))
+            {
+                modifier += 2;
+            }
+
+            if (unit.HasStatus(StatusEffectType.Intimidated))
+            {
+                modifier -= 2;
+            }
+
+            return modifier;
         }
 
         public static int GetDefenseModifier(UnitRuntimeState unit)

@@ -9,49 +9,81 @@ namespace PhalanxChronicle.UI
     public sealed class ActionMenuPanel : MonoBehaviour
     {
         private GameObject rootObject;
-        private Button attackButton;
-        private Button skillButton;
-        private Button waitButton;
-        private Text attackButtonLabel;
-        private Text skillButtonLabel;
-        private Text waitButtonLabel;
+        private Text modeLabel;
+        private ActionButtonView attackButtonView;
+        private ActionButtonView skillButtonView;
+        private ActionButtonView waitButtonView;
+        private ActionButtonView backButtonView;
+
+        public bool IsVisible => rootObject != null && rootObject.activeSelf;
+
+        public string CurrentModeText => modeLabel != null ? modeLabel.text : string.Empty;
+
+        public bool IsBackEnabled => backButtonView != null && backButtonView.Button.interactable;
+
+        public bool IsSkillEnabled => skillButtonView != null && skillButtonView.Button.interactable;
 
         public void Initialize(Transform canvasRoot)
         {
-            rootObject = CreatePanel("ActionMenu", canvasRoot, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(420f, 94f));
-            HorizontalLayoutGroup layout = rootObject.AddComponent<HorizontalLayoutGroup>();
+            rootObject = CreatePanel(
+                "ActionMenu",
+                canvasRoot,
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0f, 24f),
+                new Vector2(820f, 154f));
+
+            VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
             layout.spacing = 12f;
-            layout.padding = new RectOffset(16, 16, 16, 16);
+            layout.padding = new RectOffset(18, 18, 14, 18);
             layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childForceExpandHeight = true;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
             layout.childForceExpandWidth = true;
 
-            attackButton = CreateButton(rootObject.transform, out attackButtonLabel, LocalizationService.Text("ui.button.attack", "Attack"));
-            skillButton = CreateButton(rootObject.transform, out skillButtonLabel, LocalizationService.Text("ui.button.skill", "Skill"));
-            waitButton = CreateButton(rootObject.transform, out waitButtonLabel, LocalizationService.Text("ui.button.wait", "Wait"));
+            GameObject modePanel = CreateInsetPanel("ActionModePanel", rootObject.transform, 28f, new Color(0.16f, 0.14f, 0.11f, 0.98f));
+            modeLabel = CreateText(modePanel.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextGold);
+            RectTransform modeRect = modeLabel.GetComponent<RectTransform>();
+            modeRect.anchorMin = Vector2.zero;
+            modeRect.anchorMax = Vector2.one;
+            modeRect.offsetMin = new Vector2(10f, 2f);
+            modeRect.offsetMax = new Vector2(-10f, -2f);
+            LayoutElement modeLayout = modePanel.GetComponent<LayoutElement>();
+            modeLayout.preferredHeight = 28f;
+
+            GameObject buttonRow = new GameObject("ActionButtons", typeof(RectTransform));
+            buttonRow.transform.SetParent(rootObject.transform, false);
+            HorizontalLayoutGroup buttonLayout = buttonRow.AddComponent<HorizontalLayoutGroup>();
+            buttonLayout.spacing = 10f;
+            buttonLayout.childAlignment = TextAnchor.MiddleCenter;
+            buttonLayout.childControlHeight = true;
+            buttonLayout.childControlWidth = true;
+            buttonLayout.childForceExpandHeight = true;
+            buttonLayout.childForceExpandWidth = true;
+            buttonRow.AddComponent<LayoutElement>().preferredHeight = 82f;
+
+            attackButtonView = CreateButton(buttonRow.transform, LocalizationService.Text("ui.button.attack", "Attack"));
+            skillButtonView = CreateButton(buttonRow.transform, LocalizationService.Text("ui.button.skill", "Skill"));
+            waitButtonView = CreateButton(buttonRow.transform, LocalizationService.Text("ui.button.wait", "Wait"));
+            backButtonView = CreateButton(buttonRow.transform, LocalizationService.Text("ui.button.back", "Back"));
             Hide();
         }
 
         public void Show(
-            bool canAttack,
-            string skillLabel,
-            bool canUseSkill,
+            BattleActionMenuModel model,
             Action onAttack,
             Action onSkill,
-            Action onWait)
+            Action onWait,
+            Action onBack)
         {
             rootObject.SetActive(true);
-            attackButtonLabel.text = LocalizationService.Text("ui.button.attack", "Attack");
-            skillButtonLabel.text = LocalizationService.Text("ui.button.skill", "Skill") + "\n" + skillLabel;
-            waitButtonLabel.text = LocalizationService.Text("ui.button.wait", "Wait");
-            attackButton.interactable = canAttack;
-            skillButton.interactable = canUseSkill;
-            attackButton.onClick.RemoveAllListeners();
-            skillButton.onClick.RemoveAllListeners();
-            waitButton.onClick.RemoveAllListeners();
-            attackButton.onClick.AddListener(() => onAttack?.Invoke());
-            skillButton.onClick.AddListener(() => onSkill?.Invoke());
-            waitButton.onClick.AddListener(() => onWait?.Invoke());
+            modeLabel.text = model != null ? model.ModeLabel : string.Empty;
+
+            BindButton(attackButtonView, LocalizationService.Text("ui.button.attack", "Attack"), model?.AttackDetail, model != null && model.CanAttack, onAttack);
+            BindButton(skillButtonView, model?.SkillName ?? LocalizationService.Text("ui.button.skill", "Skill"), model?.SkillDetail, model != null && model.CanUseSkill, onSkill);
+            BindButton(waitButtonView, LocalizationService.Text("ui.button.wait", "Wait"), model?.WaitDetail, model == null || model.CanWait, onWait);
+            BindButton(backButtonView, LocalizationService.Text("ui.button.back", "Back"), model?.BackDetail, model != null && model.CanBack, onBack);
         }
 
         public void Hide()
@@ -60,6 +92,22 @@ namespace PhalanxChronicle.UI
             {
                 rootObject.SetActive(false);
             }
+        }
+
+        private static void BindButton(ActionButtonView view, string title, string detail, bool interactable, Action onClick)
+        {
+            view.TitleLabel.text = title;
+            view.DetailLabel.text = string.IsNullOrWhiteSpace(detail)
+                ? LocalizationService.Text("ui.action_menu.empty_detail", " ")
+                : detail;
+            view.Button.interactable = interactable;
+            view.Button.onClick.RemoveAllListeners();
+            view.Button.onClick.AddListener(() => onClick?.Invoke());
+
+            Color baseColor = interactable ? BattleUiTheme.ButtonPrimary : BattleUiTheme.PanelInset;
+            view.Background.color = baseColor;
+            view.TitleLabel.color = interactable ? BattleUiTheme.ButtonText : BattleUiTheme.TextDisabled;
+            view.DetailLabel.color = interactable ? new Color(0.22f, 0.15f, 0.08f, 0.92f) : BattleUiTheme.TextDisabled;
         }
 
         private static GameObject CreatePanel(
@@ -80,44 +128,124 @@ namespace PhalanxChronicle.UI
             rectTransform.sizeDelta = size;
 
             Image image = panel.GetComponent<Image>();
-            image.color = new Color(0.09f, 0.09f, 0.12f, 0.94f);
+            image.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            image.color = BattleUiTheme.PanelSurface;
+
+            Outline outline = panel.AddComponent<Outline>();
+            outline.effectDistance = new Vector2(1f, -1f);
+            outline.effectColor = BattleUiTheme.OutlineStrong;
             return panel;
         }
 
-        private static Button CreateButton(Transform parent, out Text labelText, string label)
+        private static GameObject CreateInsetPanel(string name, Transform parent, float preferredHeight, Color color)
         {
-            GameObject buttonObject = new GameObject(label + "Button", typeof(RectTransform), typeof(Image), typeof(Button));
+            GameObject panel = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+            panel.transform.SetParent(parent, false);
+            Image image = panel.GetComponent<Image>();
+            image.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            image.color = color;
+
+            LayoutElement layoutElement = panel.GetComponent<LayoutElement>();
+            layoutElement.preferredHeight = preferredHeight;
+
+            Outline outline = panel.AddComponent<Outline>();
+            outline.effectDistance = new Vector2(1f, -1f);
+            outline.effectColor = BattleUiTheme.OutlineSoft;
+            return panel;
+        }
+
+        private static ActionButtonView CreateButton(Transform parent, string title)
+        {
+            GameObject buttonObject = new GameObject(title + "Button", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
             buttonObject.transform.SetParent(parent, false);
+
+            LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
+            layoutElement.preferredHeight = 82f;
+            layoutElement.flexibleWidth = 1f;
+
             Image image = buttonObject.GetComponent<Image>();
-            image.color = new Color(0.79f, 0.58f, 0.24f, 1f);
+            image.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            image.color = BattleUiTheme.ButtonPrimary;
+
+            Outline outline = buttonObject.AddComponent<Outline>();
+            outline.effectDistance = new Vector2(1f, -1f);
+            outline.effectColor = new Color(0.34f, 0.22f, 0.08f, 0.66f);
 
             Button button = buttonObject.GetComponent<Button>();
             ColorBlock colors = button.colors;
-            colors.highlightedColor = new Color(0.9f, 0.67f, 0.29f, 1f);
-            colors.pressedColor = new Color(0.67f, 0.49f, 0.2f, 1f);
-            colors.disabledColor = new Color(0.32f, 0.32f, 0.34f, 0.9f);
+            colors.highlightedColor = BattleUiTheme.ButtonPrimaryHighlight;
+            colors.pressedColor = BattleUiTheme.ButtonPrimaryPressed;
+            colors.disabledColor = BattleUiTheme.ButtonDisabled;
             button.colors = colors;
 
-            RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
-            buttonRect.sizeDelta = new Vector2(110f, 52f);
+            GameObject contentObject = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup));
+            contentObject.transform.SetParent(buttonObject.transform, false);
+            RectTransform contentRect = contentObject.GetComponent<RectTransform>();
+            contentRect.anchorMin = Vector2.zero;
+            contentRect.anchorMax = Vector2.one;
+            contentRect.offsetMin = new Vector2(10f, 10f);
+            contentRect.offsetMax = new Vector2(-10f, -10f);
 
-            GameObject textObject = new GameObject("Label", typeof(RectTransform), typeof(Text));
-            textObject.transform.SetParent(buttonObject.transform, false);
-            RectTransform textRect = textObject.GetComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = Vector2.zero;
-            textRect.offsetMax = Vector2.zero;
+            VerticalLayoutGroup contentLayout = contentObject.GetComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 4f;
+            contentLayout.childAlignment = TextAnchor.MiddleCenter;
+            contentLayout.childControlHeight = true;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childForceExpandWidth = true;
 
-            labelText = textObject.GetComponent<Text>();
-            labelText.text = label;
-            labelText.font = RuntimeSpriteLibrary.DefaultFont;
-            labelText.fontSize = 18;
-            labelText.alignment = TextAnchor.MiddleCenter;
-            labelText.color = new Color(0.12f, 0.08f, 0.06f, 1f);
-            labelText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            labelText.verticalOverflow = VerticalWrapMode.Overflow;
-            return button;
+            Text titleLabel = CreateText(contentObject.transform, title, 18, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.ButtonText);
+            titleLabel.resizeTextForBestFit = true;
+            titleLabel.resizeTextMinSize = 12;
+            titleLabel.resizeTextMaxSize = 18;
+            titleLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            titleLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            titleLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
+
+            Text detailLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.22f, 0.15f, 0.08f, 0.92f));
+            detailLabel.resizeTextForBestFit = true;
+            detailLabel.resizeTextMinSize = 10;
+            detailLabel.resizeTextMaxSize = 12;
+            detailLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
+
+            return new ActionButtonView(button, image, titleLabel, detailLabel);
+        }
+
+        private static Text CreateText(Transform parent, string content, int size, FontStyle fontStyle, TextAnchor alignment, Color color)
+        {
+            GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
+            textObject.transform.SetParent(parent, false);
+            Text text = textObject.GetComponent<Text>();
+            text.text = content;
+            text.font = RuntimeSpriteLibrary.DefaultFont;
+            text.fontSize = size;
+            text.fontStyle = fontStyle;
+            text.alignment = alignment;
+            text.color = color;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+
+            textObject.GetComponent<LayoutElement>().preferredHeight = size + 8f;
+            return text;
+        }
+
+        private sealed class ActionButtonView
+        {
+            public ActionButtonView(Button button, Image background, Text titleLabel, Text detailLabel)
+            {
+                Button = button;
+                Background = background;
+                TitleLabel = titleLabel;
+                DetailLabel = detailLabel;
+            }
+
+            public Button Button { get; }
+
+            public Image Background { get; }
+
+            public Text TitleLabel { get; }
+
+            public Text DetailLabel { get; }
         }
     }
 }

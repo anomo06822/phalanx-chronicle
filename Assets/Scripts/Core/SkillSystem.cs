@@ -22,7 +22,11 @@ namespace PhalanxChronicle.Core
 
         public IReadOnlyList<UnitRuntimeState> GetSkillTargets(BattleContext context, UnitRuntimeState caster, GridPosition origin)
         {
-            if (context == null || caster == null || caster.HasActed || !caster.CanUseSkill)
+            if (context == null ||
+                caster == null ||
+                caster.HasActed ||
+                !caster.CanUseSkill ||
+                !caster.HasEnoughMana(ActiveSkillRules.GetManaCost(caster)))
             {
                 return new List<UnitRuntimeState>();
             }
@@ -48,23 +52,43 @@ namespace PhalanxChronicle.Core
                 return null;
             }
 
-            bool targetIsValid = GetSkillTargets(context, caster).Any(unit => unit.Id == primaryTarget.Id);
-            if (!targetIsValid)
+            int manaCost = ActiveSkillRules.GetManaCost(caster);
+            if (!caster.SpendMana(manaCost))
             {
                 return null;
             }
 
+            bool targetIsValid = GetSkillTargets(context, caster).Any(unit => unit.Id == primaryTarget.Id);
+            if (!targetIsValid)
+            {
+                caster.RestoreMana(manaCost);
+                return null;
+            }
+
             List<SkillEffectResult> effects = new List<SkillEffectResult>();
+            IReadOnlyList<UnitRuntimeState> affectedUnits = GetSkillAffectedUnits(context, caster, primaryTarget);
+            if (affectedUnits == null || affectedUnits.Count == 0)
+            {
+                caster.RestoreMana(manaCost);
+                return null;
+            }
+
             switch (caster.ActiveSkill)
             {
                 case ActiveSkillType.RoyalAid:
-                    ApplyRoyalAid(primaryTarget, effects);
+                    ApplyRoyalAid(affectedUnits.First(), effects);
                     break;
                 case ActiveSkillType.PowerStrike:
-                    ApplyPowerStrike(context, caster, primaryTarget, effects);
+                    ApplyPowerStrike(context, caster, affectedUnits.First(), effects);
                     break;
                 case ActiveSkillType.Volley:
-                    ApplyVolley(context, caster, primaryTarget, effects);
+                    ApplyVolley(context, caster, affectedUnits, effects);
+                    break;
+                case ActiveSkillType.GreenDragonSlash:
+                    ApplyGreenDragonSlash(context, caster, affectedUnits, effects);
+                    break;
+                case ActiveSkillType.WarCry:
+                    ApplyWarCry(context, caster, affectedUnits, effects);
                     break;
                 default:
                     return null;
@@ -74,6 +98,39 @@ namespace PhalanxChronicle.Core
             caster.MarkActed();
             context.EvaluateBattleOutcome();
             return new SkillResult(caster.Id, caster.ActiveSkill, primaryTarget.Id, effects);
+        }
+
+        public IReadOnlyList<UnitRuntimeState> GetSkillAffectedUnits(BattleContext context, UnitRuntimeState caster, UnitRuntimeState primaryTarget)
+        {
+            if (context == null || caster == null || primaryTarget == null || !caster.IsAlive || !primaryTarget.IsAlive)
+            {
+                return new List<UnitRuntimeState>();
+            }
+
+            if (!IsValidPrimaryTarget(caster, primaryTarget))
+            {
+                return new List<UnitRuntimeState>();
+            }
+
+            switch (caster.ActiveSkill)
+            {
+                case ActiveSkillType.RoyalAid:
+                    return new List<UnitRuntimeState> { primaryTarget };
+                case ActiveSkillType.PowerStrike:
+                    return new List<UnitRuntimeState> { primaryTarget };
+                case ActiveSkillType.Volley:
+                    return BattlePreviewCalculator.GetVolleyTargets(context, primaryTarget);
+                case ActiveSkillType.GreenDragonSlash:
+                    return BattlePreviewCalculator.GetGreenDragonSlashTargets(context, caster.Position, primaryTarget);
+                case ActiveSkillType.WarCry:
+                    return context.GetUnits(caster.Faction == UnitFaction.Player ? UnitFaction.Enemy : UnitFaction.Player)
+                        .Where(unit => caster.Position.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(caster))
+                        .OrderBy(unit => caster.Position.ManhattanDistance(unit.Position))
+                        .ThenBy(unit => unit.Id)
+                        .ToList();
+                default:
+                    return new List<UnitRuntimeState>();
+            }
         }
 
         private static bool IsValidPrimaryTarget(UnitRuntimeState caster, UnitRuntimeState candidate)
@@ -89,6 +146,8 @@ namespace PhalanxChronicle.Core
                     return candidate.Faction == caster.Faction && candidate.CurrentHp < candidate.MaxHp;
                 case ActiveSkillType.PowerStrike:
                 case ActiveSkillType.Volley:
+                case ActiveSkillType.GreenDragonSlash:
+                case ActiveSkillType.WarCry:
                     return candidate.Faction != caster.Faction;
                 default:
                     return false;
@@ -137,11 +196,9 @@ namespace PhalanxChronicle.Core
         private static void ApplyVolley(
             BattleContext context,
             UnitRuntimeState caster,
-            UnitRuntimeState primaryTarget,
+            IReadOnlyList<UnitRuntimeState> affectedUnits,
             ICollection<SkillEffectResult> effects)
         {
-            IReadOnlyList<UnitRuntimeState> affectedUnits = BattlePreviewCalculator.GetVolleyTargets(context, primaryTarget);
-
             foreach (UnitRuntimeState target in affectedUnits)
             {
                 int damage = BattlePreviewCalculator.EstimateAttackDamage(
@@ -168,6 +225,56 @@ namespace PhalanxChronicle.Core
                     !target.IsAlive,
                     false,
                     target.IsAlive ? StatusEffectType.ShatteredArmor : StatusEffectType.None));
+            }
+        }
+
+        private static void ApplyGreenDragonSlash(
+            BattleContext context,
+            UnitRuntimeState caster,
+            IReadOnlyList<UnitRuntimeState> affectedUnits,
+            ICollection<SkillEffectResult> effects)
+        {
+            foreach (UnitRuntimeState target in affectedUnits)
+            {
+                int damage = BattlePreviewCalculator.EstimateAttackDamage(
+                    context,
+                    caster,
+                    caster.Position,
+                    target,
+                    ActiveSkillRules.GetGreenDragonSlashBonus());
+
+                target.ApplyDamage(damage);
+                if (!target.IsAlive)
+                {
+                    context.RemoveUnit(target.Id);
+                }
+
+                effects.Add(new SkillEffectResult(
+                    target.Id,
+                    damage,
+                    target.CurrentHp,
+                    !target.IsAlive,
+                    false,
+                    StatusEffectType.None));
+            }
+        }
+
+        private static void ApplyWarCry(
+            BattleContext context,
+            UnitRuntimeState caster,
+            IReadOnlyList<UnitRuntimeState> affectedUnits,
+            ICollection<SkillEffectResult> effects)
+        {
+            foreach (UnitRuntimeState target in affectedUnits)
+            {
+                target.AddOrRefreshStatus(StatusEffectType.Intimidated, ActiveSkillRules.GetIntimidatedDuration());
+                effects.Add(new SkillEffectResult(
+                    target.Id,
+                    0,
+                    target.CurrentHp,
+                    false,
+                    false,
+                    StatusEffectType.Intimidated));
             }
         }
     }

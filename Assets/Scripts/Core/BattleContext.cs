@@ -49,6 +49,10 @@ namespace PhalanxChronicle.Core
 
         public TurnSide CurrentTurnSide { get; private set; } = TurnSide.Player;
 
+        public int TurnNumber { get; private set; } = 1;
+
+        public int RoundNumber => TurnNumber;
+
         public bool BattleEnded { get; private set; }
 
         public TurnSide WinningSide { get; private set; }
@@ -125,6 +129,21 @@ namespace PhalanxChronicle.Core
             unit.MoveTo(destination);
         }
 
+        public void UndoMoveUnit(string unitId, GridPosition origin)
+        {
+            UnitRuntimeState unit = GetUnit(unitId);
+            if (unit == null)
+            {
+                return;
+            }
+
+            GridCell sourceCell = cells[unit.Position];
+            GridCell originCell = cells[origin];
+            sourceCell.ClearOccupant();
+            originCell.SetOccupant(unit.Id);
+            unit.UndoMoveTo(origin);
+        }
+
         public void RemoveUnit(string unitId)
         {
             UnitRuntimeState unit = GetUnit(unitId);
@@ -140,25 +159,63 @@ namespace PhalanxChronicle.Core
             }
         }
 
+        public UnitRuntimeState AddUnit(UnitSpawnData spawnData)
+        {
+            if (spawnData == null ||
+                spawnData.Definition == null ||
+                !IsInside(spawnData.StartPosition) ||
+                !IsWalkable(spawnData.StartPosition) ||
+                IsOccupied(spawnData.StartPosition) ||
+                unitsById.ContainsKey(spawnData.Definition.Id))
+            {
+                return null;
+            }
+
+            UnitRuntimeState unit = new UnitRuntimeState(spawnData.Definition, spawnData.StartPosition);
+            unitsById.Add(unit.Id, unit);
+            cells[spawnData.StartPosition].SetOccupant(unit.Id);
+            return unit;
+        }
+
         public void SetCurrentTurn(TurnSide turnSide)
         {
             CurrentTurnSide = turnSide;
         }
 
+        public void AdvanceRound()
+        {
+            TurnNumber++;
+        }
+
+        public void SetBattleOutcome(TurnSide winningSide)
+        {
+            BattleEnded = true;
+            WinningSide = winningSide;
+        }
+
+        public void ClearBattleOutcome()
+        {
+            BattleEnded = false;
+            WinningSide = default;
+        }
+
         public void EvaluateBattleOutcome()
         {
+            if (BattleEnded)
+            {
+                return;
+            }
+
             bool anyPlayersAlive = GetUnits(UnitFaction.Player).Count > 0;
             bool anyEnemiesAlive = GetUnits(UnitFaction.Enemy).Count > 0;
 
             if (!anyEnemiesAlive)
             {
-                BattleEnded = true;
-                WinningSide = TurnSide.Player;
+                SetBattleOutcome(TurnSide.Player);
             }
             else if (!anyPlayersAlive)
             {
-                BattleEnded = true;
-                WinningSide = TurnSide.Enemy;
+                SetBattleOutcome(TurnSide.Enemy);
             }
         }
 

@@ -38,6 +38,12 @@ namespace PhalanxChronicle.Core
             return CanControlUnit(unit) ? rangeCalculator.GetMoveRange(Context, unit) : new List<GridPosition>();
         }
 
+        public IReadOnlyList<GridPosition> GetMoveDestinations(string unitId)
+        {
+            UnitRuntimeState unit = Context.GetUnit(unitId);
+            return CanControlUnit(unit) ? rangeCalculator.GetMoveDestinations(Context, unit) : new List<GridPosition>();
+        }
+
         public IReadOnlyList<UnitRuntimeState> GetAttackableTargets(string unitId)
         {
             UnitRuntimeState unit = Context.GetUnit(unitId);
@@ -71,6 +77,15 @@ namespace PhalanxChronicle.Core
             return CanControlUnit(unit) ? skillSystem.GetSkillRange(Context, unit) : new List<GridPosition>();
         }
 
+        public IReadOnlyList<UnitRuntimeState> GetSkillAffectedTargets(string casterUnitId, string primaryTargetId)
+        {
+            UnitRuntimeState caster = Context.GetUnit(casterUnitId);
+            UnitRuntimeState primaryTarget = Context.GetUnit(primaryTargetId);
+            return CanControlUnit(caster) && primaryTarget != null
+                ? skillSystem.GetSkillAffectedUnits(Context, caster, primaryTarget)
+                : new List<UnitRuntimeState>();
+        }
+
         public bool TryMoveUnit(string unitId, GridPosition destination)
         {
             UnitRuntimeState unit = Context.GetUnit(unitId);
@@ -80,6 +95,29 @@ namespace PhalanxChronicle.Core
             }
 
             return moveSystem.TryMove(Context, unit, destination);
+        }
+
+        public bool TryUndoMoveUnit(string unitId, GridPosition origin)
+        {
+            UnitRuntimeState unit = Context.GetUnit(unitId);
+            if (!CanControlUnit(unit) || !unit.HasMovedThisTurn)
+            {
+                return false;
+            }
+
+            if (!Context.IsInside(origin) || !Context.IsWalkable(origin))
+            {
+                return false;
+            }
+
+            UnitRuntimeState occupant = Context.GetUnitAt(origin);
+            if (occupant != null && occupant.Id != unitId)
+            {
+                return false;
+            }
+
+            Context.UndoMoveUnit(unitId, origin);
+            return true;
         }
 
         public CombatResult TryAttack(string attackerUnitId, string defenderUnitId)
@@ -156,6 +194,16 @@ namespace PhalanxChronicle.Core
             return turnManager.EndTurn(Context);
         }
 
+        public bool SpawnUnit(UnitSpawnData spawnData)
+        {
+            return Context.AddUnit(spawnData) != null;
+        }
+
+        public void SetBattleOutcome(TurnSide winningSide)
+        {
+            Context.SetBattleOutcome(winningSide);
+        }
+
         public AiDecision BuildEnemyDecision(string unitId)
         {
             UnitRuntimeState enemy = Context.GetUnit(unitId);
@@ -165,7 +213,7 @@ namespace PhalanxChronicle.Core
         public UnitActionResult ResolveEnemyAction(string unitId)
         {
             UnitRuntimeState enemy = Context.GetUnit(unitId);
-            if (!CanControlUnit(enemy))
+            if (!CanControlUnit(enemy) || enemy.HasActed)
             {
                 return null;
             }

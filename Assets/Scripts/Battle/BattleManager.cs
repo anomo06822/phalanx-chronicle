@@ -21,33 +21,49 @@ namespace PhalanxChronicle.Battle
         private readonly Dictionary<string, Unit> unitViews = new Dictionary<string, Unit>();
         private readonly Dictionary<Type, IBattleState> states = new Dictionary<Type, IBattleState>();
 
-        private StageDefinition stageDefinition;
+        private BattleScenarioDefinition scenarioDefinition;
+        private BattleScenarioData scenarioData;
+        private ScenarioDirector scenarioDirector;
         private BattleSimulation simulation;
         private GridManager gridManager;
         private BattleHUD battleHUD;
         private ActionMenuPanel actionMenuPanel;
         private IBattleState currentState;
         private string selectedUnitId;
+        private GridPosition selectedUnitOrigin;
+        private bool hasSelectedUnitOrigin;
         private CombatResult pendingCombatResult;
         private SkillResult pendingSkillResult;
         private bool initialized;
         private GameObject unitRoot;
+        private Type pendingDialogueResumeState;
+        private string currentTurnText = string.Empty;
+        private string currentInstructionText = string.Empty;
 
-        public void Initialize(StageDefinition stage)
+        public bool IsDialogueVisible => battleHUD != null && battleHUD.IsDialogueVisible;
+
+        public bool IsRerollVisible => battleHUD != null && battleHUD.IsRerollVisible;
+
+        public bool IsActionMenuVisible => actionMenuPanel != null && actionMenuPanel.IsVisible;
+
+        public string CurrentActionMenuModeText => actionMenuPanel != null ? actionMenuPanel.CurrentModeText : string.Empty;
+
+        public bool IsActionMenuBackEnabled => actionMenuPanel != null && actionMenuPanel.IsBackEnabled;
+
+        public bool IsActionMenuSkillEnabled => actionMenuPanel != null && actionMenuPanel.IsSkillEnabled;
+
+        public string CurrentObjectiveText => battleHUD != null ? battleHUD.CurrentObjectiveText : string.Empty;
+
+        public BattleSimulation Simulation => simulation;
+
+        public void Initialize(BattleScenarioDefinition scenario)
         {
-            stageDefinition = stage != null ? stage : StageDefinition.CreateDefault();
+            scenarioDefinition = scenario != null ? scenario : BattleScenarioDefinition.CreateDefault();
         }
 
         public void ChangeState<TState>() where TState : IBattleState
         {
-            if (!states.TryGetValue(typeof(TState), out IBattleState nextState))
-            {
-                throw new InvalidOperationException($"State {typeof(TState).Name} is not registered.");
-            }
-
-            currentState?.Exit();
-            currentState = nextState;
-            currentState.Enter();
+            ChangeState(typeof(TState));
         }
 
         public void EnsureTurn(TurnSide side)
@@ -60,12 +76,14 @@ namespace PhalanxChronicle.Battle
 
         public void SetTurnLabel(string text)
         {
-            battleHUD.SetTurn(text);
+            currentTurnText = text;
+            UpdateHudModels();
         }
 
         public void SetLog(string text)
         {
-            battleHUD.SetLog(text);
+            currentInstructionText = text;
+            UpdateHudModels();
         }
 
         public void SetEndTurnEnabled(bool enabled)
@@ -81,6 +99,49 @@ namespace PhalanxChronicle.Battle
         public void ShowResult(string text)
         {
             battleHUD.ShowResult(text);
+        }
+
+        public void ShowCurrentScenarioDialogue()
+        {
+            ScenarioDialogueLine line = scenarioDirector != null ? scenarioDirector.PeekDialogue() : null;
+            if (line == null)
+            {
+                HideScenarioDialogue();
+                ResumeAfterScenarioDialogue();
+                return;
+            }
+
+            battleHUD.ShowDialogue(
+                LocalizationService.Text(line.SpeakerNameKey, line.SpeakerFallback),
+                LocalizationService.Text(line.TextKey, line.TextFallback));
+        }
+
+        public void AdvanceScenarioDialogue()
+        {
+            if (scenarioDirector == null || !scenarioDirector.AdvanceDialogue())
+            {
+                HideScenarioDialogue();
+                ResumeAfterScenarioDialogue();
+                return;
+            }
+
+            ShowCurrentScenarioDialogue();
+        }
+
+        public void HideScenarioDialogue()
+        {
+            battleHUD.HideDialogue();
+        }
+
+        public bool HasScenarioFlag(string flagName)
+        {
+            return scenarioDirector != null && scenarioDirector.HasFlag(flagName);
+        }
+
+        public bool ProcessScenarioCheckpointAndEnterDialogue(ScenarioCheckpoint checkpoint, Type resumeStateType)
+        {
+            ProcessScenarioCheckpoint(checkpoint);
+            return TryEnterScenarioDialogue(resumeStateType);
         }
 
         public bool AreAllPlayerUnitsDone()
@@ -105,6 +166,13 @@ namespace PhalanxChronicle.Battle
         public void SelectUnit(string unitId)
         {
             selectedUnitId = unitId;
+            UnitRuntimeState selected = GetSelectedUnit();
+            if (selected != null)
+            {
+                selectedUnitOrigin = selected.Position;
+                hasSelectedUnitOrigin = true;
+            }
+
             RefreshAllVisuals();
         }
 
@@ -116,8 +184,13 @@ namespace PhalanxChronicle.Battle
         public void ClearSelectionAndHighlights()
         {
             selectedUnitId = null;
-            gridManager.ClearHighlights();
-            battleHUD.HideCombatBanner();
+            hasSelectedUnitOrigin = false;
+            ClearTargetPreview();
+            if (gridManager != null)
+            {
+                gridManager.ClearHighlights();
+            }
+
             RefreshAllVisuals();
         }
 
@@ -130,7 +203,7 @@ namespace PhalanxChronicle.Battle
             }
 
             gridManager.ClearHighlights();
-            gridManager.ShowMoveRange(simulation.GetMoveRange(selected.Id));
+            gridManager.ShowMoveRange(simulation.GetMoveDestinations(selected.Id));
             gridManager.ShowAttackRange(simulation.GetProjectedAttackRange(selected.Id));
             gridManager.HighlightSelectedCell(selected.Position);
             RefreshAllVisuals();
@@ -164,15 +237,14 @@ namespace PhalanxChronicle.Battle
             RefreshAllVisuals();
         }
 
-        public void ShowActionMenu(bool canAttack)
+        public void ShowActionMenu()
         {
             actionMenuPanel.Show(
-                canAttack,
-                GetSelectedActiveSkillDisplayName(),
-                HasSkillTargetsForSelection(),
+                BuildActionMenuModel(),
                 HandleAttackRequested,
                 HandleSkillRequested,
-                HandleWaitRequested);
+                HandleWaitRequested,
+                HandleBackRequested);
         }
 
         public void HideActionMenu()
@@ -189,7 +261,11 @@ namespace PhalanxChronicle.Battle
         public bool HasSkillTargetsForSelection()
         {
             UnitRuntimeState selected = GetSelectedUnit();
-            return selected != null && selected.CanUseSkill && simulation.GetSkillTargets(selected.Id).Count > 0;
+            int manaCost = selected == null ? 0 : ActiveSkillRules.GetManaCost(selected.ActiveSkill);
+            return selected != null
+                && selected.CanUseSkill
+                && selected.CurrentMana >= manaCost
+                && simulation.GetSkillTargets(selected.Id).Count > 0;
         }
 
         public bool TryMoveSelection(GridPosition position)
@@ -207,6 +283,50 @@ namespace PhalanxChronicle.Battle
             }
 
             return moved;
+        }
+
+        public bool HasSelectionMoved()
+        {
+            UnitRuntimeState selected = GetSelectedUnit();
+            return hasSelectedUnitOrigin && selected != null && selected.Position != selectedUnitOrigin;
+        }
+
+        public bool IsSelectionAtPosition(GridPosition position)
+        {
+            UnitRuntimeState selected = GetSelectedUnit();
+            return selected != null && selected.Position == position;
+        }
+
+        public bool TrySwitchSelectionTo(Unit unitView)
+        {
+            if (unitView == null || !CanSelectUnit(unitView) || IsSelectedUnit(unitView.UnitId) || HasSelectionMoved())
+            {
+                return false;
+            }
+
+            pendingCombatResult = null;
+            pendingSkillResult = null;
+            ClearTargetPreview();
+            SelectUnit(unitView.UnitId);
+            ShowMoveRangeForSelection();
+            return true;
+        }
+
+        public bool TryUndoSelectionMove()
+        {
+            UnitRuntimeState selected = GetSelectedUnit();
+            if (selected == null || !hasSelectedUnitOrigin || selected.Position == selectedUnitOrigin)
+            {
+                return false;
+            }
+
+            bool undone = simulation.TryUndoMoveUnit(selected.Id, selectedUnitOrigin);
+            if (undone)
+            {
+                RefreshAllVisuals();
+            }
+
+            return undone;
         }
 
         public bool TryAttackSelection(string targetUnitId)
@@ -294,11 +414,7 @@ namespace PhalanxChronicle.Battle
                 yield break;
             }
 
-            if (combatResult == null)
-            {
-                ChangeState<UnitSelectionState>();
-                yield break;
-            }
+            ChangeState<UnitSelectionState>();
         }
 
         public void WaitWithSelection()
@@ -334,27 +450,95 @@ namespace PhalanxChronicle.Battle
             return skillName;
         }
 
+        public string GetActionMenuInstructionText()
+        {
+            return HasSelectionMoved()
+                ? LocalizationService.Text("ui.log.choose_action_moved", "Choose Attack, Skill, Wait, or Back after moving.")
+                : LocalizationService.Text("ui.log.choose_action_hold", "Choose Attack, Skill, or Wait without moving.");
+        }
+
+        private BattleActionMenuModel BuildActionMenuModel()
+        {
+            UnitRuntimeState selected = GetSelectedUnit();
+            if (selected == null)
+            {
+                return new BattleActionMenuModel();
+            }
+
+            bool canAttack = HasAttackTargetsForSelection();
+            bool canUseSkill = HasSkillTargetsForSelection();
+            int skillManaCost = ActiveSkillRules.GetManaCost(selected.ActiveSkill);
+            bool moved = HasSelectionMoved();
+            string skillName = LocalizationService.Text(selected.ActiveSkillNameKey, selected.ActiveSkill.ToString());
+            string skillDetail;
+
+            if (selected.ActiveSkill == ActiveSkillType.None)
+            {
+                skillDetail = LocalizationService.Text("ui.action_menu.skill.none", "No active skill");
+            }
+            else if (selected.CurrentSkillCooldown > 0)
+            {
+                skillDetail = LocalizationService.Format(
+                    "ui.action_menu.skill.cooldown",
+                    "Cooldown {0}",
+                    selected.CurrentSkillCooldown);
+            }
+            else if (selected.CurrentMana < skillManaCost)
+            {
+                skillDetail = LocalizationService.Format(
+                    "ui.action_menu.skill.no_mana",
+                    "Not enough mana ({0}/{1})",
+                    selected.CurrentMana,
+                    selected.MaxMana);
+            }
+            else if (canUseSkill)
+            {
+                skillDetail = LocalizationService.Format(
+                    "ui.action_menu.skill.ready",
+                    "Skill ready") + " | " + LocalizationService.Format("ui.action_menu.skill.cost", "Cost {0} MP", skillManaCost);
+            }
+            else
+            {
+                skillDetail = LocalizationService.Text("ui.action_menu.skill.unavailable", "No valid target");
+            }
+
+            return new BattleActionMenuModel
+            {
+                Mode = moved ? BattleActionMenuMode.AfterMove : BattleActionMenuMode.HoldPosition,
+                ModeLabel = LocalizationService.Text(
+                    moved ? "ui.action_menu.mode.moved" : "ui.action_menu.mode.hold",
+                    moved ? "After Move" : "Hold Position"),
+                CanAttack = canAttack,
+                AttackDetail = LocalizationService.Text(
+                    canAttack ? "ui.action_menu.attack.ready" : "ui.action_menu.attack.unavailable",
+                    canAttack ? "Target in range" : "No target in range"),
+                SkillName = skillName,
+                CanUseSkill = canUseSkill,
+                SkillDetail = skillDetail,
+                WaitDetail = LocalizationService.Text("ui.action_menu.wait.detail", "End this unit's action"),
+                CanBack = moved,
+                BackDetail = LocalizationService.Text(
+                    moved ? "ui.action_menu.back.ready" : "ui.action_menu.back.unavailable",
+                    moved ? "Return to the original tile" : "No move to undo"),
+            };
+        }
+
         public void ResolvePlayerAction(string logMessage)
         {
             SetLog(logMessage);
+            PushBattleFeedEntry(logMessage);
             HideActionMenu();
-            battleHUD.HideCombatBanner();
-
-            if (simulation.Context.BattleEnded)
-            {
-                ChangeState(simulation.Context.WinningSide == TurnSide.Player ? typeof(BattleVictoryState) : typeof(BattleDefeatState));
-                return;
-            }
-
+            battleHUD.ClearForecast();
             ClearSelectionAndHighlights();
-            if (AreAllPlayerUnitsDone())
+
+            Type nextStateType = AreAllPlayerUnitsDone() ? typeof(EnemyTurnState) : typeof(UnitSelectionState);
+            if (HandlePostActionScenarioFlow(nextStateType))
             {
-                ChangeState<EnemyTurnState>();
                 return;
             }
 
             SetEndTurnEnabled(true);
-            ChangeState<UnitSelectionState>();
+            ChangeState(nextStateType);
         }
 
         public Coroutine StartManagedCoroutine(IEnumerator routine)
@@ -396,43 +580,55 @@ namespace PhalanxChronicle.Battle
                 if (actionResult.PerformedAttack)
                 {
                     yield return PlayCombatSequence(actionResult.CombatResult);
-                    SetLog(BuildCombatLog(actionResult.CombatResult));
+                    string logText = BuildCombatLog(actionResult.CombatResult);
+                    SetLog(logText);
+                    PushBattleFeedEntry(logText);
                 }
                 else if (actionResult.PerformedSkill)
                 {
                     yield return PlaySkillSequence(actionResult.SkillResult);
-                    SetLog(BuildSkillLog(actionResult.SkillResult));
+                    string logText = BuildSkillLog(actionResult.SkillResult);
+                    SetLog(logText);
+                    PushBattleFeedEntry(logText);
                 }
                 else
                 {
                     RefreshAllVisuals();
                     if (actionResult.EndPosition != actionResult.StartPosition)
                     {
-                        SetLog(LocalizationService.Format("ui.log.enemy_advanced", "{0} advanced.", GetUnitDisplayName(enemy.Id)));
+                        string logText = LocalizationService.Format("ui.log.enemy_advanced", "{0} advanced.", GetUnitDisplayName(enemy.Id));
+                        SetLog(logText);
+                        PushBattleFeedEntry(logText);
                     }
                     else
                     {
-                        SetLog(LocalizationService.Format("ui.log.enemy_held", "{0} held position.", GetUnitDisplayName(enemy.Id)));
+                        string logText = LocalizationService.Format("ui.log.enemy_held", "{0} held position.", GetUnitDisplayName(enemy.Id));
+                        SetLog(logText);
+                        PushBattleFeedEntry(logText);
                     }
                 }
 
                 yield return new WaitForSeconds(0.35f);
 
-                if (simulation.Context.BattleEnded)
+                if (HandlePostActionScenarioFlow(typeof(EnemyTurnState)))
                 {
-                    battleHUD.HideCombatBanner();
-                    ChangeState<BattleDefeatState>();
                     yield break;
                 }
             }
 
             simulation.EndCurrentTurn();
-            battleHUD.HideCombatBanner();
+            battleHUD.ClearForecast();
             ChangeState<PlayerTurnStartState>();
         }
 
         public void RefreshAllVisuals()
         {
+            if (simulation == null || gridManager == null)
+            {
+                return;
+            }
+
+            EnsureUnitViews();
             foreach (KeyValuePair<string, Unit> entry in unitViews)
             {
                 UnitRuntimeState runtimeState = simulation.Context.GetUnit(entry.Key);
@@ -445,7 +641,7 @@ namespace PhalanxChronicle.Battle
                 entry.Value.Sync(gridManager.GetWorldPosition(runtimeState.Position));
             }
 
-            UpdateSelectedHud();
+            UpdateHudModels();
         }
 
         private void Awake()
@@ -460,13 +656,13 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            if (stageDefinition == null)
+            if (scenarioDefinition == null)
             {
-                stageDefinition = StageDefinition.CreateDefault();
+                scenarioDefinition = BattleScenarioDefinition.CreateDefault();
             }
 
             RegisterStates();
-            LoadStage(stageDefinition.ToData());
+            LoadScenario(scenarioDefinition.ToData());
             initialized = true;
             ChangeState<BattleStartState>();
         }
@@ -490,7 +686,7 @@ namespace PhalanxChronicle.Battle
             GameObject hudObject = new GameObject("BattleHUD");
             hudObject.transform.SetParent(canvasObject.transform, false);
             battleHUD = hudObject.AddComponent<BattleHUD>();
-            battleHUD.Initialize(canvasObject.transform, HandleEndTurnRequested, HandleRerollRequested);
+            battleHUD.Initialize(canvasObject.transform, HandleEndTurnRequested, HandleRerollRequested, HandleDialogueAdvanceRequested);
 
             GameObject actionMenuObject = new GameObject("ActionMenuPanel");
             actionMenuObject.transform.SetParent(canvasObject.transform, false);
@@ -512,16 +708,30 @@ namespace PhalanxChronicle.Battle
                 Destroy(unitRoot.transform.GetChild(index).gameObject);
             }
 
+            EnsureUnitViews();
+            RefreshAllVisuals();
+        }
+
+        private void EnsureUnitViews()
+        {
+            if (simulation == null || unitRoot == null)
+            {
+                return;
+            }
+
             foreach (UnitRuntimeState runtimeState in simulation.Context.Units)
             {
+                if (unitViews.ContainsKey(runtimeState.Id))
+                {
+                    continue;
+                }
+
                 GameObject unitObject = new GameObject(runtimeState.Id);
                 unitObject.transform.SetParent(unitRoot.transform, false);
                 Unit unitView = unitObject.AddComponent<Unit>();
-                unitView.Initialize(runtimeState, OnUnitClicked);
+                unitView.Initialize(runtimeState, OnUnitClicked, OnUnitHoverChanged);
                 unitViews[runtimeState.Id] = unitView;
             }
-
-            RefreshAllVisuals();
         }
 
         private void ConfigureCamera()
@@ -534,7 +744,7 @@ namespace PhalanxChronicle.Battle
 
             mainCamera.clearFlags = CameraClearFlags.SolidColor;
             mainCamera.orthographic = true;
-            mainCamera.backgroundColor = new Color(0.58f, 0.63f, 0.52f, 1f);
+            mainCamera.backgroundColor = new Color(0.31f, 0.34f, 0.28f, 1f);
             mainCamera.transform.position = new Vector3(0f, 0f, -10f);
             mainCamera.orthographicSize = Mathf.Max(simulation.Context.Width, simulation.Context.Height) * 0.68f;
         }
@@ -550,49 +760,105 @@ namespace PhalanxChronicle.Battle
             states[typeof(UnitSkillTargetState)] = new UnitSkillTargetState(this);
             states[typeof(UnitActionExecuteState)] = new UnitActionExecuteState(this);
             states[typeof(EnemyTurnState)] = new EnemyTurnState(this);
+            states[typeof(ScenarioDialogueState)] = new ScenarioDialogueState(this);
             states[typeof(BattleVictoryState)] = new BattleVictoryState(this);
             states[typeof(BattleDefeatState)] = new BattleDefeatState(this);
         }
 
         private void OnUnitClicked(Unit unitView)
         {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
             currentState?.OnUnitClicked(unitView);
+        }
+
+        private void OnUnitHoverChanged(Unit unitView, bool isHovered)
+        {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
+            currentState?.OnUnitHovered(unitView, isHovered);
         }
 
         private void OnCellClicked(GridCellView cellView)
         {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
             currentState?.OnCellClicked(cellView.Position);
         }
 
         private void HandleAttackRequested()
         {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
             currentState?.OnAttackRequested();
         }
 
         private void HandleSkillRequested()
         {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
             currentState?.OnSkillRequested();
         }
 
         private void HandleWaitRequested()
         {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
             currentState?.OnWaitRequested();
+        }
+
+        private void HandleBackRequested()
+        {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
+            currentState?.OnBackRequested();
         }
 
         private void HandleEndTurnRequested()
         {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
             currentState?.OnEndTurnRequested();
         }
 
         private void HandleRerollRequested()
         {
-            if (stageDefinition == null || !stageDefinition.UseRandomMap)
+            if (IsInteractionLocked() || scenarioData == null || !scenarioData.Stage.IsRandomMap)
             {
                 return;
             }
 
-            LoadStage(stageDefinition.CreateRerolledData());
+            LoadScenario(scenarioDefinition.ToData());
             ChangeState<BattleStartState>();
+        }
+
+        private void HandleDialogueAdvanceRequested()
+        {
+            currentState?.OnConfirmRequested();
         }
 
         private UnitRuntimeState GetSelectedUnit()
@@ -605,44 +871,26 @@ namespace PhalanxChronicle.Battle
             return unitViews.TryGetValue(unitId, out Unit unitView) ? unitView : null;
         }
 
-        private void UpdateSelectedHud()
+        private void UpdateHudModels()
         {
-            UnitRuntimeState selected = GetSelectedUnit();
-            if (selected == null)
+            if (battleHUD == null || simulation == null)
             {
-                battleHUD.SetSelectedUnit(LocalizationService.Text("ui.selected.none", "Selected: None"));
                 return;
             }
 
-            string status = selected.HasActed
-                ? LocalizationService.Text("ui.status.done", "DONE")
-                : LocalizationService.Text("ui.status.ready", "READY");
-            string passiveDescription = LocalizationService.Text(selected.PassiveSkillDescriptionKey, selected.PassiveSkill.ToString());
-            string activeDescription = LocalizationService.Text(selected.ActiveSkillDescriptionKey, selected.ActiveSkill.ToString());
-            string cooldownText = selected.ActiveSkill == ActiveSkillType.None
-                ? LocalizationService.Text("ui.cooldown.none", "-")
-                : (selected.CurrentSkillCooldown > 0
-                    ? LocalizationService.Format("ui.cooldown.value", "CD {0}", selected.CurrentSkillCooldown)
-                    : LocalizationService.Text("ui.cooldown.ready", "Ready"));
-            string statusSummary = BuildStatusSummary(selected);
-            battleHUD.SetSelectedUnit(LocalizationService.Format(
-                "ui.selected.summary",
-                "Selected: {0}\nRole {1}\nPassive {2}  Active {3}\nHP {4}/{5}  ATK {6}  DEF {7}  MOVE {8}  RANGE {9}  {10}",
-                GetUnitDisplayName(selected.Id),
-                LocalizationService.Text(selected.RoleNameKey, selected.Role.ToString()),
-                LocalizationService.Text(selected.PassiveSkillNameKey, selected.PassiveSkill.ToString()),
-                LocalizationService.Text(selected.ActiveSkillNameKey, selected.ActiveSkill.ToString()),
-                selected.CurrentHp,
-                selected.MaxHp,
-                selected.Attack + PassiveSkillRules.GetAttackBonus(simulation.Context, selected) + StatusEffectRules.GetAttackModifier(selected),
-                selected.Defense + PassiveSkillRules.GetDefenseBonus(selected) + StatusEffectRules.GetDefenseModifier(selected),
-                PassiveSkillRules.GetMoveRange(selected),
-                PassiveSkillRules.GetAttackRange(selected),
-                status) +
-                "\n" + LocalizationService.Text("ui.label.cooldown", "Cooldown") + ": " + cooldownText +
-                "    " + LocalizationService.Text("ui.label.status", "Status") + ": " + statusSummary +
-                "\n" + passiveDescription +
-                "\n" + activeDescription);
+            BattleThreatSummary threatSummary = null;
+            UnitRuntimeState selected = GetSelectedUnit();
+            if (selected != null)
+            {
+                threatSummary = BattleThreatAnalyzer.Analyze(simulation.Context, selected);
+            }
+
+            battleHUD.BindOverview(BuildOverviewModel());
+            battleHUD.BindSelectedUnit(BuildSelectedUnitModel(selected, threatSummary));
+            battleHUD.BindRoster(
+                BuildRosterEntries(UnitFaction.Player, threatSummary),
+                BuildRosterEntries(UnitFaction.Enemy, threatSummary),
+                HandleHudUnitRequested);
         }
 
         private IEnumerator PlaySkillSequence(SkillResult skillResult)
@@ -654,15 +902,14 @@ namespace PhalanxChronicle.Battle
 
             Unit casterView = GetUnitView(skillResult.CasterUnitId);
             Unit primaryTargetView = GetUnitView(skillResult.PrimaryTargetUnitId);
-            string casterName = GetUnitDisplayName(skillResult.CasterUnitId);
-            string skillName = GetSkillDisplayName(skillResult.CasterUnitId, skillResult.SkillType);
-            string detail = BuildSkillBannerDetail(skillResult);
+            battleHUD.BindForecast(BuildSkillResultForecastModel(skillResult));
 
-            battleHUD.ShowCombatBanner(
-                LocalizationService.Format("ui.skill.banner", "{0} uses {1}", casterName, skillName),
-                detail);
+            if (casterView != null)
+            {
+                yield return SkillVisualEffects.PlayCasterEffect(skillResult.SkillType, casterView, primaryTargetView);
+            }
 
-            if (casterView != null && primaryTargetView != null && ActiveSkillRules.IsOffensiveSkill(skillResult.SkillType))
+            if (casterView != null && primaryTargetView != null && SkillVisualEffects.ShouldAnimateLunge(skillResult.SkillType))
             {
                 yield return casterView.AnimateAttack(primaryTargetView.transform.position);
             }
@@ -677,12 +924,13 @@ namespace PhalanxChronicle.Battle
 
                 if (effect.IsHealing)
                 {
+                    yield return SkillVisualEffects.PlayTargetEffect(skillResult.SkillType, targetView, effect.UnitId == skillResult.PrimaryTargetUnitId);
                     FloatingText.Spawn("+" + effect.Amount, targetView.GetAnchorPosition(0.98f), new Color(0.54f, 1f, 0.62f, 1f));
                     yield return targetView.AnimatePulse(new Color(0.7f, 1f, 0.78f, 1f));
                 }
-                else
+                else if (effect.Amount > 0)
                 {
-                    yield return PlaySlashEffect(targetView.GetAnchorPosition(0.12f));
+                    yield return SkillVisualEffects.PlayTargetEffect(skillResult.SkillType, targetView, effect.UnitId == skillResult.PrimaryTargetUnitId);
                     FloatingText.Spawn("-" + effect.Amount, targetView.GetAnchorPosition(0.98f), new Color(1f, 0.89f, 0.4f, 1f));
                     yield return targetView.AnimateHit();
 
@@ -690,6 +938,11 @@ namespace PhalanxChronicle.Battle
                     {
                         FloatingText.Spawn(LocalizationService.Text("ui.combat.popup_ko", "KO"), targetView.GetAnchorPosition(1.24f), new Color(1f, 0.56f, 0.42f, 1f));
                     }
+                }
+                else
+                {
+                    yield return SkillVisualEffects.PlayTargetEffect(skillResult.SkillType, targetView, effect.UnitId == skillResult.PrimaryTargetUnitId);
+                    yield return targetView.AnimatePulse(new Color(0.75f, 0.72f, 1f, 1f));
                 }
 
                 if (effect.AppliedStatus != StatusEffectType.None)
@@ -701,7 +954,7 @@ namespace PhalanxChronicle.Battle
             }
 
             yield return new WaitForSeconds(0.18f);
-            battleHUD.HideCombatBanner();
+            battleHUD.ClearForecast();
             RefreshAllVisuals();
         }
 
@@ -714,15 +967,7 @@ namespace PhalanxChronicle.Battle
 
             Unit attackerView = GetUnitView(combatResult.AttackerUnitId);
             Unit defenderView = GetUnitView(combatResult.DefenderUnitId);
-            string attackerName = GetUnitDisplayName(combatResult.AttackerUnitId);
-            string defenderName = GetUnitDisplayName(combatResult.DefenderUnitId);
-            string detail = combatResult.DefenderDied
-                ? LocalizationService.Format("ui.combat.ko", "-{0} HP   KO", combatResult.Damage)
-                : LocalizationService.Format("ui.combat.damage", "-{0} HP   {1} left", combatResult.Damage, combatResult.DefenderRemainingHp);
-
-            battleHUD.ShowCombatBanner(
-                LocalizationService.Format("ui.combat.banner", "{0} strikes {1}", attackerName, defenderName),
-                detail);
+            battleHUD.BindForecast(BuildCombatResultForecastModel(combatResult));
 
             if (attackerView != null && defenderView != null)
             {
@@ -738,7 +983,7 @@ namespace PhalanxChronicle.Battle
             }
 
             yield return new WaitForSeconds(0.18f);
-            battleHUD.HideCombatBanner();
+            battleHUD.ClearForecast();
             RefreshAllVisuals();
         }
 
@@ -783,6 +1028,436 @@ namespace PhalanxChronicle.Battle
             return LocalizationService.Format("ui.skill.log.use", "{0} used {1}.", casterName, skillName);
         }
 
+        private BattleOverviewModel BuildOverviewModel()
+        {
+            ObjectiveState objective = scenarioDirector != null ? scenarioDirector.CurrentObjective : null;
+            BattleContext context = simulation.Context;
+            int playerAlive = context.GetUnits(UnitFaction.Player).Count;
+            int enemyAlive = context.GetUnits(UnitFaction.Enemy).Count;
+            int playerTotal = context.Units.Count(unit => unit.Faction == UnitFaction.Player);
+            int enemyTotal = context.Units.Count(unit => unit.Faction == UnitFaction.Enemy);
+            int readyUnits = context.Units.Count(unit => unit.Faction == UnitFaction.Player && unit.IsAlive && !unit.HasActed);
+            int skillReadyUnits = context.Units.Count(unit => unit.Faction == UnitFaction.Player && unit.IsAlive && !unit.HasActed && unit.CanUseSkill);
+
+            return new BattleOverviewModel
+            {
+                StageLabel = LocalizationService.Format("ui.stage", "Stage: {0}", LocalizationService.Text(context.StageNameKey, context.StageName)),
+                SeedLabel = context.IsRandomMap
+                    ? LocalizationService.Format("ui.seed.value", "Seed: {0}", context.MapSeed)
+                    : LocalizationService.Text("ui.seed.fixed", "Seed: Fixed"),
+                PhaseLabel = string.IsNullOrEmpty(currentTurnText)
+                    ? LocalizationService.Text(
+                        context.CurrentTurnSide == TurnSide.Player ? "ui.turn.player" : "ui.turn.enemy",
+                        context.CurrentTurnSide == TurnSide.Player ? "Turn: Player Phase" : "Turn: Enemy Phase")
+                    : currentTurnText,
+                TurnLabel = LocalizationService.Format("ui.turn.count", "Turn {0}", context.TurnNumber),
+                PlayerAliveLabel = LocalizationService.Format("ui.overview.player_force", "Allies {0}/{1}", playerAlive, playerTotal),
+                EnemyAliveLabel = LocalizationService.Format("ui.overview.enemy_force", "Enemies {0}/{1}", enemyAlive, enemyTotal),
+                ReadyLabel = LocalizationService.Format("ui.overview.ready_units", "Ready units {0}", readyUnits),
+                SkillReadyLabel = LocalizationService.Format("ui.overview.skill_ready", "Skills ready {0}", skillReadyUnits),
+                ObjectivePrimary = LocalizationService.Format(
+                    "ui.objective.primary",
+                    "Primary: {0}",
+                    objective != null ? LocalizationService.Text(objective.PrimaryObjectiveKey, objective.PrimaryObjectiveFallback) : "-"),
+                ObjectiveFailure = LocalizationService.Format(
+                    "ui.objective.failure",
+                    "Fail: {0}",
+                    objective != null ? LocalizationService.Text(objective.FailureConditionKey, objective.FailureConditionFallback) : "-"),
+                InstructionText = currentInstructionText,
+            };
+        }
+
+        private BattleSelectedUnitModel BuildSelectedUnitModel(UnitRuntimeState selected, BattleThreatSummary threatSummary)
+        {
+            if (selected == null)
+            {
+                return new BattleSelectedUnitModel();
+            }
+
+            RoleLoadoutProfile loadoutProfile = RoleLoadoutCatalog.GetProfile(selected.Role);
+            string cooldownText = selected.ActiveSkill == ActiveSkillType.None
+                ? LocalizationService.Format("ui.label.cooldown_value", "Cooldown: {0}", LocalizationService.Text("ui.cooldown.none", "-"))
+                : LocalizationService.Format(
+                    "ui.label.cooldown_value",
+                    "Cooldown: {0}",
+                    selected.CurrentSkillCooldown > 0
+                        ? LocalizationService.Format("ui.cooldown.value", "CD {0}", selected.CurrentSkillCooldown)
+                        : LocalizationService.Text("ui.cooldown.ready", "Ready"));
+
+            string threatSummaryText = threatSummary == null || threatSummary.ThreateningEnemyCount == 0
+                ? LocalizationService.Text("ui.threat.none", "No immediate enemy threat.")
+                : LocalizationService.Format(
+                    "ui.threat.summary",
+                    "Threats {0} | Max incoming {1}",
+                    threatSummary.ThreateningEnemyCount,
+                    threatSummary.MaxProjectedDamage);
+            string threatDetailText = threatSummary == null || threatSummary.ThreateningEnemyCount == 0
+                ? string.Empty
+                : LocalizationService.Format(
+                    "ui.threat.detail",
+                    "Threatened by: {0}",
+                    string.Join(", ", threatSummary.ThreateningUnitIds.Select(GetUnitDisplayName)));
+
+            return new BattleSelectedUnitModel
+            {
+                HasSelection = true,
+                UnitId = selected.Id,
+                DisplayName = GetUnitDisplayName(selected.Id),
+                Role = selected.Role,
+                RoleLabel = LocalizationService.Text(selected.RoleNameKey, selected.Role.ToString()),
+                PositionLabel = LocalizationService.Format("ui.position.value", "Position ({0}, {1})", selected.Position.X, selected.Position.Y),
+                Faction = selected.Faction,
+                CurrentHp = selected.CurrentHp,
+                MaxHp = selected.MaxHp,
+                CurrentMana = selected.CurrentMana,
+                MaxMana = selected.MaxMana,
+                Attack = selected.Attack + PassiveSkillRules.GetAttackBonus(simulation.Context, selected) + StatusEffectRules.GetAttackModifier(selected),
+                Defense = selected.Defense + PassiveSkillRules.GetDefenseBonus(selected) + StatusEffectRules.GetDefenseModifier(selected),
+                MoveRange = PassiveSkillRules.GetMoveRange(selected),
+                AttackRange = PassiveSkillRules.GetAttackRange(selected),
+                WeaponTypeLabel = LocalizationService.Text(loadoutProfile.WeaponTypeKey, loadoutProfile.WeaponTypeFallback),
+                WeaponName = LocalizationService.Text(loadoutProfile.WeaponNameKey, loadoutProfile.WeaponNameFallback),
+                WeaponDescription = LocalizationService.Text(loadoutProfile.WeaponDescriptionKey, loadoutProfile.WeaponDescriptionFallback),
+                WeaponAccentColor = loadoutProfile.AccentColor,
+                PassiveName = LocalizationService.Text(selected.PassiveSkillNameKey, selected.PassiveSkill.ToString()),
+                PassiveDescription = LocalizationService.Text(selected.PassiveSkillDescriptionKey, selected.PassiveSkill.ToString()),
+                ActiveName = LocalizationService.Text(selected.ActiveSkillNameKey, selected.ActiveSkill.ToString()),
+                ActiveDescription = LocalizationService.Text(selected.ActiveSkillDescriptionKey, selected.ActiveSkill.ToString()),
+                CooldownLabel = cooldownText,
+                StatusSummary = LocalizationService.Format("ui.label.status_value", "Status: {0}", BuildStatusSummary(selected)),
+                ActionSummary = LocalizationService.Format(
+                    "ui.label.action_state",
+                    "Action state: {0}",
+                    selected.HasActed
+                        ? LocalizationService.Text("ui.status.done", "DONE")
+                        : LocalizationService.Text("ui.status.ready", "READY")),
+                ThreatSummary = threatSummaryText,
+                ThreatDetail = threatDetailText,
+            };
+        }
+
+        private IReadOnlyList<BattleRosterEntryModel> BuildRosterEntries(UnitFaction faction, BattleThreatSummary threatSummary)
+        {
+            HashSet<string> threateningIds = faction == UnitFaction.Enemy && threatSummary != null
+                ? new HashSet<string>(threatSummary.ThreateningUnitIds)
+                : new HashSet<string>();
+
+            return simulation.Context.Units
+                .Where(unit => unit.Faction == faction)
+                .OrderBy(unit => unit.IsAlive ? (unit.HasActed ? 1 : 0) : 2)
+                .ThenBy(unit => unit.Position.Y)
+                .ThenBy(unit => unit.Position.X)
+                .ThenBy(unit => unit.Id)
+                .Select(unit => new BattleRosterEntryModel
+                {
+                    UnitId = unit.Id,
+                    DisplayName = GetUnitDisplayName(unit.Id),
+                    RoleShortLabel = GetRoleShortLabel(unit.Role),
+                    PositionLabel = LocalizationService.Format("ui.position.compact", "({0},{1})", unit.Position.X, unit.Position.Y),
+                    StatusLabel = BuildRosterStatusLabel(unit),
+                    SkillLabel = BuildRosterSkillLabel(unit),
+                    Faction = unit.Faction,
+                    CurrentHp = unit.CurrentHp,
+                    MaxHp = unit.MaxHp,
+                    IsAlive = unit.IsAlive,
+                    HasActed = unit.HasActed,
+                    CanUseSkill = unit.CanUseSkill,
+                    IsSelected = unit.Id == selectedUnitId,
+                    IsThreateningSelection = threateningIds.Contains(unit.Id),
+                })
+                .ToList();
+        }
+
+        private void HandleHudUnitRequested(string unitId)
+        {
+            if (IsInteractionLocked())
+            {
+                return;
+            }
+
+            Unit unitView = GetUnitView(unitId);
+            if (unitView == null)
+            {
+                return;
+            }
+
+            currentState?.OnUnitClicked(unitView);
+        }
+
+        public void PreviewAttackTarget(Unit unitView, bool isHovered)
+        {
+            if (!isHovered)
+            {
+                ClearTargetPreview();
+                return;
+            }
+
+            UnitRuntimeState selected = GetSelectedUnit();
+            if (selected == null || unitView == null || unitView.RuntimeState == null)
+            {
+                ClearTargetPreview();
+                return;
+            }
+
+            UnitRuntimeState target = unitView.RuntimeState;
+            if (target.Faction == selected.Faction || !simulation.GetAttackableTargets(selected.Id).Any(candidate => candidate.Id == target.Id))
+            {
+                ClearTargetPreview();
+                return;
+            }
+
+            battleHUD.BindForecast(BuildAttackPreviewModel(selected, target));
+        }
+
+        public void PreviewSkillTarget(Unit unitView, bool isHovered)
+        {
+            if (!isHovered)
+            {
+                ClearTargetPreview();
+                ShowSkillRangeForSelection();
+                return;
+            }
+
+            UnitRuntimeState selected = GetSelectedUnit();
+            if (selected == null || unitView == null || unitView.RuntimeState == null)
+            {
+                ClearTargetPreview();
+                ShowSkillRangeForSelection();
+                return;
+            }
+
+            UnitRuntimeState target = unitView.RuntimeState;
+            if (!simulation.GetSkillTargets(selected.Id).Any(candidate => candidate.Id == target.Id))
+            {
+                ClearTargetPreview();
+                ShowSkillRangeForSelection();
+                return;
+            }
+
+            battleHUD.BindForecast(BuildSkillPreviewModel(selected, target));
+            RefreshSkillTargetPreview(selected, target);
+        }
+
+        public void ClearTargetPreview()
+        {
+            if (battleHUD != null)
+            {
+                battleHUD.ClearForecast();
+            }
+        }
+
+        private void RefreshSkillTargetPreview(UnitRuntimeState caster, UnitRuntimeState target)
+        {
+            if (caster == null || target == null)
+            {
+                return;
+            }
+
+            if (gridManager == null || simulation == null)
+            {
+                return;
+            }
+
+            IReadOnlyList<UnitRuntimeState> affectedUnits = simulation.GetSkillAffectedTargets(caster.Id, target.Id);
+            gridManager.ClearHighlights();
+            gridManager.ShowSkillRange(simulation.GetSkillRange(caster.Id));
+            gridManager.HighlightSelectedCell(caster.Position);
+
+            if (affectedUnits.Count > 1)
+            {
+                gridManager.ShowAttackRange(affectedUnits.Select(unit => unit.Position));
+            }
+        }
+
+        private BattleForecastModel BuildAttackPreviewModel(UnitRuntimeState attacker, UnitRuntimeState defender)
+        {
+            int damage = BattlePreviewCalculator.EstimateAttackDamage(simulation.Context, attacker, attacker.Position, defender);
+            bool defenderFalls = damage >= defender.CurrentHp;
+            return new BattleForecastModel
+            {
+                Header = LocalizationService.Text("ui.forecast.attack.header", "Attack Forecast"),
+                Title = LocalizationService.Format("ui.forecast.attack.title", "{0} -> {1}", GetUnitDisplayName(attacker.Id), GetUnitDisplayName(defender.Id)),
+                Summary = defenderFalls
+                    ? LocalizationService.Format("ui.forecast.attack.ko", "Projected damage {0} | KO", damage)
+                    : LocalizationService.Format("ui.forecast.attack.damage", "Projected damage {0} | {1} HP left", damage, Mathf.Max(0, defender.CurrentHp - damage)),
+                Detail = LocalizationService.Format(
+                    "ui.forecast.attack.detail",
+                    "ATK {0} vs DEF {1}",
+                    attacker.Attack + PassiveSkillRules.GetAttackBonus(simulation.Context, attacker) + StatusEffectRules.GetAttackModifier(attacker),
+                    defender.Defense + PassiveSkillRules.GetDefenseBonus(defender) + StatusEffectRules.GetDefenseModifier(defender)),
+                Footer = BuildAttackForecastFooter(attacker, defender),
+                AccentColor = attacker.Faction == UnitFaction.Player ? new Color(0.28f, 0.58f, 0.98f, 1f) : new Color(0.92f, 0.36f, 0.28f, 1f),
+            };
+        }
+
+        private BattleForecastModel BuildSkillPreviewModel(UnitRuntimeState caster, UnitRuntimeState primaryTarget)
+        {
+            string skillName = GetSkillDisplayName(caster.Id, caster.ActiveSkill);
+            string title = LocalizationService.Format("ui.forecast.skill.title", "{0} -> {1}", skillName, GetUnitDisplayName(primaryTarget.Id));
+            string manaText = LocalizationService.Format("ui.skill.mana_cost", "Cost {0} MP", ActiveSkillRules.GetManaCost(caster.ActiveSkill));
+            string summary;
+            string detail;
+            string footer = string.Empty;
+            Color accent = caster.Faction == UnitFaction.Player ? new Color(0.27f, 0.65f, 0.98f, 1f) : new Color(0.92f, 0.36f, 0.28f, 1f);
+
+            switch (caster.ActiveSkill)
+            {
+                case ActiveSkillType.RoyalAid:
+                    int healAmount = BattlePreviewCalculator.EstimateHealing(primaryTarget, ActiveSkillRules.GetRoyalAidAmount());
+                    summary = LocalizationService.Format("ui.forecast.skill.heal", "Heal {0} HP", healAmount);
+                    detail = LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Inspired));
+                    footer = manaText;
+                    accent = new Color(0.34f, 0.82f, 0.58f, 1f);
+                    break;
+                case ActiveSkillType.PowerStrike:
+                    int powerStrikeDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                        simulation.Context,
+                        caster,
+                        caster.Position,
+                        primaryTarget,
+                        ActiveSkillRules.GetPowerStrikeBonus());
+                    bool powerStrikeKo = powerStrikeDamage >= primaryTarget.CurrentHp;
+                    summary = powerStrikeKo
+                        ? LocalizationService.Format("ui.forecast.attack.ko", "Projected damage {0} | KO", powerStrikeDamage)
+                        : LocalizationService.Format("ui.forecast.attack.damage", "Projected damage {0} | {1} HP left", powerStrikeDamage, Mathf.Max(0, primaryTarget.CurrentHp - powerStrikeDamage));
+                    detail = powerStrikeKo
+                        ? LocalizationService.Text("ui.forecast.skill.power_strike_ko", "The target falls before armor can shatter.")
+                        : LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.ShatteredArmor));
+                    footer = manaText;
+                    break;
+                case ActiveSkillType.Volley:
+                    IReadOnlyList<UnitRuntimeState> volleyTargets = BattlePreviewCalculator.GetVolleyTargets(simulation.Context, primaryTarget);
+                    int volleyPrimaryDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                        simulation.Context,
+                        caster,
+                        caster.Position,
+                        primaryTarget,
+                        ActiveSkillRules.GetVolleyBonus());
+                    summary = LocalizationService.Format(
+                        "ui.forecast.skill.volley",
+                        "Primary {0} | Splash {1} | {2} targets",
+                        volleyPrimaryDamage,
+                        Mathf.Max(0, volleyTargets.Count - 1),
+                        volleyTargets.Count);
+                    detail = LocalizationService.Format(
+                        "ui.forecast.skill.targets",
+                        "Affects {0}",
+                        string.Join(", ", volleyTargets.Select(unit => GetUnitDisplayName(unit.Id))));
+                    footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0} to surviving targets", GetStatusDisplayName(StatusEffectType.ShatteredArmor)) + " | " + manaText;
+                    break;
+                case ActiveSkillType.GreenDragonSlash:
+                    IReadOnlyList<UnitRuntimeState> slashTargets = BattlePreviewCalculator.GetGreenDragonSlashTargets(simulation.Context, caster.Position, primaryTarget);
+                    int slashDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                        simulation.Context,
+                        caster,
+                        caster.Position,
+                        primaryTarget,
+                        ActiveSkillRules.GetGreenDragonSlashBonus());
+                    summary = LocalizationService.Format(
+                        "ui.forecast.skill.green_dragon",
+                        "Primary {0} | Cleave {1}",
+                        slashDamage,
+                        slashTargets.Count);
+                    detail = LocalizationService.Format(
+                        "ui.forecast.skill.targets",
+                        "Affects {0}",
+                        string.Join(", ", slashTargets.Select(unit => GetUnitDisplayName(unit.Id))));
+                    footer = manaText;
+                    break;
+                case ActiveSkillType.WarCry:
+                    IReadOnlyList<UnitRuntimeState> warCryTargets = simulation.Context.GetUnits(primaryTarget.Faction)
+                        .Where(unit => caster.Position.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(caster))
+                        .OrderBy(unit => caster.Position.ManhattanDistance(unit.Position))
+                        .ThenBy(unit => unit.Id)
+                        .ToList();
+                    summary = LocalizationService.Format("ui.forecast.skill.war_cry", "Affects {0} nearby foes", warCryTargets.Count);
+                    detail = LocalizationService.Format("ui.forecast.skill.targets", "Affects {0}", string.Join(", ", warCryTargets.Select(unit => GetUnitDisplayName(unit.Id))));
+                    footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Intimidated)) + " | " + manaText;
+                    break;
+                default:
+                    summary = LocalizationService.Text("ui.forecast.skill.none", "No forecast available.");
+                    detail = string.Empty;
+                    break;
+            }
+
+            return new BattleForecastModel
+            {
+                Header = LocalizationService.Text("ui.forecast.skill.header", "Skill Forecast"),
+                Title = title,
+                Summary = summary,
+                Detail = detail,
+                Footer = footer,
+                AccentColor = accent,
+            };
+        }
+
+        private BattleForecastModel BuildCombatResultForecastModel(CombatResult combatResult)
+        {
+            string attackerName = GetUnitDisplayName(combatResult.AttackerUnitId);
+            string defenderName = GetUnitDisplayName(combatResult.DefenderUnitId);
+            return new BattleForecastModel
+            {
+                Header = LocalizationService.Text("ui.forecast.result.header", "Battle Result"),
+                Title = LocalizationService.Format("ui.combat.banner", "{0} strikes {1}", attackerName, defenderName),
+                Summary = combatResult.DefenderDied
+                    ? LocalizationService.Format("ui.combat.ko", "-{0} HP   KO", combatResult.Damage)
+                    : LocalizationService.Format("ui.combat.damage", "-{0} HP   {1} left", combatResult.Damage, combatResult.DefenderRemainingHp),
+                Detail = string.Empty,
+                Footer = BuildCombatLog(combatResult),
+                AccentColor = new Color(0.96f, 0.42f, 0.26f, 1f),
+            };
+        }
+
+        private BattleForecastModel BuildSkillResultForecastModel(SkillResult skillResult)
+        {
+            string casterName = GetUnitDisplayName(skillResult.CasterUnitId);
+            string skillName = GetSkillDisplayName(skillResult.CasterUnitId, skillResult.SkillType);
+            return new BattleForecastModel
+            {
+                Header = LocalizationService.Text("ui.forecast.result.header", "Battle Result"),
+                Title = LocalizationService.Format("ui.skill.banner", "{0} uses {1}", casterName, skillName),
+                Summary = BuildSkillBannerDetail(skillResult),
+                Detail = skillResult.Effects.Count > 1
+                    ? LocalizationService.Format("ui.forecast.skill.targets", "Affects {0}", string.Join(", ", skillResult.Effects.Select(effect => GetUnitDisplayName(effect.UnitId))))
+                    : string.Empty,
+                Footer = BuildSkillLog(skillResult),
+                AccentColor = new Color(0.32f, 0.72f, 0.98f, 1f),
+            };
+        }
+
+        private string BuildAttackForecastFooter(UnitRuntimeState attacker, UnitRuntimeState defender)
+        {
+            List<string> notes = new List<string>();
+            if (PassiveSkillRules.GetAttackBonus(simulation.Context, attacker) > 0)
+            {
+                notes.Add(LocalizationService.Text("skill.command_aura.name", "Command Aura"));
+            }
+
+            if (PassiveSkillRules.GetDamageBonus(attacker) > 0)
+            {
+                notes.Add(LocalizationService.Text("skill.vanguard.name", "Vanguard"));
+            }
+
+            if (PassiveSkillRules.GetIgnoredDefense(attacker) > 0)
+            {
+                notes.Add(LocalizationService.Text("skill.armor_break.name", "Armor Break"));
+            }
+
+            if (StatusEffectRules.GetDefenseModifier(defender) < 0)
+            {
+                notes.Add(GetStatusDisplayName(StatusEffectType.ShatteredArmor));
+            }
+
+            return notes.Count == 0
+                ? LocalizationService.Text("ui.forecast.no_modifier", "No extra combat modifiers.")
+                : string.Join(" | ", notes);
+        }
+
+        private void PushBattleFeedEntry(string text)
+        {
+            battleHUD.PushFeedEntry(text);
+        }
+
         private string BuildSkillBannerDetail(SkillResult skillResult)
         {
             if (skillResult.Effects == null || skillResult.Effects.Count == 0)
@@ -794,6 +1469,11 @@ namespace PhalanxChronicle.Battle
             {
                 int total = skillResult.Effects.Sum(effect => effect.Amount);
                 return LocalizationService.Format("ui.skill.detail.heal", "+{0} HP", total);
+            }
+
+            if (skillResult.Effects.All(effect => !effect.IsHealing && effect.Amount <= 0 && effect.AppliedStatus != StatusEffectType.None))
+            {
+                return LocalizationService.Format("ui.skill.detail.status", "{0} units afflicted", skillResult.Effects.Count);
             }
 
             if (skillResult.Effects.Count == 1)
@@ -828,6 +1508,8 @@ namespace PhalanxChronicle.Battle
                     return LocalizationService.Text("status.inspired.name", "Inspired");
                 case StatusEffectType.ShatteredArmor:
                     return LocalizationService.Text("status.shattered_armor.name", "Shattered Armor");
+                case StatusEffectType.Intimidated:
+                    return LocalizationService.Text("status.intimidated.name", "Intimidated");
                 default:
                     return statusEffectType.ToString();
             }
@@ -843,19 +1525,73 @@ namespace PhalanxChronicle.Battle
             return string.Join(", ", unit.StatusEffects.Select(effect => GetStatusDisplayName(effect.Type)));
         }
 
-        private void ChangeState(Type stateType)
+        private string BuildRosterStatusLabel(UnitRuntimeState unit)
         {
-            if (stateType == typeof(BattleVictoryState))
+            if (!unit.IsAlive)
             {
-                ChangeState<BattleVictoryState>();
+                return LocalizationService.Text("ui.roster.defeated", "Defeated");
             }
-            else if (stateType == typeof(BattleDefeatState))
+
+            string actionState = unit.HasActed
+                ? LocalizationService.Text("ui.roster.done", "Done")
+                : LocalizationService.Text("ui.roster.ready", "Ready");
+            if (unit.StatusEffects.Count == 0)
             {
-                ChangeState<BattleDefeatState>();
+                return actionState;
+            }
+
+            return actionState + " | " + BuildStatusSummary(unit);
+        }
+
+        private string BuildRosterSkillLabel(UnitRuntimeState unit)
+        {
+            if (!unit.IsAlive || unit.ActiveSkill == ActiveSkillType.None)
+            {
+                return LocalizationService.Text("ui.cooldown.none", "-");
+            }
+
+            if (unit.CurrentSkillCooldown > 0)
+            {
+                return LocalizationService.Format("ui.cooldown.value", "CD {0}", unit.CurrentSkillCooldown);
+            }
+
+            return unit.HasActed
+                ? LocalizationService.Text("ui.roster.skill_spent", "Spent")
+                : LocalizationService.Text("ui.roster.skill_ready", "Skill Ready");
+        }
+
+        private string GetRoleShortLabel(UnitRole role)
+        {
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    return LocalizationService.Text("ui.role.short.commander", "CMD");
+                case UnitRole.Guardian:
+                    return LocalizationService.Text("ui.role.short.guardian", "GDN");
+                case UnitRole.Ranger:
+                    return LocalizationService.Text("ui.role.short.ranger", "RNG");
+                case UnitRole.Scout:
+                    return LocalizationService.Text("ui.role.short.scout", "SCT");
+                case UnitRole.Raider:
+                    return LocalizationService.Text("ui.role.short.raider", "RDR");
+                default:
+                    return LocalizationService.Text("ui.role.short.unknown", "UNIT");
             }
         }
 
-        private void LoadStage(StageDefinitionData stageData)
+        private void ChangeState(Type stateType)
+        {
+            if (!states.TryGetValue(stateType, out IBattleState nextState))
+            {
+                throw new InvalidOperationException($"State {stateType.Name} is not registered.");
+            }
+
+            currentState?.Exit();
+            currentState = nextState;
+            currentState.Enter();
+        }
+
+        private void LoadScenario(BattleScenarioData data)
         {
             StopAllCoroutines();
             currentState?.Exit();
@@ -863,21 +1599,83 @@ namespace PhalanxChronicle.Battle
             selectedUnitId = null;
             pendingCombatResult = null;
             pendingSkillResult = null;
+            pendingDialogueResumeState = null;
+            currentTurnText = LocalizationService.Text("ui.turn.player", "Turn: Player Phase");
+            currentInstructionText = string.Empty;
 
-            battleHUD.HideCombatBanner();
+            battleHUD.ClearForecast();
             battleHUD.HideResult();
+            battleHUD.HideDialogue();
 
-            simulation = new BattleSimulation(stageData);
+            scenarioData = data;
+            simulation = new BattleSimulation(scenarioData.Stage);
+            scenarioDirector = new ScenarioDirector(scenarioData);
             gridManager.BuildGrid(simulation.Context.Width, simulation.Context.Height, simulation.Context.BlockedCells, OnCellClicked);
             CreateUnits();
             ConfigureCamera();
-            battleHUD.SetStage(LocalizationService.Format("ui.stage", "Stage: {0}", LocalizationService.Text(simulation.Context.StageNameKey, simulation.Context.StageName)));
-            battleHUD.SetMapSeed(
-                simulation.Context.IsRandomMap
-                    ? LocalizationService.Format("ui.seed.value", "Seed: {0}", simulation.Context.MapSeed)
-                    : LocalizationService.Text("ui.seed.fixed", "Seed: Fixed"));
-            battleHUD.SetRerollEnabled(stageDefinition != null && stageDefinition.UseRandomMap);
+            battleHUD.SetRerollEnabled(simulation.Context.IsRandomMap);
             RefreshAllVisuals();
+        }
+
+        private bool IsInteractionLocked()
+        {
+            return currentState is ScenarioDialogueState;
+        }
+
+        private ScenarioEvaluationResult ProcessScenarioCheckpoint(ScenarioCheckpoint checkpoint)
+        {
+            ScenarioEvaluationResult result = scenarioDirector != null
+                ? scenarioDirector.Evaluate(checkpoint, simulation.Context)
+                : new ScenarioEvaluationResult(Array.Empty<string>(), false, false, false);
+
+            UpdateHudModels();
+            if (result.SpawnedUnitIds.Count > 0)
+            {
+                RefreshAllVisuals();
+            }
+
+            return result;
+        }
+
+        private bool TryEnterScenarioDialogue(Type resumeStateType)
+        {
+            if (scenarioDirector == null || !scenarioDirector.HasPendingDialogue)
+            {
+                return false;
+            }
+
+            pendingDialogueResumeState = resumeStateType;
+            ChangeState<ScenarioDialogueState>();
+            return true;
+        }
+
+        private void ResumeAfterScenarioDialogue()
+        {
+            Type resumeStateType = pendingDialogueResumeState ?? typeof(UnitSelectionState);
+            pendingDialogueResumeState = null;
+            ChangeState(resumeStateType);
+        }
+
+        private bool HandlePostActionScenarioFlow(Type defaultResumeStateType)
+        {
+            ProcessScenarioCheckpoint(ScenarioCheckpoint.ActionResolved);
+            if (simulation.Context.BattleEnded)
+            {
+                ProcessScenarioCheckpoint(ScenarioCheckpoint.PreBattleOutcome);
+                Type terminalState = simulation.Context.WinningSide == TurnSide.Player
+                    ? typeof(BattleVictoryState)
+                    : typeof(BattleDefeatState);
+                if (TryEnterScenarioDialogue(terminalState))
+                {
+                    return true;
+                }
+
+                battleHUD.ClearForecast();
+                ChangeState(terminalState);
+                return true;
+            }
+
+            return TryEnterScenarioDialogue(defaultResumeStateType);
         }
     }
 }

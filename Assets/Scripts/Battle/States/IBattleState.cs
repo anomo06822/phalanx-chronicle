@@ -13,6 +13,8 @@ namespace PhalanxChronicle.Battle.States
 
         void OnUnitClicked(Unit unitView);
 
+        void OnUnitHovered(Unit unitView, bool isHovered);
+
         void OnCellClicked(GridPosition position);
 
         void OnAttackRequested();
@@ -20,6 +22,10 @@ namespace PhalanxChronicle.Battle.States
         void OnSkillRequested();
 
         void OnWaitRequested();
+
+        void OnConfirmRequested();
+
+        void OnBackRequested();
 
         void OnEndTurnRequested();
     }

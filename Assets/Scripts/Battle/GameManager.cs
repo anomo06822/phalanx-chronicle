@@ -9,7 +9,7 @@ namespace PhalanxChronicle.Battle
     {
         private static GameManager instance;
 
-        [SerializeField] private StageDefinition stageDefinition;
+        [SerializeField] private BattleScenarioDefinition scenarioDefinition;
         [SerializeField] private GameLocale initialLocale = GameLocale.TraditionalChinese;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -74,7 +74,7 @@ namespace PhalanxChronicle.Battle
             GameObject battleManagerObject = new GameObject("BattleManager");
             battleManagerObject.transform.SetParent(transform, false);
             BattleManager battleManager = battleManagerObject.AddComponent<BattleManager>();
-            battleManager.Initialize(stageDefinition != null ? stageDefinition : StageDefinition.CreateDefault());
+            battleManager.Initialize(scenarioDefinition != null ? scenarioDefinition : BattleScenarioDefinition.CreateDefault());
         }
     }
 }

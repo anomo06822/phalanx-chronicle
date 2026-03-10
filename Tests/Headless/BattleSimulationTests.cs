@@ -29,6 +29,17 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void MoveDestinations_ExcludeOriginForUiFlow()
+        {
+            BattleSimulation simulation = CreateSimulation();
+
+            IReadOnlyList<GridPosition> destinations = simulation.GetMoveDestinations("player-1");
+
+            Assert.DoesNotContain(new GridPosition(0, 0), destinations);
+            Assert.Contains(new GridPosition(0, 1), destinations);
+        }
+
+        [Fact]
         public void Attack_UsesMinimumDamageFormula()
         {
             BattleSimulation simulation = CreateAdjacentCombatSimulation(
@@ -105,6 +116,22 @@ namespace PhalanxChronicle.Headless.Tests
 
             Assert.True(found);
             Assert.Equal(new GridPosition(1, 1), destination);
+        }
+
+        [Fact]
+        public void UndoMove_ReturnsUnitToOriginalCell()
+        {
+            BattleSimulation simulation = CreateSimulation();
+
+            bool moved = simulation.TryMoveUnit("player-1", new GridPosition(1, 1));
+            bool undone = simulation.TryUndoMoveUnit("player-1", new GridPosition(0, 0));
+
+            Assert.True(moved);
+            Assert.True(undone);
+            Assert.Equal(new GridPosition(0, 0), simulation.Context.GetUnit("player-1").Position);
+            Assert.False(simulation.Context.GetUnit("player-1").HasMovedThisTurn);
+            Assert.Equal("player-1", simulation.Context.GetUnitAt(new GridPosition(0, 0)).Id);
+            Assert.Null(simulation.Context.GetUnitAt(new GridPosition(1, 1)));
         }
 
         [Fact]
@@ -290,6 +317,58 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void TurnSwitch_AdvancesTurnNumberWhenEnemyPhaseEnds()
+        {
+            BattleSimulation simulation = CreateSimulation();
+
+            Assert.Equal(1, simulation.Context.TurnNumber);
+
+            simulation.Wait("player-1");
+            simulation.Wait("player-2");
+            simulation.EndCurrentTurn();
+            Assert.Equal(1, simulation.Context.TurnNumber);
+
+            simulation.Wait("enemy-1");
+            simulation.Wait("enemy-2");
+            simulation.Wait("enemy-3");
+            simulation.EndCurrentTurn();
+
+            Assert.Equal(2, simulation.Context.TurnNumber);
+        }
+
+        [Fact]
+        public void BattleThreatAnalyzer_FindsDirectAndSplashThreats()
+        {
+            UnitDefinitionData focus = CreateDefinition("player-focus", "Focus", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, defense: 5);
+            UnitDefinitionData ally = CreateDefinition("player-ally", "Ally", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.None, defense: 5);
+            UnitDefinitionData raider = CreateDefinition("enemy-raider", "Raider", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, attack: 9, moveRange: 3);
+            UnitDefinitionData archer = CreateDefinition("enemy-archer", "Archer", UnitFaction.Enemy, UnitRole.Ranger, PassiveSkillType.None, ActiveSkillType.Volley, attack: 10, moveRange: 3);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Threat Stage",
+                "stage.threat_stage",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(focus, new GridPosition(1, 1)),
+                    new UnitSpawnData(ally, new GridPosition(1, 2)),
+                    new UnitSpawnData(raider, new GridPosition(4, 1)),
+                    new UnitSpawnData(archer, new GridPosition(4, 2)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            BattleThreatSummary threatSummary = BattleThreatAnalyzer.Analyze(simulation.Context, simulation.Context.GetUnit("player-focus"));
+
+            Assert.Equal(2, threatSummary.ThreateningEnemyCount);
+            Assert.Equal(6, threatSummary.MaxProjectedDamage);
+            Assert.Contains("enemy-raider", threatSummary.ThreateningUnitIds);
+            Assert.Contains("enemy-archer", threatSummary.ThreateningUnitIds);
+        }
+
+        [Fact]
         public void PassiveSkill_LongShot_ExtendsAttackRange()
         {
             UnitDefinitionData rangerDefinition = CreateDefinition(
@@ -434,6 +513,62 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void ActiveSkill_CanBeUsedWithoutMoving()
+        {
+            UnitDefinitionData healer = CreateDefinition("player-healer", "Healer", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.RoyalAid);
+            UnitDefinitionData ally = CreateDefinition("player-ally", "Ally", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Hold Skill Stage",
+                "stage.hold_skill_stage",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(healer, new GridPosition(0, 0)),
+                    new UnitSpawnData(ally, new GridPosition(1, 0)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.Context.GetUnit("player-ally").ApplyDamage(6);
+
+            SkillResult result = simulation.TryUseSkill("player-healer", "player-ally");
+
+            Assert.NotNull(result);
+            Assert.False(simulation.Context.GetUnit("player-healer").HasMovedThisTurn);
+            Assert.Equal(30, simulation.Context.GetUnit("player-ally").CurrentHp);
+        }
+
+        [Fact]
+        public void Preview_RoyalAidEstimate_MatchesResolvedHeal()
+        {
+            UnitDefinitionData healer = CreateDefinition("player-healer", "Healer", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.RoyalAid);
+            UnitDefinitionData ally = CreateDefinition("player-ally", "Ally", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Heal Preview Stage",
+                "stage.heal_preview",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(healer, new GridPosition(0, 0)),
+                    new UnitSpawnData(ally, new GridPosition(1, 0)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.Context.GetUnit("player-ally").ApplyDamage(10);
+
+            int estimatedHeal = BattlePreviewCalculator.EstimateHealing(simulation.Context.GetUnit("player-ally"), ActiveSkillRules.GetRoyalAidAmount());
+            SkillResult result = simulation.TryUseSkill("player-healer", "player-ally");
+
+            Assert.NotNull(result);
+            Assert.Equal(estimatedHeal, result.Effects[0].Amount);
+        }
+
+        [Fact]
         public void ActiveSkill_Volley_HitsAdjacentEnemies()
         {
             UnitDefinitionData archer = CreateDefinition("player-archer", "Archer", UnitFaction.Player, UnitRole.Ranger, PassiveSkillType.None, ActiveSkillType.Volley, attack: 10);
@@ -464,6 +599,191 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.True(simulation.Context.GetUnit("enemy-1").HasStatus(StatusEffectType.ShatteredArmor));
             Assert.Equal(11, simulation.Context.GetUnit("enemy-1").CurrentHp);
             Assert.Equal(11, simulation.Context.GetUnit("enemy-2").CurrentHp);
+        }
+
+        [Fact]
+        public void Preview_VolleyEstimate_MatchesResolvedDamage()
+        {
+            UnitDefinitionData archer = CreateDefinition("player-archer", "Archer", UnitFaction.Player, UnitRole.Ranger, PassiveSkillType.None, ActiveSkillType.Volley, attack: 10);
+            UnitDefinitionData enemyOne = CreateDefinition("enemy-1", "Bandit A", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 2);
+            UnitDefinitionData enemyTwo = CreateDefinition("enemy-2", "Bandit B", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 2);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Volley Preview Stage",
+                "stage.volley_preview",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(archer, new GridPosition(0, 0)),
+                    new UnitSpawnData(enemyOne, new GridPosition(2, 0)),
+                    new UnitSpawnData(enemyTwo, new GridPosition(2, 1)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            UnitRuntimeState caster = simulation.Context.GetUnit("player-archer");
+            UnitRuntimeState primaryTarget = simulation.Context.GetUnit("enemy-1");
+            IReadOnlyList<UnitRuntimeState> previewTargets = BattlePreviewCalculator.GetVolleyTargets(simulation.Context, primaryTarget);
+            List<int> previewDamage = previewTargets
+                .Select(target => BattlePreviewCalculator.EstimateAttackDamage(
+                    simulation.Context,
+                    caster,
+                    caster.Position,
+                    target,
+                    ActiveSkillRules.GetVolleyBonus()))
+                .ToList();
+
+            SkillResult result = simulation.TryUseSkill("player-archer", "enemy-1");
+
+            Assert.NotNull(result);
+            Assert.Equal(previewDamage, result.Effects.Select(effect => effect.Amount).ToList());
+        }
+
+        [Fact]
+        public void ActiveSkill_GreenDragonSlash_HitsEnemyBehindPrimary()
+        {
+            UnitDefinitionData striker = CreateDefinition("player-striker", "Striker", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.GreenDragonSlash, attack: 10);
+            UnitDefinitionData enemyOne = CreateDefinition("enemy-1", "Bandit A", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 1);
+            UnitDefinitionData enemyTwo = CreateDefinition("enemy-2", "Bandit B", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 1);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Dragon Slash Stage",
+                "stage.dragon_slash_stage",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(striker, new GridPosition(0, 0)),
+                    new UnitSpawnData(enemyOne, new GridPosition(1, 0)),
+                    new UnitSpawnData(enemyTwo, new GridPosition(2, 0)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            SkillResult result = simulation.TryUseSkill("player-striker", "enemy-1");
+
+            Assert.NotNull(result);
+            Assert.Equal(2, result.Effects.Count);
+            Assert.All(result.Effects, effect => Assert.Equal(11, effect.Amount));
+            Assert.Equal(9, simulation.Context.GetUnit("enemy-1").CurrentHp);
+            Assert.Equal(9, simulation.Context.GetUnit("enemy-2").CurrentHp);
+        }
+
+        [Fact]
+        public void Preview_PowerStrikeEstimate_MatchesResolvedDamage()
+        {
+            UnitDefinitionData striker = CreateDefinition("player-striker", "Striker", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.PowerStrike, attack: 10);
+            UnitDefinitionData enemy = CreateDefinition("enemy-1", "Bandit", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 3);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Power Strike Preview",
+                "stage.power_strike_preview",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(striker, new GridPosition(0, 0)),
+                    new UnitSpawnData(enemy, new GridPosition(1, 0)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            UnitRuntimeState caster = simulation.Context.GetUnit("player-striker");
+            UnitRuntimeState target = simulation.Context.GetUnit("enemy-1");
+            int estimatedDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                simulation.Context,
+                caster,
+                caster.Position,
+                target,
+                ActiveSkillRules.GetPowerStrikeBonus());
+
+            SkillResult result = simulation.TryUseSkill("player-striker", "enemy-1");
+
+            Assert.NotNull(result);
+            Assert.Equal(estimatedDamage, result.Effects[0].Amount);
+        }
+
+        [Fact]
+        public void ActiveSkill_WarCry_AppliesIntimidatedUntilTargetTurnEnds()
+        {
+            UnitDefinitionData intimidator = CreateDefinition("player-intimidator", "Intimidator", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.WarCry);
+            UnitDefinitionData ally = CreateDefinition("player-ally", "Ally", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.None);
+            UnitDefinitionData enemy = CreateDefinition("enemy-1", "Bandit", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, attack: 10);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "War Cry Stage",
+                "stage.war_cry_stage",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(intimidator, new GridPosition(1, 1)),
+                    new UnitSpawnData(ally, new GridPosition(0, 1)),
+                    new UnitSpawnData(enemy, new GridPosition(2, 1)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            SkillResult result = simulation.TryUseSkill("player-intimidator", "enemy-1");
+
+            Assert.NotNull(result);
+            Assert.True(simulation.Context.GetUnit("enemy-1").HasStatus(StatusEffectType.Intimidated));
+            Assert.Equal(-2, StatusEffectRules.GetAttackModifier(simulation.Context.GetUnit("enemy-1")));
+
+            simulation.Wait("player-ally");
+            simulation.EndCurrentTurn();
+            Assert.True(simulation.Context.GetUnit("enemy-1").HasStatus(StatusEffectType.Intimidated));
+
+            simulation.Wait("enemy-1");
+            simulation.EndCurrentTurn();
+            Assert.False(simulation.Context.GetUnit("enemy-1").HasStatus(StatusEffectType.Intimidated));
+        }
+
+        [Fact]
+        public void PassiveSkill_Vanguard_OnlyAddsDamageAfterMoving()
+        {
+            UnitDefinitionData vanguard = CreateDefinition("player-vanguard", "Vanguard", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.Vanguard, ActiveSkillType.None, attack: 10);
+            UnitDefinitionData enemyAdjacent = CreateDefinition("enemy-adjacent", "Adjacent", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 5);
+            UnitDefinitionData enemyFar = CreateDefinition("enemy-far", "Far", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 5);
+
+            BattleSimulation adjacentSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Vanguard Adjacent",
+                    "stage.vanguard_adjacent",
+                    10,
+                    10,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(vanguard, new GridPosition(0, 0)),
+                        new UnitSpawnData(enemyAdjacent, new GridPosition(1, 0)),
+                    },
+                    new List<GridPosition>()));
+
+            CombatResult adjacentResult = adjacentSimulation.TryAttack("player-vanguard", "enemy-adjacent");
+
+            BattleSimulation movedSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Vanguard Moved",
+                    "stage.vanguard_moved",
+                    10,
+                    10,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(vanguard, new GridPosition(0, 0)),
+                        new UnitSpawnData(enemyFar, new GridPosition(2, 0)),
+                    },
+                    new List<GridPosition>()));
+
+            bool moved = movedSimulation.TryMoveUnit("player-vanguard", new GridPosition(1, 0));
+            CombatResult movedResult = movedSimulation.TryAttack("player-vanguard", "enemy-far");
+
+            Assert.True(moved);
+            Assert.NotNull(adjacentResult);
+            Assert.NotNull(movedResult);
+            Assert.Equal(adjacentResult.Damage + 2, movedResult.Damage);
         }
 
         [Fact]
@@ -538,6 +858,67 @@ namespace PhalanxChronicle.Headless.Tests
 
             SkillResult secondCast = simulation.TryUseSkill("player-striker", "enemy-1");
             Assert.NotNull(secondCast);
+        }
+
+        [Fact]
+        public void Scenario_ReinforcementsSpawnOnceAndCancelPrematureVictory()
+        {
+            BattleScenarioData scenario = BattleScenarioCatalog.CreateJieqiaoFires();
+            BattleSimulation simulation = new BattleSimulation(scenario.Stage);
+            ScenarioDirector director = new ScenarioDirector(scenario);
+
+            director.Evaluate(ScenarioCheckpoint.BattleStart, simulation.Context);
+            DefeatUnit(simulation.Context, "enemy-han-raider");
+            DefeatUnit(simulation.Context, "enemy-armored-captain");
+            DefeatUnit(simulation.Context, "enemy-zhang-bao");
+            DefeatUnit(simulation.Context, "enemy-yellow-turban-archer");
+            simulation.Context.EvaluateBattleOutcome();
+
+            ScenarioEvaluationResult result = director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+            ScenarioEvaluationResult secondResult = director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+
+            Assert.Equal(3, result.SpawnedUnitIds.Count);
+            Assert.False(simulation.Context.BattleEnded);
+            Assert.NotNull(simulation.Context.GetUnit("enemy-zhang-liang"));
+            Assert.Empty(secondResult.SpawnedUnitIds);
+        }
+
+        [Fact]
+        public void Scenario_ObjectiveUpdatesAndBossKillsTriggerVictory()
+        {
+            BattleScenarioData scenario = BattleScenarioCatalog.CreateJieqiaoFires();
+            BattleSimulation simulation = new BattleSimulation(scenario.Stage);
+            ScenarioDirector director = new ScenarioDirector(scenario);
+
+            director.Evaluate(ScenarioCheckpoint.BattleStart, simulation.Context);
+            Assert.Equal("objective.jieqiao.opening", director.CurrentObjective.PrimaryObjectiveKey);
+
+            DefeatUnit(simulation.Context, "enemy-han-raider");
+            DefeatUnit(simulation.Context, "enemy-armored-captain");
+            director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+            Assert.Equal("objective.jieqiao.final", director.CurrentObjective.PrimaryObjectiveKey);
+
+            DefeatUnit(simulation.Context, "enemy-zhang-bao");
+            DefeatUnit(simulation.Context, "enemy-zhang-liang");
+            director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+
+            Assert.True(simulation.Context.BattleEnded);
+            Assert.Equal(TurnSide.Player, simulation.Context.WinningSide);
+        }
+
+        [Fact]
+        public void Scenario_LiuBeiDeathTriggersImmediateDefeat()
+        {
+            BattleScenarioData scenario = BattleScenarioCatalog.CreateJieqiaoFires();
+            BattleSimulation simulation = new BattleSimulation(scenario.Stage);
+            ScenarioDirector director = new ScenarioDirector(scenario);
+
+            director.Evaluate(ScenarioCheckpoint.BattleStart, simulation.Context);
+            DefeatUnit(simulation.Context, "player-liu-bei");
+            director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+
+            Assert.True(simulation.Context.BattleEnded);
+            Assert.Equal(TurnSide.Enemy, simulation.Context.WinningSide);
         }
 
         [Fact]
@@ -670,6 +1051,13 @@ namespace PhalanxChronicle.Headless.Tests
             }
 
             return -1;
+        }
+
+        private static void DefeatUnit(BattleContext context, string unitId)
+        {
+            UnitRuntimeState unit = context.GetUnit(unitId);
+            unit.ApplyDamage(unit.CurrentHp);
+            context.RemoveUnit(unitId);
         }
     }
 }

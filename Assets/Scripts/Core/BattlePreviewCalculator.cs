@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -19,6 +20,7 @@ namespace PhalanxChronicle.Core
 
             int effectiveAttack = attacker.Attack +
                                   PassiveSkillRules.GetAttackBonus(context, attacker, attackerPosition) +
+                                  PassiveSkillRules.GetDamageBonus(attacker, attackerPosition) +
                                   StatusEffectRules.GetAttackModifier(attacker) +
                                   flatAttackBonus;
             int effectiveDefense = defender.Defense +
@@ -57,6 +59,38 @@ namespace PhalanxChronicle.Core
                 .OrderBy(unit => unit.Position.ManhattanDistance(primaryTarget.Position))
                 .ThenBy(unit => unit.Id)
                 .ToList();
+        }
+
+        public static IReadOnlyList<UnitRuntimeState> GetGreenDragonSlashTargets(
+            BattleContext context,
+            GridPosition attackerPosition,
+            UnitRuntimeState primaryTarget)
+        {
+            if (context == null || primaryTarget == null)
+            {
+                return new List<UnitRuntimeState>();
+            }
+
+            List<UnitRuntimeState> targets = new List<UnitRuntimeState> { primaryTarget };
+            int distanceX = primaryTarget.Position.X - attackerPosition.X;
+            int distanceY = primaryTarget.Position.Y - attackerPosition.Y;
+            if (Math.Abs(distanceX) + Math.Abs(distanceY) != 1)
+            {
+                return targets;
+            }
+
+            GridPosition secondaryPosition = new GridPosition(
+                primaryTarget.Position.X + distanceX,
+                primaryTarget.Position.Y + distanceY);
+            UnitRuntimeState secondaryTarget = context.GetUnitAt(secondaryPosition);
+            if (secondaryTarget != null &&
+                secondaryTarget.IsAlive &&
+                secondaryTarget.Faction == primaryTarget.Faction)
+            {
+                targets.Add(secondaryTarget);
+            }
+
+            return targets;
         }
     }
 }

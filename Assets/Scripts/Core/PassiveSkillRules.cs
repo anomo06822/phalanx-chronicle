@@ -44,5 +44,20 @@ namespace PhalanxChronicle.Core
         {
             return attacker.PassiveSkill == PassiveSkillType.ArmorBreak ? 2 : 0;
         }
+
+        public static int GetDamageBonus(UnitRuntimeState attacker)
+        {
+            return attacker == null ? 0 : GetDamageBonus(attacker, attacker.Position);
+        }
+
+        public static int GetDamageBonus(UnitRuntimeState attacker, GridPosition attackOrigin)
+        {
+            if (attacker == null || attacker.PassiveSkill != PassiveSkillType.Vanguard)
+            {
+                return 0;
+            }
+
+            return attacker.HasMovedThisTurn || attackOrigin != attacker.Position ? 2 : 0;
+        }
     }
 }

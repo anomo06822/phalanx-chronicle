@@ -5,11 +5,15 @@ using System.Linq;
 using System.Reflection;
 using PhalanxChronicle.Battle;
 using PhalanxChronicle.Battle.Grid;
+using PhalanxChronicle.Battle.States;
 using PhalanxChronicle.Battle.Units;
+using PhalanxChronicle.Core;
+using PhalanxChronicle.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace PhalanxChronicle.Editor
 {
@@ -68,6 +72,12 @@ namespace PhalanxChronicle.Editor
                 GridManager gridManager = UnityEngine.Object.FindObjectOfType<GridManager>();
                 Canvas canvas = UnityEngine.Object.FindObjectOfType<Canvas>();
                 Unit[] units = UnityEngine.Object.FindObjectsOfType<Unit>();
+                GameObject selectedUnitPanel = GameObject.Find("SelectedUnitPanel");
+                GameObject overviewPanel = GameObject.Find("OverviewPanel");
+                GameObject forecastPanel = GameObject.Find("ForecastPanel");
+                GameObject alliedRosterPanel = GameObject.Find("AlliedRosterPanel");
+                GameObject enemyRosterPanel = GameObject.Find("EnemyRosterPanel");
+                GameObject feedPanel = GameObject.Find("FeedPanel");
                 string[] rootNames = EditorSceneManager.GetActiveScene()
                     .GetRootGameObjects()
                     .Select(root => root.name)
@@ -87,6 +97,129 @@ namespace PhalanxChronicle.Editor
                 if (units.Length == 0)
                 {
                     throw new InvalidOperationException("No runtime units were created.");
+                }
+
+                if (selectedUnitPanel == null || overviewPanel == null || forecastPanel == null)
+                {
+                    throw new InvalidOperationException("Expected the rebuilt HUD panels to exist.");
+                }
+
+                if (alliedRosterPanel == null || alliedRosterPanel.GetComponent<ScrollRect>() == null ||
+                    enemyRosterPanel == null || enemyRosterPanel.GetComponent<ScrollRect>() == null ||
+                    feedPanel == null || feedPanel.GetComponent<ScrollRect>() == null)
+                {
+                    throw new InvalidOperationException("Expected the overview ledgers and feed to use scrollable panels.");
+                }
+
+                if (!battleManager.IsDialogueVisible)
+                {
+                    throw new InvalidOperationException("Expected opening dialogue to be visible on startup.");
+                }
+
+                for (int index = 0; index < 8 && battleManager.IsDialogueVisible; index++)
+                {
+                    battleManager.AdvanceScenarioDialogue();
+                }
+
+                if (battleManager.IsRerollVisible)
+                {
+                    throw new InvalidOperationException("Fixed story scenario should not expose reroll.");
+                }
+
+                battleManager.ChangeState<UnitSelectionState>();
+                Unit liuBeiView = units.Single(unit => unit.UnitId == "player-liu-bei");
+                battleManager.Simulation.Context.GetUnit("player-guan-yu").ApplyDamage(6);
+                InvokeMethod(battleManager, "OnUnitClicked", liuBeiView);
+                InvokeMethod(battleManager, "OnUnitClicked", liuBeiView);
+
+                if (!battleManager.IsActionMenuVisible)
+                {
+                    throw new InvalidOperationException("Expected clicking the selected unit to open the hold-position action menu.");
+                }
+
+                if (battleManager.Simulation.Context.GetUnit("player-liu-bei").HasActed)
+                {
+                    throw new InvalidOperationException("Hold-position action menu should not immediately mark the unit as acted.");
+                }
+
+                if (!ContainsAny(battleManager.CurrentActionMenuModeText, "原地行動", "Hold Position"))
+                {
+                    throw new InvalidOperationException("Expected the action menu to show hold-position context.");
+                }
+
+                if (battleManager.IsActionMenuBackEnabled)
+                {
+                    throw new InvalidOperationException("Back should be disabled while the unit has not moved.");
+                }
+
+                if (!battleManager.IsActionMenuSkillEnabled)
+                {
+                    throw new InvalidOperationException("Expected hold-position action menu to allow using a skill when a valid target exists.");
+                }
+
+                Unit guanYuView = units.Single(unit => unit.UnitId == "player-guan-yu");
+                InvokeMethod(battleManager, "OnUnitClicked", guanYuView);
+                if (!battleManager.IsSelectedUnit("player-guan-yu") || battleManager.IsActionMenuVisible)
+                {
+                    throw new InvalidOperationException("Expected clicking another allied unit before moving to switch selection instead of locking the current unit.");
+                }
+
+                battleManager.ChangeState<UnitSelectionState>();
+                InvokeMethod(battleManager, "OnUnitClicked", liuBeiView);
+                GridCellView destinationCell = UnityEngine.Object.FindObjectsOfType<GridCellView>().Single(cell => cell.Position == new GridPosition(2, 4));
+                InvokeMethod(battleManager, "OnCellClicked", destinationCell);
+
+                if (!battleManager.IsActionMenuVisible || !battleManager.IsActionMenuBackEnabled)
+                {
+                    throw new InvalidOperationException("Expected moved action menu to be visible with Back enabled.");
+                }
+
+                if (!ContainsAny(battleManager.CurrentActionMenuModeText, "移動後行動", "After Move"))
+                {
+                    throw new InvalidOperationException("Expected the action menu to show after-move context.");
+                }
+
+                battleManager.TryUndoSelectionMove();
+                battleManager.ChangeState<UnitSelectionState>();
+
+                Unit armoredCaptainView = units.Single(unit => unit.UnitId == "enemy-armored-captain");
+                TextMesh armoredCaptainName = GetPrivateField<TextMesh>(armoredCaptainView, "nameText");
+                if (armoredCaptainName == null || armoredCaptainName.characterSize >= 0.075f)
+                {
+                    throw new InvalidOperationException("Expected long world-space names to scale down for readability.");
+                }
+
+                BattleHUD battleHud = UnityEngine.Object.FindObjectOfType<BattleHUD>();
+                Text selectedNameLabel = GetPrivateField<Text>(battleHud, "selectedNameLabel");
+                if (selectedNameLabel == null || !selectedNameLabel.resizeTextForBestFit)
+                {
+                    throw new InvalidOperationException("Expected selected unit name label to use best fit.");
+                }
+
+                DefeatUnit(battleManager.Simulation.Context, "enemy-han-raider");
+                DefeatUnit(battleManager.Simulation.Context, "enemy-armored-captain");
+                bool enteredDialogue = battleManager.ProcessScenarioCheckpointAndEnterDialogue(
+                    ScenarioCheckpoint.ActionResolved,
+                    typeof(UnitSelectionState));
+
+                if (!enteredDialogue || !battleManager.IsDialogueVisible)
+                {
+                    throw new InvalidOperationException("Expected reinforcements to trigger scenario dialogue.");
+                }
+
+                if (!battleManager.HasScenarioFlag(BattleScenarioCatalog.ReinforcementsArrivedFlag))
+                {
+                    throw new InvalidOperationException("Scenario reinforcement flag was not set.");
+                }
+
+                if (battleManager.Simulation.Context.GetUnit("enemy-zhang-liang") == null)
+                {
+                    throw new InvalidOperationException("Reinforcement unit Zhang Liang was not spawned.");
+                }
+
+                if (!battleManager.CurrentObjectiveText.Contains("張寶") || !battleManager.CurrentObjectiveText.Contains("張梁"))
+                {
+                    throw new InvalidOperationException("Objective HUD did not update after reinforcements.");
                 }
 
                 Debug.Log(
@@ -131,10 +264,44 @@ namespace PhalanxChronicle.Editor
             method.Invoke(target, null);
         }
 
+        private static void InvokeMethod(object target, string methodName, params object[] args)
+        {
+            MethodInfo method = target.GetType().GetMethod(methodName, BindingFlags.Instance | BindingFlags.NonPublic);
+            if (method == null)
+            {
+                throw new MissingMethodException(target.GetType().Name, methodName);
+            }
+
+            method.Invoke(target, args);
+        }
+
+        private static T GetPrivateField<T>(object target, string fieldName) where T : class
+        {
+            FieldInfo fieldInfo = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+            return fieldInfo?.GetValue(target) as T;
+        }
+
+        private static bool ContainsAny(string text, params string[] candidates)
+        {
+            return candidates.Any(candidate => !string.IsNullOrEmpty(candidate) && text.IndexOf(candidate, StringComparison.Ordinal) >= 0);
+        }
+
         private static void WriteResult(string content)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(ResultPath) ?? "/tmp");
             File.WriteAllText(ResultPath, content);
+        }
+
+        private static void DefeatUnit(BattleContext context, string unitId)
+        {
+            UnitRuntimeState unit = context.GetUnit(unitId);
+            if (unit == null)
+            {
+                throw new InvalidOperationException($"Missing unit {unitId}.");
+            }
+
+            unit.ApplyDamage(unit.CurrentHp);
+            context.RemoveUnit(unitId);
         }
     }
 }

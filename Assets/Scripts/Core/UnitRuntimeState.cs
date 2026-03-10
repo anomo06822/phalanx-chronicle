@@ -27,6 +27,8 @@ namespace PhalanxChronicle.Core
             Defense = definition.Defense;
             MoveRange = definition.MoveRange;
             AttackRange = definition.AttackRange;
+            MaxMana = definition.MaxMana;
+            CurrentMana = definition.MaxMana;
             Position = startPosition;
         }
 
@@ -66,6 +68,10 @@ namespace PhalanxChronicle.Core
 
         public int AttackRange { get; }
 
+        public int MaxMana { get; }
+
+        public int CurrentMana { get; private set; }
+
         public GridPosition Position { get; private set; }
 
         public bool HasActed { get; private set; }
@@ -86,10 +92,50 @@ namespace PhalanxChronicle.Core
             HasMovedThisTurn = true;
         }
 
+        public void UndoMoveTo(GridPosition position)
+        {
+            Position = position;
+            HasMovedThisTurn = false;
+        }
+
         public void ResetTurn()
         {
             HasActed = false;
             HasMovedThisTurn = false;
+        }
+
+        public bool HasEnoughMana(int manaAmount)
+        {
+            return manaAmount <= 0 || CurrentMana >= manaAmount;
+        }
+
+        public bool SpendMana(int amount)
+        {
+            if (!HasEnoughMana(amount))
+            {
+                return false;
+            }
+
+            if (amount > 0)
+            {
+                CurrentMana -= amount;
+            }
+
+            return true;
+        }
+
+        public void RestoreMana(int amount)
+        {
+            if (amount <= 0)
+            {
+                return;
+            }
+
+            CurrentMana += amount;
+            if (CurrentMana > MaxMana)
+            {
+                CurrentMana = MaxMana;
+            }
         }
 
         public void MarkActed()

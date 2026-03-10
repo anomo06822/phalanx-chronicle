@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using PhalanxChronicle.Battle.Units;
 using PhalanxChronicle.Core;
@@ -18,6 +19,11 @@ namespace PhalanxChronicle.Battle.States
             BattleManager.ClearSelectionAndHighlights();
             BattleManager.HideActionMenu();
             BattleManager.RefreshAllVisuals();
+            if (BattleManager.ProcessScenarioCheckpointAndEnterDialogue(ScenarioCheckpoint.BattleStart, typeof(PlayerTurnStartState)))
+            {
+                return;
+            }
+
             BattleManager.ChangeState<PlayerTurnStartState>();
         }
     }
@@ -36,6 +42,11 @@ namespace PhalanxChronicle.Battle.States
             BattleManager.SetTurnLabel(LocalizationService.Text("ui.turn.player", "Turn: Player Phase"));
             BattleManager.SetLog(LocalizationService.Text("ui.log.select_player", "Select a blue officer to act."));
             BattleManager.SetEndTurnEnabled(true);
+            if (BattleManager.ProcessScenarioCheckpointAndEnterDialogue(ScenarioCheckpoint.PlayerTurnStart, typeof(UnitSelectionState)))
+            {
+                return;
+            }
+
             BattleManager.ChangeState<UnitSelectionState>();
         }
     }
@@ -90,7 +101,7 @@ namespace PhalanxChronicle.Battle.States
 
         public override void Enter()
         {
-            BattleManager.SetLog(LocalizationService.Text("ui.log.choose_destination", "Choose a destination or click the unit to hold position."));
+            BattleManager.SetLog(LocalizationService.Text("ui.log.choose_destination", "Choose a destination, click the unit to act in place, or click an enemy in range to attack."));
             BattleManager.SetEndTurnEnabled(false);
             BattleManager.ShowMoveRangeForSelection();
         }
@@ -106,6 +117,11 @@ namespace PhalanxChronicle.Battle.States
                 return;
             }
 
+            if (BattleManager.TrySwitchSelectionTo(unitView))
+            {
+                return;
+            }
+
             if (!BattleManager.IsSelectedUnit(unitView.UnitId))
             {
                 return;
@@ -116,6 +132,12 @@ namespace PhalanxChronicle.Battle.States
 
         public override void OnCellClicked(GridPosition position)
         {
+            if (BattleManager.IsSelectionAtPosition(position))
+            {
+                BattleManager.ChangeState<UnitActionMenuState>();
+                return;
+            }
+
             if (!BattleManager.TryMoveSelection(position))
             {
                 return;
@@ -135,8 +157,8 @@ namespace PhalanxChronicle.Battle.States
 
         public override void Enter()
         {
-            BattleManager.SetLog(LocalizationService.Text("ui.log.choose_action", "Choose Attack, Skill, or Wait."));
-            BattleManager.ShowActionMenu(BattleManager.HasAttackTargetsForSelection());
+            BattleManager.SetLog(BattleManager.GetActionMenuInstructionText());
+            BattleManager.ShowActionMenu();
         }
 
         public override void Exit()
@@ -171,11 +193,41 @@ namespace PhalanxChronicle.Battle.States
             BattleManager.ResolvePlayerAction(LocalizationService.Format("ui.log.unit_waited", "{0} held position.", unitName));
         }
 
+        public override void OnBackRequested()
+        {
+            if (!BattleManager.TryUndoSelectionMove())
+            {
+                return;
+            }
+
+            BattleManager.ChangeState<UnitMoveSelectState>();
+        }
+
         public override void OnUnitClicked(Unit unitView)
         {
-            if (unitView == null ||
-                unitView.RuntimeState == null ||
-                unitView.RuntimeState.Faction != UnitFaction.Enemy)
+            if (unitView == null || unitView.RuntimeState == null)
+            {
+                return;
+            }
+
+            if (BattleManager.TrySwitchSelectionTo(unitView))
+            {
+                BattleManager.ChangeState<UnitMoveSelectState>();
+                return;
+            }
+
+            if (BattleManager.IsSelectedUnit(unitView.UnitId))
+            {
+                if (BattleManager.TryUndoSelectionMove())
+                {
+                    BattleManager.ChangeState<UnitMoveSelectState>();
+                    return;
+                }
+
+                return;
+            }
+
+            if (unitView.RuntimeState.Faction != UnitFaction.Enemy)
             {
                 return;
             }
@@ -203,14 +255,29 @@ namespace PhalanxChronicle.Battle.States
             BattleManager.ShowAttackRangeForSelection();
         }
 
+        public override void Exit()
+        {
+            BattleManager.ClearTargetPreview();
+        }
+
         public override void OnUnitClicked(Unit unitView)
         {
             if (!BattleManager.TryAttackSelection(unitView.UnitId))
             {
+                if (BattleManager.TrySwitchSelectionTo(unitView))
+                {
+                    BattleManager.ChangeState<UnitMoveSelectState>();
+                }
+
                 return;
             }
 
             BattleManager.ChangeState<UnitActionExecuteState>();
+        }
+
+        public override void OnUnitHovered(Unit unitView, bool isHovered)
+        {
+            BattleManager.PreviewAttackTarget(unitView, isHovered);
         }
     }
 
@@ -228,14 +295,29 @@ namespace PhalanxChronicle.Battle.States
             BattleManager.ShowSkillRangeForSelection();
         }
 
+        public override void Exit()
+        {
+            BattleManager.ClearTargetPreview();
+        }
+
         public override void OnUnitClicked(Unit unitView)
         {
             if (!BattleManager.TryUseSkillSelection(unitView.UnitId))
             {
+                if (BattleManager.TrySwitchSelectionTo(unitView))
+                {
+                    BattleManager.ChangeState<UnitMoveSelectState>();
+                }
+
                 return;
             }
 
             BattleManager.ChangeState<UnitActionExecuteState>();
+        }
+
+        public override void OnUnitHovered(Unit unitView, bool isHovered)
+        {
+            BattleManager.PreviewSkillTarget(unitView, isHovered);
         }
     }
 
@@ -268,12 +350,42 @@ namespace PhalanxChronicle.Battle.States
 
         public override void Enter()
         {
+            if (BattleManager.ProcessScenarioCheckpointAndEnterDialogue(ScenarioCheckpoint.EnemyTurnStart, typeof(EnemyTurnState)))
+            {
+                return;
+            }
+
             BattleManager.StartManagedCoroutine(RunEnemyTurn());
         }
 
         private IEnumerator RunEnemyTurn()
         {
             yield return BattleManager.ExecuteEnemyTurnSequence();
+        }
+    }
+
+    public sealed class ScenarioDialogueState : BattleStateBase
+    {
+        public ScenarioDialogueState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(ScenarioDialogueState);
+
+        public override void Enter()
+        {
+            BattleManager.HideActionMenu();
+            BattleManager.ShowCurrentScenarioDialogue();
+        }
+
+        public override void Exit()
+        {
+            BattleManager.HideScenarioDialogue();
+        }
+
+        public override void OnConfirmRequested()
+        {
+            BattleManager.AdvanceScenarioDialogue();
         }
     }
 

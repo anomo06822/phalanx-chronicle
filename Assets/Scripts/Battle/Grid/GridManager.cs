@@ -32,13 +32,7 @@ namespace PhalanxChronicle.Battle.Grid
 
                     GridCellView cellView = cellObject.AddComponent<GridCellView>();
                     bool blocked = ContainsPosition(blockedCells, position);
-                    Color baseColor = blocked
-                        ? ((x + y) % 2 == 0
-                            ? new Color(0.33f, 0.43f, 0.31f, 1f)
-                            : new Color(0.28f, 0.37f, 0.27f, 1f))
-                        : ((x + y) % 2 == 0
-                            ? new Color(0.93f, 0.86f, 0.67f, 1f)
-                            : new Color(0.87f, 0.78f, 0.58f, 1f));
+                    Color baseColor = BattleUiTheme.GetGridTileColor(blocked, (x + y) % 2 == 0);
                     cellView.Initialize(position, baseColor, onCellClicked);
                     cellViews[position] = cellView;
                 }
@@ -66,7 +60,7 @@ namespace PhalanxChronicle.Battle.Grid
             {
                 if (cellViews.TryGetValue(position, out GridCellView cellView))
                 {
-                    cellView.SetMoveHighlight(new Color(0.3f, 0.55f, 0.95f, 0.7f));
+                    cellView.SetMoveHighlight(BattleUiTheme.MoveHighlight);
                 }
             }
         }
@@ -77,7 +71,7 @@ namespace PhalanxChronicle.Battle.Grid
             {
                 if (cellViews.TryGetValue(position, out GridCellView cellView))
                 {
-                    cellView.SetAttackHighlight(new Color(0.91f, 0.28f, 0.22f, 0.92f));
+                    cellView.SetAttackHighlight(BattleUiTheme.AttackHighlight);
                 }
             }
         }
@@ -88,7 +82,7 @@ namespace PhalanxChronicle.Battle.Grid
             {
                 if (cellViews.TryGetValue(position, out GridCellView cellView))
                 {
-                    cellView.SetSkillHighlight(new Color(0.34f, 0.78f, 0.42f, 0.92f));
+                    cellView.SetSkillHighlight(BattleUiTheme.SkillHighlight);
                 }
             }
         }
@@ -97,7 +91,7 @@ namespace PhalanxChronicle.Battle.Grid
         {
             if (cellViews.TryGetValue(position, out GridCellView cellView))
             {
-                cellView.SetSelectedHighlight(new Color(0.98f, 0.85f, 0.25f, 0.95f));
+                cellView.SetSelectedHighlight(BattleUiTheme.SelectedHighlight);
             }
         }
 
@@ -137,7 +131,7 @@ namespace PhalanxChronicle.Battle.Grid
 
             SpriteRenderer backdropRenderer = backdropObject.AddComponent<SpriteRenderer>();
             backdropRenderer.sprite = RuntimeSpriteLibrary.WhiteSprite;
-            backdropRenderer.color = new Color(0.27f, 0.2f, 0.13f, 1f);
+            backdropRenderer.color = BattleUiTheme.GridBackdrop;
             backdropRenderer.sortingOrder = 0;
 
             GameObject frameObject = new GameObject("BoardFrame");
@@ -147,7 +141,7 @@ namespace PhalanxChronicle.Battle.Grid
 
             SpriteRenderer frameRenderer = frameObject.AddComponent<SpriteRenderer>();
             frameRenderer.sprite = RuntimeSpriteLibrary.FrameSprite;
-            frameRenderer.color = new Color(0.93f, 0.81f, 0.45f, 1f);
+            frameRenderer.color = BattleUiTheme.GridFrame;
             frameRenderer.sortingOrder = 1;
         }
     }

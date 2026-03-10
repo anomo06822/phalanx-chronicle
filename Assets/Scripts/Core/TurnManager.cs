@@ -21,6 +21,11 @@ namespace PhalanxChronicle.Core
             }
 
             TurnSide next = context.CurrentTurnSide == TurnSide.Player ? TurnSide.Enemy : TurnSide.Player;
+            if (context.CurrentTurnSide == TurnSide.Enemy)
+            {
+                context.AdvanceRound();
+            }
+
             BeginTurn(context, next);
             return next;
         }

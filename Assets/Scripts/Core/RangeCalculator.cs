@@ -55,6 +55,15 @@ namespace PhalanxChronicle.Core
                 .ToList();
         }
 
+        public IReadOnlyList<GridPosition> GetMoveDestinations(BattleContext context, UnitRuntimeState unit)
+        {
+            return GetMoveRange(context, unit)
+                .Where(position => position != unit.Position)
+                .OrderBy(position => position.Y)
+                .ThenBy(position => position.X)
+                .ToList();
+        }
+
         public IReadOnlyList<GridPosition> GetAttackRange(BattleContext context, GridPosition origin, int attackRange)
         {
             List<GridPosition> positions = new List<GridPosition>();
