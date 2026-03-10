@@ -364,12 +364,12 @@ cat >"$tmp_dir/task_tests.md" <<EOF
 補齊 headless 規則測試，覆蓋移動、攻擊、回合與勝敗核心規則。
 
 ## 完成定義
-- [ ] `dotnet test` 可執行
+- [ ] \`dotnet test\` 可執行
 - [ ] 核心規則有代表性測試案例
 - [ ] 新增測試不依賴 Unity 執行環境
 
 ## 測試方式
-- 執行 `dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj`
+- 執行 \`dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj\`
 
 ## 上層 Feature 或 Epic
 #${epic_m1} [Epic] 專案骨架
@@ -476,7 +476,7 @@ cat >"$tmp_dir/task_combat.md" <<EOF
 實作傷害公式與死亡移除，完成最小可玩的攻擊結算流程。
 
 ## 完成定義
-- [ ] 傷害公式為 `max(1, ATK - DEF)`
+- [ ] 傷害公式為 \`max(1, ATK - DEF)\`
 - [ ] 受傷後 HP 正確更新
 - [ ] HP <= 0 時單位自場上移除
 
