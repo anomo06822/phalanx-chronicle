@@ -1,0 +1,45 @@
+name: Feature
+description: 建立一個可交付功能需求
+title: "[Feature] "
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: 使用者故事
+      description: 用一句話描述誰要什麼能力以及原因
+      placeholder: 作為玩家，我希望能看到角色可移動範圍，才能規劃本回合行動
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 功能描述
+      description: 寫清楚實際行為
+      placeholder: 選取玩家單位後，藍色格子顯示所有可移動位置
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 驗收條件
+      placeholder: |
+        - [ ] 選取玩家單位後顯示藍色移動格
+        - [ ] 不顯示超出 MoveRange 的格子
+        - [ ] 被佔用格子不可選
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 依賴與備註
+      description: 記錄相依 issue、限制或實作備註
+      placeholder: 例如：依賴 GridManager 基礎座標資料已完成
+
+  - type: input
+    id: epic
+    attributes:
+      label: 上層 Epic
+      placeholder: 例如：#12 [Epic] 移動系統

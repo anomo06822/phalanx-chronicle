@@ -1,0 +1,36 @@
+name: Bug
+description: 回報實際行為與預期不符的問題
+title: "[Bug] "
+body:
+  - type: textarea
+    id: actual
+    attributes:
+      label: 實際行為
+      placeholder: 敵人回合開始後，第一個敵方單位行動完就卡住
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 預期行為
+      placeholder: 敵方單位應依序完成所有行動後切回玩家回合
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重現步驟
+      placeholder: |
+        1. 進入 Battle 場景
+        2. 結束玩家回合
+        3. 觀察敵方第二個單位未行動
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 補充資訊
+      placeholder: 可填錯誤訊息、截圖、log、懷疑模組

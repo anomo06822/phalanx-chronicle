@@ -1,0 +1,317 @@
+using System.Collections;
+using PhalanxChronicle.Battle.Units;
+using PhalanxChronicle.Core;
+using PhalanxChronicle.Localization;
+
+namespace PhalanxChronicle.Battle.States
+{
+    public sealed class BattleStartState : BattleStateBase
+    {
+        public BattleStartState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(BattleStartState);
+
+        public override void Enter()
+        {
+            BattleManager.ClearSelectionAndHighlights();
+            BattleManager.HideActionMenu();
+            BattleManager.RefreshAllVisuals();
+            BattleManager.ChangeState<PlayerTurnStartState>();
+        }
+    }
+
+    public sealed class PlayerTurnStartState : BattleStateBase
+    {
+        public PlayerTurnStartState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(PlayerTurnStartState);
+
+        public override void Enter()
+        {
+            BattleManager.EnsureTurn(TurnSide.Player);
+            BattleManager.SetTurnLabel(LocalizationService.Text("ui.turn.player", "Turn: Player Phase"));
+            BattleManager.SetLog(LocalizationService.Text("ui.log.select_player", "Select a blue officer to act."));
+            BattleManager.SetEndTurnEnabled(true);
+            BattleManager.ChangeState<UnitSelectionState>();
+        }
+    }
+
+    public sealed class UnitSelectionState : BattleStateBase
+    {
+        public UnitSelectionState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(UnitSelectionState);
+
+        public override void Enter()
+        {
+            BattleManager.HideActionMenu();
+            BattleManager.ClearSelectionAndHighlights();
+
+            if (BattleManager.AreAllPlayerUnitsDone())
+            {
+                BattleManager.ChangeState<EnemyTurnState>();
+                return;
+            }
+
+            BattleManager.SetLog(LocalizationService.Text("ui.log.select_to_move", "Select a blue officer to move."));
+        }
+
+        public override void OnUnitClicked(Unit unitView)
+        {
+            if (!BattleManager.CanSelectUnit(unitView))
+            {
+                return;
+            }
+
+            BattleManager.SelectUnit(unitView.UnitId);
+            BattleManager.ShowMoveRangeForSelection();
+            BattleManager.ChangeState<UnitMoveSelectState>();
+        }
+
+        public override void OnEndTurnRequested()
+        {
+            BattleManager.ChangeState<EnemyTurnState>();
+        }
+    }
+
+    public sealed class UnitMoveSelectState : BattleStateBase
+    {
+        public UnitMoveSelectState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(UnitMoveSelectState);
+
+        public override void Enter()
+        {
+            BattleManager.SetLog(LocalizationService.Text("ui.log.choose_destination", "Choose a destination or click the unit to hold position."));
+            BattleManager.SetEndTurnEnabled(false);
+            BattleManager.ShowMoveRangeForSelection();
+        }
+
+        public override void OnUnitClicked(Unit unitView)
+        {
+            if (unitView != null &&
+                unitView.RuntimeState != null &&
+                unitView.RuntimeState.Faction == UnitFaction.Enemy &&
+                BattleManager.TryQuickAttackSelection(unitView.UnitId))
+            {
+                BattleManager.ChangeState<UnitActionExecuteState>();
+                return;
+            }
+
+            if (!BattleManager.IsSelectedUnit(unitView.UnitId))
+            {
+                return;
+            }
+
+            BattleManager.ChangeState<UnitActionMenuState>();
+        }
+
+        public override void OnCellClicked(GridPosition position)
+        {
+            if (!BattleManager.TryMoveSelection(position))
+            {
+                return;
+            }
+
+            BattleManager.ChangeState<UnitActionMenuState>();
+        }
+    }
+
+    public sealed class UnitActionMenuState : BattleStateBase
+    {
+        public UnitActionMenuState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(UnitActionMenuState);
+
+        public override void Enter()
+        {
+            BattleManager.SetLog(LocalizationService.Text("ui.log.choose_action", "Choose Attack, Skill, or Wait."));
+            BattleManager.ShowActionMenu(BattleManager.HasAttackTargetsForSelection());
+        }
+
+        public override void Exit()
+        {
+            BattleManager.HideActionMenu();
+        }
+
+        public override void OnAttackRequested()
+        {
+            if (!BattleManager.HasAttackTargetsForSelection())
+            {
+                return;
+            }
+
+            BattleManager.ChangeState<UnitTargetSelectState>();
+        }
+
+        public override void OnSkillRequested()
+        {
+            if (!BattleManager.HasSkillTargetsForSelection())
+            {
+                return;
+            }
+
+            BattleManager.ChangeState<UnitSkillTargetState>();
+        }
+
+        public override void OnWaitRequested()
+        {
+            BattleManager.WaitWithSelection();
+            string unitName = BattleManager.GetSelectedUnitDisplayName();
+            BattleManager.ResolvePlayerAction(LocalizationService.Format("ui.log.unit_waited", "{0} held position.", unitName));
+        }
+
+        public override void OnUnitClicked(Unit unitView)
+        {
+            if (unitView == null ||
+                unitView.RuntimeState == null ||
+                unitView.RuntimeState.Faction != UnitFaction.Enemy)
+            {
+                return;
+            }
+
+            if (!BattleManager.TryQuickAttackSelection(unitView.UnitId))
+            {
+                return;
+            }
+
+            BattleManager.ChangeState<UnitActionExecuteState>();
+        }
+    }
+
+    public sealed class UnitTargetSelectState : BattleStateBase
+    {
+        public UnitTargetSelectState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(UnitTargetSelectState);
+
+        public override void Enter()
+        {
+            BattleManager.SetLog(LocalizationService.Text("ui.log.select_target", "Select an enemy target."));
+            BattleManager.ShowAttackRangeForSelection();
+        }
+
+        public override void OnUnitClicked(Unit unitView)
+        {
+            if (!BattleManager.TryAttackSelection(unitView.UnitId))
+            {
+                return;
+            }
+
+            BattleManager.ChangeState<UnitActionExecuteState>();
+        }
+    }
+
+    public sealed class UnitSkillTargetState : BattleStateBase
+    {
+        public UnitSkillTargetState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(UnitSkillTargetState);
+
+        public override void Enter()
+        {
+            BattleManager.SetLog(LocalizationService.Text("ui.log.select_skill_target", "Select a skill target."));
+            BattleManager.ShowSkillRangeForSelection();
+        }
+
+        public override void OnUnitClicked(Unit unitView)
+        {
+            if (!BattleManager.TryUseSkillSelection(unitView.UnitId))
+            {
+                return;
+            }
+
+            BattleManager.ChangeState<UnitActionExecuteState>();
+        }
+    }
+
+    public sealed class UnitActionExecuteState : BattleStateBase
+    {
+        public UnitActionExecuteState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(UnitActionExecuteState);
+
+        public override void Enter()
+        {
+            BattleManager.StartManagedCoroutine(RunPlayerAction());
+        }
+
+        private IEnumerator RunPlayerAction()
+        {
+            yield return BattleManager.ExecutePendingPlayerAction();
+        }
+    }
+
+    public sealed class EnemyTurnState : BattleStateBase
+    {
+        public EnemyTurnState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(EnemyTurnState);
+
+        public override void Enter()
+        {
+            BattleManager.StartManagedCoroutine(RunEnemyTurn());
+        }
+
+        private IEnumerator RunEnemyTurn()
+        {
+            yield return BattleManager.ExecuteEnemyTurnSequence();
+        }
+    }
+
+    public sealed class BattleVictoryState : BattleStateBase
+    {
+        public BattleVictoryState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(BattleVictoryState);
+
+        public override void Enter()
+        {
+            BattleManager.HideActionMenu();
+            BattleManager.ClearSelectionAndHighlights();
+            BattleManager.SetTurnLabel(LocalizationService.Text("ui.turn.end", "Turn: Battle End"));
+            BattleManager.SetLog(LocalizationService.Text("ui.log.victory", "All enemies defeated."));
+            BattleManager.ShowResult(LocalizationService.Text("ui.result.victory", "Victory"));
+            BattleManager.SetEndTurnEnabled(false);
+        }
+    }
+
+    public sealed class BattleDefeatState : BattleStateBase
+    {
+        public BattleDefeatState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(BattleDefeatState);
+
+        public override void Enter()
+        {
+            BattleManager.HideActionMenu();
+            BattleManager.ClearSelectionAndHighlights();
+            BattleManager.SetTurnLabel(LocalizationService.Text("ui.turn.end", "Turn: Battle End"));
+            BattleManager.SetLog(LocalizationService.Text("ui.log.defeat", "All player units have fallen."));
+            BattleManager.ShowResult(LocalizationService.Text("ui.result.defeat", "Defeat"));
+            BattleManager.SetEndTurnEnabled(false);
+        }
+    }
+}

@@ -1,0 +1,56 @@
+name: Epic
+description: 建立較大範圍的需求主題或里程碑
+title: "[Epic] "
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目標
+      description: 這個 Epic 要解決什麼問題或交付什麼價值
+      placeholder: 例如：完成玩家單位移動能力，讓玩家可在合法格上行動
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 範圍
+      description: 這個 Epic 包含哪些內容，不包含哪些內容
+      placeholder: |
+        包含：
+        - 顯示移動範圍
+        - 檢查合法移動
+
+        不包含：
+        - 地形加成
+        - 傳送或位移技能
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 驗收條件
+      description: Epic 完成時必須成立的條件
+      placeholder: |
+        - 玩家可選擇單位
+        - 可顯示合法移動範圍
+        - 不可移動到非法格
+    validations:
+      required: true
+
+  - type: textarea
+    id: breakdown
+    attributes:
+      label: 預計拆解的 Feature / Task
+      description: 先列出預計往下拆的工作
+      placeholder: |
+        - [ ] [Feature] 顯示可移動範圍
+        - [ ] [Task] 實作 RangeCalculator
+        - [ ] [Task] 撰寫移動測試
+
+  - type: input
+    id: milestone
+    attributes:
+      label: 對應 Milestone
+      placeholder: 例如：M3 移動系統

@@ -1,0 +1,39 @@
+name: Task
+description: 建立具體可執行的工程工作
+title: "[Task] "
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: 工作內容
+      description: 這張卡要做的具體事情
+      placeholder: 實作 RangeCalculator，輸入角色位置與 MoveRange，輸出合法格清單
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition_of_done
+    attributes:
+      label: 完成定義
+      description: 什麼狀態算完成
+      placeholder: |
+        - [ ] 方法可回傳合法格
+        - [ ] 已補單元測試
+        - [ ] 已接到 Battle 顯示流程
+    validations:
+      required: true
+
+  - type: textarea
+    id: test_plan
+    attributes:
+      label: 測試方式
+      description: 這張卡如何驗證
+      placeholder: |
+        - 執行 headless test
+        - Play Mode 中選角確認範圍顯示
+
+  - type: input
+    id: parent_issue
+    attributes:
+      label: 上層 Feature 或 Epic
+      placeholder: 例如：#18 [Feature] 顯示可移動範圍
