@@ -7,6 +7,11 @@ namespace PhalanxChronicle.Core
     {
         public IReadOnlyList<GridPosition> GetMoveRange(BattleContext context, UnitRuntimeState unit)
         {
+            if (StatusEffectRules.IsMovementBlocked(unit))
+            {
+                return new List<GridPosition> { unit.Position };
+            }
+
             int moveRange = PassiveSkillRules.GetMoveRange(unit);
             Dictionary<GridPosition, int> distances = new Dictionary<GridPosition, int>();
             Queue<GridPosition> frontier = new Queue<GridPosition>();
@@ -16,8 +21,8 @@ namespace PhalanxChronicle.Core
             while (frontier.Count > 0)
             {
                 GridPosition current = frontier.Dequeue();
-                int nextDistance = distances[current] + 1;
-                if (nextDistance > moveRange)
+                int minimumNextDistance = distances[current] + 1;
+                if (minimumNextDistance > moveRange)
                 {
                     continue;
                 }
@@ -39,7 +44,13 @@ namespace PhalanxChronicle.Core
                         continue;
                     }
 
-                    if (distances.ContainsKey(neighbor))
+                    int nextDistance = distances[current] + TerrainRules.GetMoveCost(unit, context.GetTerrainAt(neighbor));
+                    if (nextDistance > moveRange)
+                    {
+                        continue;
+                    }
+
+                    if (distances.TryGetValue(neighbor, out int knownDistance) && knownDistance <= nextDistance)
                     {
                         continue;
                     }

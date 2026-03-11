@@ -94,9 +94,17 @@ namespace PhalanxChronicle.Editor
                     throw new InvalidOperationException("Battle canvas was not created.");
                 }
 
-                if (units.Length == 0)
+                if (!battleManager.IsCampaignOverlayVisible || battleManager.Simulation != null)
                 {
-                    throw new InvalidOperationException("No runtime units were created.");
+                    throw new InvalidOperationException("Expected campaign stage selection to appear before any battle starts.");
+                }
+
+                gameManager.StartCampaignStage(0);
+                units = UnityEngine.Object.FindObjectsOfType<Unit>();
+
+                if (units.Length == 0 || battleManager.Simulation == null)
+                {
+                    throw new InvalidOperationException("Expected the first campaign stage to spawn runtime units.");
                 }
 
                 if (selectedUnitPanel == null || overviewPanel == null || forecastPanel == null)
@@ -182,8 +190,8 @@ namespace PhalanxChronicle.Editor
                 battleManager.TryUndoSelectionMove();
                 battleManager.ChangeState<UnitSelectionState>();
 
-                Unit armoredCaptainView = units.Single(unit => unit.UnitId == "enemy-armored-captain");
-                TextMesh armoredCaptainName = GetPrivateField<TextMesh>(armoredCaptainView, "nameText");
+                Unit armoredZealotView = units.Single(unit => unit.UnitId == "enemy-armored_zealot");
+                TextMesh armoredCaptainName = GetPrivateField<TextMesh>(armoredZealotView, "nameText");
                 if (armoredCaptainName == null || armoredCaptainName.characterSize >= 0.075f)
                 {
                     throw new InvalidOperationException("Expected long world-space names to scale down for readability.");
@@ -196,8 +204,8 @@ namespace PhalanxChronicle.Editor
                     throw new InvalidOperationException("Expected selected unit name label to use best fit.");
                 }
 
-                DefeatUnit(battleManager.Simulation.Context, "enemy-han-raider");
-                DefeatUnit(battleManager.Simulation.Context, "enemy-armored-captain");
+                DefeatUnit(battleManager.Simulation.Context, "enemy-yellow_turban_raider");
+                DefeatUnit(battleManager.Simulation.Context, "enemy-armored_zealot");
                 bool enteredDialogue = battleManager.ProcessScenarioCheckpointAndEnterDialogue(
                     ScenarioCheckpoint.ActionResolved,
                     typeof(UnitSelectionState));
@@ -207,7 +215,7 @@ namespace PhalanxChronicle.Editor
                     throw new InvalidOperationException("Expected reinforcements to trigger scenario dialogue.");
                 }
 
-                if (!battleManager.HasScenarioFlag(BattleScenarioCatalog.ReinforcementsArrivedFlag))
+                if (!battleManager.HasScenarioFlag(BattleScenarioCatalog.GuangzongReinforcementsArrivedFlag))
                 {
                     throw new InvalidOperationException("Scenario reinforcement flag was not set.");
                 }
@@ -220,6 +228,39 @@ namespace PhalanxChronicle.Editor
                 if (!battleManager.CurrentObjectiveText.Contains("張寶") || !battleManager.CurrentObjectiveText.Contains("張梁"))
                 {
                     throw new InvalidOperationException("Objective HUD did not update after reinforcements.");
+                }
+
+                gameManager.StartCampaignStage(1);
+                for (int index = 0; index < 8 && battleManager.IsDialogueVisible; index++)
+                {
+                    battleManager.AdvanceScenarioDialogue();
+                }
+
+                if (!battleManager.CurrentObjectiveText.Contains("第五回合") && !battleManager.CurrentObjectiveText.Contains("fifth round"))
+                {
+                    throw new InvalidOperationException("Expected Changban objective text to mention the fifth-round hold objective.");
+                }
+
+                gameManager.StartCampaignStage(2);
+                for (int index = 0; index < 8 && battleManager.IsDialogueVisible; index++)
+                {
+                    battleManager.AdvanceScenarioDialogue();
+                }
+
+                DefeatUnit(battleManager.Simulation.Context, "enemy-wei_vanguard_captain");
+                DefeatUnit(battleManager.Simulation.Context, "enemy-wei_archer_captain");
+                bool dingjunDialogue = battleManager.ProcessScenarioCheckpointAndEnterDialogue(
+                    ScenarioCheckpoint.ActionResolved,
+                    typeof(UnitSelectionState));
+
+                if (!dingjunDialogue || !battleManager.HasScenarioFlag(BattleScenarioCatalog.DingjunBossArrivedFlag))
+                {
+                    throw new InvalidOperationException("Expected Dingjun boss phase to begin after both forward captains fall.");
+                }
+
+                if (battleManager.Simulation.Context.GetUnit("enemy-xiahou-yuan") == null)
+                {
+                    throw new InvalidOperationException("Expected Xiahou Yuan to spawn for the Dingjun boss phase.");
                 }
 
                 Debug.Log(

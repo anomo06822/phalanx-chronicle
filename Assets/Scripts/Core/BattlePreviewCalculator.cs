@@ -19,12 +19,16 @@ namespace PhalanxChronicle.Core
             }
 
             int effectiveAttack = attacker.Attack +
+                                  PassiveSkillRules.GetPersonalAttackBonus(attacker) +
                                   PassiveSkillRules.GetAttackBonus(context, attacker, attackerPosition) +
+                                  SupportRules.GetAttackBonus(context, attacker, attackerPosition) +
                                   PassiveSkillRules.GetDamageBonus(attacker, attackerPosition) +
                                   StatusEffectRules.GetAttackModifier(attacker) +
                                   flatAttackBonus;
             int effectiveDefense = defender.Defense +
                                    PassiveSkillRules.GetDefenseBonus(defender) +
+                                   SupportRules.GetDefenseBonus(context, defender) +
+                                   TerrainRules.GetDefenseBonus(context.GetTerrainAt(defender.Position)) +
                                    StatusEffectRules.GetDefenseModifier(defender) -
                                    PassiveSkillRules.GetIgnoredDefense(attacker);
             if (effectiveDefense < 0)

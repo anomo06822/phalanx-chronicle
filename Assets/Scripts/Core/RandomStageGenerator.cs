@@ -21,25 +21,30 @@ namespace PhalanxChronicle.Core
             {
                 List<GridPosition> blockedCells = BuildBlockedCells(width, height, random);
                 List<UnitSpawnData> spawns = BuildSpawns(width, height, units, random, blockedCells);
+                List<TerrainTileData> terrainTiles = BuildTerrainTiles(width, height, random, blockedCells, spawns);
                 if (IsPlayableLayout(width, height, blockedCells, spawns))
                 {
-                    return new StageDefinitionData(stageName, stageNameKey, width, height, spawns, blockedCells, true, actualSeed);
+                    return new StageDefinitionData(stageName, stageNameKey, width, height, spawns, blockedCells, terrainTiles, true, actualSeed);
                 }
             }
 
             List<GridPosition> fallbackBlockedCells = new List<GridPosition>();
             List<UnitSpawnData> fallbackSpawns = BuildSpawns(width, height, units, random, fallbackBlockedCells);
-            return new StageDefinitionData(stageName, stageNameKey, width, height, fallbackSpawns, fallbackBlockedCells, true, actualSeed);
+            List<TerrainTileData> fallbackTerrainTiles = BuildTerrainTiles(width, height, random, fallbackBlockedCells, fallbackSpawns);
+            return new StageDefinitionData(stageName, stageNameKey, width, height, fallbackSpawns, fallbackBlockedCells, fallbackTerrainTiles, true, actualSeed);
         }
 
         private static List<GridPosition> BuildBlockedCells(int width, int height, Random random)
         {
             HashSet<GridPosition> blocked = new HashSet<GridPosition>();
             int pairCount = Math.Max(2, height / 4) + random.Next(0, 2);
+            int laneDepth = GetSpawnLaneDepth(width);
+            int leftBound = Math.Max(laneDepth + 1, 2);
+            int rightBound = Math.Max(leftBound + 1, width / 2);
 
             for (int index = 0; index < pairCount; index++)
             {
-                int x = random.Next(3, Math.Max(4, width / 2));
+                int x = random.Next(leftBound, rightBound);
                 int y = random.Next(1, height - 1);
                 GridPosition left = new GridPosition(x, y);
                 GridPosition right = new GridPosition(width - 1 - x, y);
@@ -107,12 +112,10 @@ namespace PhalanxChronicle.Core
             int requiredCount,
             bool leftSide)
         {
+            int laneDepth = GetSpawnLaneDepth(width);
             IEnumerable<GridPosition> candidates = Enumerable.Range(1, Math.Max(1, height - 2))
-                .SelectMany(y => new[]
-                {
-                    new GridPosition(leftSide ? 1 : width - 2, y),
-                    new GridPosition(leftSide ? 2 : width - 3, y),
-                });
+                .SelectMany(y => Enumerable.Range(1, laneDepth)
+                    .Select(offset => new GridPosition(leftSide ? offset : width - 1 - offset, y)));
 
             List<GridPosition> available = candidates
                 .Where(position => !blockedCells.Contains(position))
@@ -128,9 +131,68 @@ namespace PhalanxChronicle.Core
             return requiredCount > 0 ? available.Take(requiredCount).ToList() : available;
         }
 
+        private static List<TerrainTileData> BuildTerrainTiles(
+            int width,
+            int height,
+            Random random,
+            IReadOnlyCollection<GridPosition> blockedCells,
+            IReadOnlyCollection<UnitSpawnData> spawns)
+        {
+            HashSet<GridPosition> reserved = new HashSet<GridPosition>(blockedCells);
+            foreach (UnitSpawnData spawn in spawns)
+            {
+                reserved.Add(spawn.StartPosition);
+            }
+
+            List<TerrainTileData> tiles = new List<TerrainTileData>();
+            TryAddTerrainPair(width, height / 2, TerrainType.Fort, reserved, tiles, 2);
+            TryAddTerrainPair(width, 2, TerrainType.Forest, reserved, tiles, 3);
+            TryAddTerrainPair(width, Math.Max(2, height - 3), TerrainType.Forest, reserved, tiles, 3);
+            TryAddTerrainPair(width, Math.Max(3, height / 2 - 1), TerrainType.Hazard, reserved, tiles, Math.Max(3, width / 2 - 1));
+
+            for (int index = 0; index < 2; index++)
+            {
+                int x = random.Next(GetSpawnLaneDepth(width) + 1, Math.Max(GetSpawnLaneDepth(width) + 2, width / 2));
+                int y = random.Next(1, height - 1);
+                TryAddTerrainPair(width, y, TerrainType.Forest, reserved, tiles, x);
+            }
+
+            return tiles
+                .OrderBy(tile => tile.Position.Y)
+                .ThenBy(tile => tile.Position.X)
+                .ToList();
+        }
+
+        private static void TryAddTerrainPair(
+            int width,
+            int y,
+            TerrainType terrainType,
+            ISet<GridPosition> reserved,
+            ICollection<TerrainTileData> tiles,
+            int x)
+        {
+            GridPosition left = new GridPosition(x, y);
+            GridPosition right = new GridPosition(width - 1 - x, y);
+            if (reserved.Contains(left) || reserved.Contains(right))
+            {
+                return;
+            }
+
+            reserved.Add(left);
+            reserved.Add(right);
+            tiles.Add(new TerrainTileData(left, terrainType));
+            tiles.Add(new TerrainTileData(right, terrainType));
+        }
+
         private static bool IsReservedLane(int width, GridPosition position)
         {
-            return position.X <= 2 || position.X >= width - 3;
+            int laneDepth = GetSpawnLaneDepth(width);
+            return position.X <= laneDepth || position.X >= width - 1 - laneDepth;
+        }
+
+        private static int GetSpawnLaneDepth(int width)
+        {
+            return Math.Max(2, Math.Min(3, width / 4));
         }
 
         private static bool IsPlayableLayout(

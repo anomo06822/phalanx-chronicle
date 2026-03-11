@@ -10,7 +10,8 @@ namespace PhalanxChronicle.Core
             ObjectiveState objectiveState,
             IReadOnlyList<UnitSpawnData> unitSpawns,
             TurnSide? winningSide,
-            string flagName)
+            string flagName,
+            BattlefieldMutation battlefieldMutation)
         {
             Type = type;
             DialogueLines = dialogueLines;
@@ -18,6 +19,7 @@ namespace PhalanxChronicle.Core
             UnitSpawns = unitSpawns;
             WinningSide = winningSide;
             FlagName = flagName;
+            BattlefieldMutation = battlefieldMutation;
         }
 
         public ScenarioDirectiveType Type { get; }
@@ -32,29 +34,36 @@ namespace PhalanxChronicle.Core
 
         public string FlagName { get; }
 
+        public BattlefieldMutation BattlefieldMutation { get; }
+
         public static ScenarioDirective QueueDialogue(IReadOnlyList<ScenarioDialogueLine> dialogueLines)
         {
-            return new ScenarioDirective(ScenarioDirectiveType.QueueDialogue, dialogueLines, null, null, null, null);
+            return new ScenarioDirective(ScenarioDirectiveType.QueueDialogue, dialogueLines, null, null, null, null, null);
         }
 
         public static ScenarioDirective UpdateObjective(ObjectiveState objectiveState)
         {
-            return new ScenarioDirective(ScenarioDirectiveType.UpdateObjective, null, objectiveState, null, null, null);
+            return new ScenarioDirective(ScenarioDirectiveType.UpdateObjective, null, objectiveState, null, null, null, null);
         }
 
         public static ScenarioDirective SpawnUnits(IReadOnlyList<UnitSpawnData> unitSpawns)
         {
-            return new ScenarioDirective(ScenarioDirectiveType.SpawnUnits, null, null, unitSpawns, null, null);
+            return new ScenarioDirective(ScenarioDirectiveType.SpawnUnits, null, null, unitSpawns, null, null, null);
         }
 
         public static ScenarioDirective SetBattleOutcome(TurnSide winningSide)
         {
-            return new ScenarioDirective(ScenarioDirectiveType.SetBattleOutcome, null, null, null, winningSide, null);
+            return new ScenarioDirective(ScenarioDirectiveType.SetBattleOutcome, null, null, null, winningSide, null, null);
         }
 
         public static ScenarioDirective SetFlag(string flagName)
         {
-            return new ScenarioDirective(ScenarioDirectiveType.SetFlag, null, null, null, null, flagName);
+            return new ScenarioDirective(ScenarioDirectiveType.SetFlag, null, null, null, null, flagName, null);
+        }
+
+        public static ScenarioDirective ApplyBattlefieldMutation(BattlefieldMutation battlefieldMutation)
+        {
+            return new ScenarioDirective(ScenarioDirectiveType.ApplyBattlefieldMutation, null, null, null, null, null, battlefieldMutation);
         }
     }
 }

@@ -4,20 +4,48 @@ using UnityEngine;
 
 namespace PhalanxChronicle.Presentation
 {
+    public enum GridOverlayKind
+    {
+        Move = 0,
+        Attack = 1,
+        Skill = 2,
+        Selected = 3,
+    }
+
+    public enum StageBackdropLayer
+    {
+        Far = 0,
+        Mid = 1,
+    }
+
     public static class RuntimeSpriteLibrary
     {
         private static readonly Dictionary<string, Sprite> unitSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> portraitSprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<string, Sprite> weaponSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> factionMarkerSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> terrainBaseSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> terrainOverlaySprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> terrainPropSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> stageLandmarkSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> stageBackdropSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> ambientOverlaySprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> gradientSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<GridOverlayKind, Sprite> gridOverlaySprites = new Dictionary<GridOverlayKind, Sprite>();
 
         private static Sprite whiteSprite;
         private static Sprite tileSprite;
         private static Sprite frameSprite;
         private static Sprite bannerSprite;
+        private static Sprite mistBandSprite;
+        private static Sprite inkPanelSprite;
         private static Sprite slashSprite;
         private static Sprite ringSprite;
         private static Sprite sparkSprite;
         private static Sprite arrowSprite;
         private static Font defaultFont;
+        private static Font headingFont;
+        private static Font bodyFont;
 
         public static Sprite WhiteSprite
         {
@@ -33,11 +61,15 @@ namespace PhalanxChronicle.Presentation
             }
         }
 
-        public static Sprite TileSprite => tileSprite ??= CreateTileSprite();
+        public static Sprite TileSprite => tileSprite ??= CreatePlainTileSprite();
 
         public static Sprite FrameSprite => frameSprite ??= CreateFrameSprite();
 
         public static Sprite BannerSprite => bannerSprite ??= CreateBannerSprite();
+
+        public static Sprite MistBandSprite => mistBandSprite ??= CreateMistBandSprite();
+
+        public static Sprite InkPanelSprite => inkPanelSprite ??= CreateInkPanelSprite();
 
         public static Sprite SlashSprite => slashSprite ??= CreateSlashSprite();
 
@@ -47,164 +79,466 @@ namespace PhalanxChronicle.Presentation
 
         public static Sprite ArrowSprite => arrowSprite ??= CreateArrowSprite();
 
-        public static Font DefaultFont => defaultFont ??= CreateDefaultFont();
+        public static Font HeadingFont => headingFont ??= CreateHeadingFont();
+
+        public static Font BodyFont => bodyFont ??= CreateBodyFont();
+
+        public static Font DefaultFont => defaultFont ??= BodyFont;
+
+        public static Font GetUiFont(int size, FontStyle fontStyle)
+        {
+            return fontStyle == FontStyle.Bold && size >= 17 ? HeadingFont : BodyFont;
+        }
 
         public static Sprite GetUnitSprite(string unitId, UnitFaction faction)
         {
-            string key = faction + ":" + unitId;
-            if (unitSprites.TryGetValue(key, out Sprite sprite))
+            return GetUnitSprite(unitId, faction, UnitRole.Commander);
+        }
+
+        public static Sprite GetUnitSprite(string unitId, UnitFaction faction, UnitRole role)
+        {
+            return GetUnitSprite(UnitVisualCatalog.GetProfile(unitId, faction, role));
+        }
+
+        public static Sprite GetUnitSprite(UnitVisualProfile profile)
+        {
+            if (profile == null)
             {
-                return sprite;
+                return GetUnitSprite(string.Empty, UnitFaction.Player, UnitRole.Commander);
             }
 
-            sprite = CreateUnitSprite(unitId, faction);
-            unitSprites[key] = sprite;
+            if (profile.BattleSprite != null)
+            {
+                return profile.BattleSprite;
+            }
+
+            string key = "unit:" + profile.UnitId + ":" + profile.Archetype + ":" + profile.Role + ":" + profile.Faction;
+            if (!unitSprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = CreateUnitSprite(profile);
+                unitSprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Sprite GetPortraitSprite(string unitId, UnitFaction faction, UnitRole role)
+        {
+            return GetPortraitSprite(UnitVisualCatalog.GetProfile(unitId, faction, role));
+        }
+
+        public static Sprite GetPortraitSprite(UnitVisualProfile profile)
+        {
+            if (profile == null)
+            {
+                return GetPortraitSprite(string.Empty, UnitFaction.Player, UnitRole.Commander);
+            }
+
+            if (profile.PortraitSprite != null)
+            {
+                return profile.PortraitSprite;
+            }
+
+            string key = "portrait:" + profile.UnitId + ":" + profile.Archetype + ":" + profile.Role + ":" + profile.Faction;
+            if (!portraitSprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = CreatePortraitSprite(profile);
+                portraitSprites[key] = sprite;
+            }
+
             return sprite;
         }
 
         public static Sprite GetWeaponSprite(UnitRole role, UnitFaction faction)
         {
-            string key = role + ":" + faction;
-            if (weaponSprites.TryGetValue(key, out Sprite sprite))
+            string key = "weapon:" + role + ":" + faction;
+            if (!weaponSprites.TryGetValue(key, out Sprite sprite))
             {
-                return sprite;
+                sprite = CreateWeaponSprite(role, faction);
+                weaponSprites[key] = sprite;
             }
 
-            sprite = CreateWeaponSprite(role, faction);
-            weaponSprites[key] = sprite;
             return sprite;
         }
 
-        private static Sprite CreateTileSprite()
+        public static Sprite GetWeaponSprite(UnitVisualProfile profile)
         {
-            Texture2D texture = CreateTexture(16, 16);
-            Color32 border = new Color32(56, 39, 25, 255);
-            Color32 fillA = new Color32(188, 162, 106, 255);
-            Color32 fillB = new Color32(171, 146, 96, 255);
-            Color32 accent = new Color32(208, 188, 138, 255);
-
-            for (int y = 0; y < 16; y++)
+            if (profile != null && profile.WeaponIcon != null)
             {
-                for (int x = 0; x < 16; x++)
-                {
-                    bool isBorder = x == 0 || y == 0 || x == 15 || y == 15;
-                    if (isBorder)
-                    {
-                        texture.SetPixel(x, y, border);
-                        continue;
-                    }
-
-                    bool diagonal = (x + y) % 5 == 0;
-                    texture.SetPixel(x, y, diagonal ? fillB : fillA);
-                }
+                return profile.WeaponIcon;
             }
 
-            FillRect(texture, 2, 12, 4, 13, accent);
-            FillRect(texture, 11, 2, 13, 3, accent);
-            texture.Apply();
-            return CreateSprite(texture, 16f);
+            return GetWeaponSprite(profile != null ? profile.Role : UnitRole.Commander, profile != null ? profile.Faction : UnitFaction.Player);
         }
 
-        private static Sprite CreateFrameSprite()
+        public static Sprite GetFactionMarkerSprite(UnitVisualProfile profile)
+        {
+            if (profile != null && profile.FactionMarker != null)
+            {
+                return profile.FactionMarker;
+            }
+
+            string key = "marker:" + (profile != null ? profile.FrameStyle.ToString() : UnitFrameStyle.Common.ToString()) + ":" + (profile != null ? profile.Faction.ToString() : UnitFaction.Player.ToString());
+            if (!factionMarkerSprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = CreateFactionMarkerSprite(profile);
+                factionMarkerSprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Sprite GetTerrainBaseSprite(TerrainType terrainType, bool blocked)
+        {
+            string key = "base:" + GetTerrainResourceKey(terrainType, blocked);
+            if (!terrainBaseSprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_base") ?? CreateTerrainBaseSprite(terrainType, blocked);
+                terrainBaseSprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Sprite GetTerrainOverlaySprite(TerrainType terrainType, bool blocked)
+        {
+            string key = "overlay:" + GetTerrainResourceKey(terrainType, blocked);
+            if (!terrainOverlaySprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_overlay") ?? CreateTerrainOverlaySprite(terrainType, blocked);
+                terrainOverlaySprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Sprite GetTerrainPropSprite(TerrainType terrainType, bool blocked)
+        {
+            string key = "prop:" + GetTerrainResourceKey(terrainType, blocked);
+            if (!terrainPropSprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_prop") ?? CreateTerrainPropSprite(terrainType, blocked);
+                terrainPropSprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Sprite GetStageLandmarkSprite(string stageNameKey)
+        {
+            string key = string.IsNullOrWhiteSpace(stageNameKey) ? "default" : stageNameKey;
+            if (!stageLandmarkSprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = TryLoadSpriteResource("StageBackdrops/" + key) ?? CreateStageLandmarkSprite(key);
+                stageLandmarkSprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Sprite GetStageBackdropSprite(string stageNameKey, StageBackdropLayer layer)
+        {
+            string key = (string.IsNullOrWhiteSpace(stageNameKey) ? "default" : stageNameKey) + ":" + layer;
+            if (!stageBackdropSprites.TryGetValue(key, out Sprite sprite))
+            {
+                string resourcePath = "StageBackdrops/" + (string.IsNullOrWhiteSpace(stageNameKey) ? "default" : stageNameKey) + "_" + layer.ToString().ToLowerInvariant();
+                sprite = TryLoadSpriteResource(resourcePath) ?? CreateStageBackdropSprite(stageNameKey, layer);
+                stageBackdropSprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Sprite GetAmbientOverlaySprite(string presetId)
+        {
+            string key = string.IsNullOrWhiteSpace(presetId) ? "default" : presetId;
+            if (!ambientOverlaySprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = CreateAmbientOverlaySprite(key);
+                ambientOverlaySprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Sprite GetVerticalGradientSprite(Color top, Color bottom)
+        {
+            string key = "gradient:" + ColorUtility.ToHtmlStringRGBA(top) + ":" + ColorUtility.ToHtmlStringRGBA(bottom);
+            if (!gradientSprites.TryGetValue(key, out Sprite sprite))
+            {
+                sprite = CreateVerticalGradientSprite(top, bottom);
+                gradientSprites[key] = sprite;
+            }
+
+            return sprite;
+        }
+
+        public static Color GetTerrainBaseTint(string paletteId, TerrainType terrainType, bool blocked)
+        {
+            if (blocked)
+            {
+                return GetPaletteColor(paletteId, "blocked");
+            }
+
+            switch (terrainType)
+            {
+                case TerrainType.Forest:
+                    return GetPaletteColor(paletteId, "forest");
+                case TerrainType.Fort:
+                    return GetPaletteColor(paletteId, "fort");
+                case TerrainType.Hazard:
+                    return GetPaletteColor(paletteId, "hazard");
+                default:
+                    return GetPaletteColor(paletteId, "plain");
+            }
+        }
+
+        public static Color GetTerrainOverlayTint(string paletteId, TerrainType terrainType, bool blocked)
+        {
+            if (blocked)
+            {
+                return GetPaletteColor(paletteId, "overlay-blocked");
+            }
+
+            switch (terrainType)
+            {
+                case TerrainType.Forest:
+                    return GetPaletteColor(paletteId, "overlay-forest");
+                case TerrainType.Fort:
+                    return GetPaletteColor(paletteId, "overlay-fort");
+                case TerrainType.Hazard:
+                    return GetPaletteColor(paletteId, "overlay-hazard");
+                default:
+                    return GetPaletteColor(paletteId, "overlay-plain");
+            }
+        }
+
+        public static Color GetTerrainPropTint(string paletteId, TerrainType terrainType, bool blocked)
+        {
+            if (blocked)
+            {
+                return GetPaletteColor(paletteId, "prop-blocked");
+            }
+
+            switch (terrainType)
+            {
+                case TerrainType.Forest:
+                    return GetPaletteColor(paletteId, "prop-forest");
+                case TerrainType.Fort:
+                    return GetPaletteColor(paletteId, "prop-fort");
+                case TerrainType.Hazard:
+                    return GetPaletteColor(paletteId, "prop-hazard");
+                default:
+                    return GetPaletteColor(paletteId, "prop-plain");
+            }
+        }
+
+        public static Sprite GetGridOverlaySprite(GridOverlayKind kind)
+        {
+            if (!gridOverlaySprites.TryGetValue(kind, out Sprite sprite))
+            {
+                sprite = CreateGridOverlaySprite(kind);
+                gridOverlaySprites[kind] = sprite;
+            }
+
+            return sprite;
+        }
+
+        private static Sprite CreatePlainTileSprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 gold = new Color32(240, 209, 96, 255);
+            Color32 border = new Color32(74, 54, 36, 255);
+            Color32 fillA = new Color32(168, 143, 95, 255);
+            Color32 fillB = new Color32(151, 129, 84, 255);
+            Color32 accent = new Color32(196, 172, 122, 255);
+            FillBaseTile(texture, border, fillA, fillB, accent);
+            return CreateSprite(texture, 20f);
+        }
 
-            for (int y = 0; y < 20; y++)
+        private static Sprite CreateForestTileSprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 border = new Color32(46, 62, 35, 255);
+            Color32 fillA = new Color32(90, 106, 62, 255);
+            Color32 fillB = new Color32(72, 90, 52, 255);
+            Color32 accent = new Color32(128, 146, 83, 255);
+            FillBaseTile(texture, border, fillA, fillB, accent);
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateFortTileSprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 border = new Color32(70, 66, 61, 255);
+            Color32 fillA = new Color32(143, 140, 132, 255);
+            Color32 fillB = new Color32(121, 118, 111, 255);
+            Color32 accent = new Color32(175, 172, 162, 255);
+            FillBaseTile(texture, border, fillA, fillB, accent);
+            for (int y = 4; y <= 14; y += 5)
             {
-                for (int x = 0; x < 20; x++)
-                {
-                    bool outer = x == 0 || y == 0 || x == 19 || y == 19;
-                    bool corner = (x <= 4 || x >= 15) && (y <= 4 || y >= 15);
-                    if (outer || corner)
-                    {
-                        texture.SetPixel(x, y, gold);
-                    }
-                }
+                DrawLine(texture, 2, y, 17, y, border, 1);
+            }
+
+            for (int x = 5; x <= 15; x += 5)
+            {
+                DrawLine(texture, x, 2, x, 17, border, 1);
             }
 
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
 
+        private static Sprite CreateHazardTileSprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 border = new Color32(62, 34, 22, 255);
+            Color32 fillA = new Color32(93, 58, 40, 255);
+            Color32 fillB = new Color32(75, 44, 33, 255);
+            Color32 accent = new Color32(167, 92, 50, 255);
+            FillBaseTile(texture, border, fillA, fillB, accent);
+            DrawLine(texture, 4, 3, 8, 10, accent, 1);
+            DrawLine(texture, 12, 4, 15, 10, accent, 1);
+            DrawLine(texture, 6, 15, 11, 11, accent, 1);
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateBlockedTileSprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 border = new Color32(36, 40, 44, 255);
+            Color32 fillA = new Color32(83, 88, 95, 255);
+            Color32 fillB = new Color32(65, 70, 78, 255);
+            Color32 accent = new Color32(118, 126, 136, 255);
+            FillBaseTile(texture, border, fillA, fillB, accent);
+            FillRect(texture, 4, 10, 15, 16, accent);
+            StrokeRect(texture, 4, 10, 15, 16, border);
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateFrameSprite()
+        {
+            Texture2D texture = CreateTexture(24, 24);
+            Color32 bronze = new Color32(197, 154, 73, 255);
+            Color32 innerBronze = new Color32(233, 203, 140, 255);
+            StrokeRect(texture, 0, 0, 23, 23, bronze);
+            StrokeRect(texture, 2, 2, 21, 21, bronze);
+            FillTriangle(texture, new Vector2Int(0, 6), new Vector2Int(6, 0), new Vector2Int(7, 7), innerBronze);
+            FillTriangle(texture, new Vector2Int(17, 0), new Vector2Int(23, 6), new Vector2Int(16, 7), innerBronze);
+            FillTriangle(texture, new Vector2Int(0, 17), new Vector2Int(6, 23), new Vector2Int(7, 16), innerBronze);
+            FillTriangle(texture, new Vector2Int(17, 23), new Vector2Int(23, 17), new Vector2Int(16, 16), innerBronze);
+            DrawLine(texture, 4, 1, 9, 1, innerBronze, 1);
+            DrawLine(texture, 14, 1, 19, 1, innerBronze, 1);
+            DrawLine(texture, 4, 22, 9, 22, innerBronze, 1);
+            DrawLine(texture, 14, 22, 19, 22, innerBronze, 1);
+            texture.Apply();
+            return CreateSprite(texture, 24f);
+        }
+
         private static Sprite CreateBannerSprite()
         {
-            Texture2D texture = CreateTexture(48, 16);
-            Color32 fill = new Color32(28, 31, 45, 240);
-            Color32 border = new Color32(199, 168, 86, 255);
+            Texture2D texture = CreateTexture(72, 22);
+            Color32 fill = new Color32(25, 27, 31, 236);
+            Color32 accent = new Color32(197, 154, 73, 255);
+            FillRect(texture, 6, 3, 65, 18, fill);
+            StrokeRect(texture, 6, 3, 65, 18, accent);
+            FillTriangle(texture, new Vector2Int(6, 3), new Vector2Int(0, 10), new Vector2Int(6, 18), fill);
+            FillTriangle(texture, new Vector2Int(65, 3), new Vector2Int(71, 10), new Vector2Int(65, 18), fill);
+            DrawLine(texture, 14, 6, 58, 6, accent, 1);
+            DrawLine(texture, 14, 15, 58, 15, new Color32(102, 77, 40, 255), 1);
+            texture.Apply();
+            return CreateSprite(texture, 36f);
+        }
 
-            FillRect(texture, 0, 0, 47, 15, fill);
-            StrokeRect(texture, 0, 0, 47, 15, border);
-            FillRect(texture, 2, 2, 45, 13, fill);
+        private static Sprite CreateMistBandSprite()
+        {
+            Texture2D texture = CreateTexture(160, 48, FilterMode.Bilinear);
+            Color baseColor = new Color(1f, 1f, 1f, 0.68f);
+            FillEllipse(texture, 38f, 24f, 28f, 10f, new Color(baseColor.r, baseColor.g, baseColor.b, 0.22f));
+            FillEllipse(texture, 78f, 30f, 34f, 11f, new Color(baseColor.r, baseColor.g, baseColor.b, 0.3f));
+            FillEllipse(texture, 120f, 22f, 26f, 9f, new Color(baseColor.r, baseColor.g, baseColor.b, 0.18f));
+            DrawEllipseRing(texture, 78f, 25f, 54f, 14f, new Color(1f, 1f, 1f, 0.08f), 0.08f);
+            texture.Apply();
+            return CreateSprite(texture, 160f);
+        }
+
+        private static Sprite CreateInkPanelSprite()
+        {
+            Texture2D texture = CreateTexture(48, 48, FilterMode.Bilinear);
+            for (int y = 0; y < texture.height; y++)
+            {
+                for (int x = 0; x < texture.width; x++)
+                {
+                    float edgeDistance = Mathf.Min(Mathf.Min(x, texture.width - 1 - x), Mathf.Min(y, texture.height - 1 - y));
+                    float edgeFade = Mathf.Clamp01(edgeDistance / 6f);
+                    float grain = (((x * 13) + (y * 7)) % 17) / 16f;
+                    float alpha = Mathf.Lerp(0.82f, 1f, grain * 0.16f) * edgeFade;
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
             texture.Apply();
             return CreateSprite(texture, 24f);
         }
 
         private static Sprite CreateSlashSprite()
         {
-            Texture2D texture = CreateTexture(32, 32);
-            Color32 bright = new Color32(255, 246, 210, 255);
-            Color32 warm = new Color32(255, 173, 84, 255);
-
-            for (int x = 4; x < 28; x++)
-            {
-                int y = x - 2;
-                PlotSlashPixel(texture, x, y, bright);
-                PlotSlashPixel(texture, x, y - 1, warm);
-                PlotSlashPixel(texture, x, y + 1, warm);
-            }
-
+            Texture2D texture = CreateTexture(48, 48, FilterMode.Bilinear);
+            Color32 bright = new Color32(255, 243, 214, 255);
+            Color32 warm = new Color32(229, 159, 88, 255);
+            FillTriangle(texture, new Vector2Int(6, 12), new Vector2Int(32, 38), new Vector2Int(14, 40), warm);
+            FillTriangle(texture, new Vector2Int(11, 10), new Vector2Int(38, 33), new Vector2Int(20, 37), bright);
+            DrawLine(texture, 8, 13, 39, 34, new Color32(255, 255, 255, 164), 1);
             texture.Apply();
-            return CreateSprite(texture, 20f);
+            return CreateSprite(texture, 30f);
         }
 
         private static Sprite CreateRingSprite()
         {
-            Texture2D texture = CreateTexture(32, 32);
-            Vector2 center = new Vector2(15.5f, 15.5f);
+            Texture2D texture = CreateTexture(40, 40, FilterMode.Bilinear);
+            Vector2 center = new Vector2(19.5f, 19.5f);
             Color32 ring = new Color32(255, 255, 255, 255);
-
-            for (int y = 0; y < 32; y++)
+            for (int y = 0; y < 40; y++)
             {
-                for (int x = 0; x < 32; x++)
+                for (int x = 0; x < 40; x++)
                 {
                     float distance = Vector2.Distance(new Vector2(x, y), center);
-                    if (distance >= 10.5f && distance <= 13.2f)
+                    if (distance >= 12f && distance <= 15f)
                     {
                         texture.SetPixel(x, y, ring);
                     }
                 }
             }
 
+            DrawEllipseRing(texture, 19.5f, 19.5f, 11f, 11f, new Color(1f, 1f, 1f, 0.4f), 0.1f);
             texture.Apply();
-            return CreateSprite(texture, 24f);
+            return CreateSprite(texture, 30f);
         }
 
         private static Sprite CreateSparkSprite()
         {
-            Texture2D texture = CreateTexture(32, 32);
+            Texture2D texture = CreateTexture(40, 40, FilterMode.Bilinear);
             Color32 bright = new Color32(255, 255, 255, 255);
-
-            DrawLine(texture, 16, 4, 16, 28, bright, 1);
-            DrawLine(texture, 4, 16, 28, 16, bright, 1);
-            DrawLine(texture, 8, 8, 24, 24, bright, 1);
-            DrawLine(texture, 8, 24, 24, 8, bright, 1);
-            FillRect(texture, 14, 14, 18, 18, bright);
+            DrawLine(texture, 20, 6, 20, 34, bright, 1);
+            DrawLine(texture, 6, 20, 34, 20, bright, 1);
+            DrawLine(texture, 10, 10, 30, 30, bright, 1);
+            DrawLine(texture, 10, 30, 30, 10, bright, 1);
+            FillRect(texture, 18, 18, 22, 22, bright);
             texture.Apply();
-            return CreateSprite(texture, 24f);
+            return CreateSprite(texture, 30f);
         }
 
         private static Sprite CreateArrowSprite()
         {
-            Texture2D texture = CreateTexture(32, 32);
+            Texture2D texture = CreateTexture(40, 40, FilterMode.Bilinear);
             Color32 bright = new Color32(255, 255, 255, 255);
-
-            FillRect(texture, 14, 5, 17, 20, bright);
-            FillRect(texture, 12, 18, 19, 21, bright);
-            DrawLine(texture, 8, 16, 16, 27, bright, 1);
-            DrawLine(texture, 24, 16, 16, 27, bright, 1);
+            FillRect(texture, 18, 6, 21, 23, bright);
+            FillRect(texture, 15, 21, 24, 24, bright);
+            DrawLine(texture, 11, 19, 20, 34, bright, 1);
+            DrawLine(texture, 29, 19, 20, 34, bright, 1);
             texture.Apply();
-            return CreateSprite(texture, 24f);
+            return CreateSprite(texture, 30f);
         }
 
         private static Sprite CreateWeaponSprite(UnitRole role, UnitFaction faction)
@@ -271,106 +605,1134 @@ namespace PhalanxChronicle.Presentation
             return CreateSprite(texture, 24f);
         }
 
-        private static Sprite CreateUnitSprite(string unitId, UnitFaction faction)
+        private static Sprite CreateFactionMarkerSprite(UnitVisualProfile profile)
+        {
+            Texture2D texture = CreateTexture(40, 18);
+            Color markerColor = profile != null ? profile.MarkerColor : new Color(0.34f, 0.62f, 0.94f, 1f);
+            Color shadow = Color.Lerp(markerColor, Color.black, 0.48f);
+            FillEllipse(texture, 20f, 8.5f, 18f, 7f, new Color(shadow.r, shadow.g, shadow.b, 0.85f));
+            FillEllipse(texture, 20f, 9f, 14f, 4.2f, new Color(markerColor.r, markerColor.g, markerColor.b, 0.98f));
+            DrawEllipseRing(texture, 20f, 9f, 14f, 4.2f, Color.white, 0.7f);
+            texture.Apply();
+            return CreateSprite(texture, 24f);
+        }
+
+        private static Sprite CreateTerrainBaseSprite(TerrainType terrainType, bool blocked)
+        {
+            if (blocked)
+            {
+                return CreateBlockedTileSprite();
+            }
+
+            switch (terrainType)
+            {
+                case TerrainType.Forest:
+                    return CreateForestTileSprite();
+                case TerrainType.Fort:
+                    return CreateFortTileSprite();
+                case TerrainType.Hazard:
+                    return CreateHazardTileSprite();
+                default:
+                    return CreatePlainTileSprite();
+            }
+        }
+
+        private static Sprite CreateTerrainOverlaySprite(TerrainType terrainType, bool blocked)
+        {
+            if (blocked)
+            {
+                return CreateBlockedOverlaySprite();
+            }
+
+            switch (terrainType)
+            {
+                case TerrainType.Forest:
+                    return CreateForestOverlaySprite();
+                case TerrainType.Fort:
+                    return CreateFortOverlaySprite();
+                case TerrainType.Hazard:
+                    return CreateHazardOverlaySprite();
+                default:
+                    return CreatePlainOverlaySprite();
+            }
+        }
+
+        private static Sprite CreateTerrainPropSprite(TerrainType terrainType, bool blocked)
+        {
+            if (blocked)
+            {
+                return CreateBoulderPropSprite();
+            }
+
+            switch (terrainType)
+            {
+                case TerrainType.Forest:
+                    return CreateTreePropSprite();
+                case TerrainType.Fort:
+                    return CreateFortPropSprite();
+                case TerrainType.Hazard:
+                    return CreateFlamePropSprite();
+                default:
+                    return null;
+            }
+        }
+
+        private static Sprite CreateStageLandmarkSprite(string stageNameKey)
+        {
+            Texture2D texture = CreateTexture(160, 72, FilterMode.Bilinear);
+            Color silhouette = new Color(1f, 1f, 1f, 0.95f);
+            if (stageNameKey == "stage.changban_rearguard")
+            {
+                FillTriangle(texture, new Vector2Int(18, 20), new Vector2Int(48, 20), new Vector2Int(34, 42), silhouette);
+                FillTriangle(texture, new Vector2Int(42, 20), new Vector2Int(80, 20), new Vector2Int(61, 50), silhouette);
+                FillTriangle(texture, new Vector2Int(76, 20), new Vector2Int(116, 20), new Vector2Int(97, 44), silhouette);
+                FillTriangle(texture, new Vector2Int(110, 20), new Vector2Int(144, 20), new Vector2Int(126, 38), silhouette);
+                DrawLine(texture, 20, 20, 144, 20, silhouette, 2);
+                for (int x = 28; x <= 138; x += 12)
+                {
+                    DrawLine(texture, x, 20, x, 30, silhouette, 1);
+                }
+            }
+            else if (stageNameKey == "stage.dingjun_mountain")
+            {
+                FillTriangle(texture, new Vector2Int(10, 16), new Vector2Int(52, 58), new Vector2Int(90, 16), silhouette);
+                FillTriangle(texture, new Vector2Int(66, 16), new Vector2Int(106, 62), new Vector2Int(150, 16), silhouette);
+                DrawLine(texture, 14, 16, 150, 16, silhouette, 2);
+                for (int x = 24; x <= 140; x += 14)
+                {
+                    DrawLine(texture, x, 16, x, 30, silhouette, 1);
+                }
+            }
+            else
+            {
+                FillRect(texture, 16, 18, 146, 26, silhouette);
+                for (int x = 28; x <= 136; x += 20)
+                {
+                    DrawLine(texture, x, 26, x, 52, silhouette, 2);
+                    FillTriangle(texture, new Vector2Int(x, 50), new Vector2Int(x + 16, 42), new Vector2Int(x, 32), silhouette);
+                }
+
+                DrawLine(texture, 26, 18, 34, 32, silhouette, 1);
+                DrawLine(texture, 82, 18, 90, 34, silhouette, 1);
+                DrawLine(texture, 120, 18, 128, 34, silhouette, 1);
+            }
+
+            texture.Apply();
+            return CreateSprite(texture, 160f);
+        }
+
+        private static Sprite CreateStageBackdropSprite(string stageNameKey, StageBackdropLayer layer)
+        {
+            Texture2D texture = CreateTexture(220, 84, FilterMode.Bilinear);
+            Color silhouette = new Color(1f, 1f, 1f, layer == StageBackdropLayer.Far ? 0.72f : 0.9f);
+            if (stageNameKey == "stage.guangzong")
+            {
+                if (layer == StageBackdropLayer.Far)
+                {
+                    FillTriangle(texture, new Vector2Int(0, 20), new Vector2Int(54, 52), new Vector2Int(100, 20), silhouette);
+                    FillTriangle(texture, new Vector2Int(74, 20), new Vector2Int(130, 48), new Vector2Int(188, 20), silhouette);
+                }
+                else
+                {
+                    FillRect(texture, 8, 18, 206, 24, silhouette);
+                    for (int x = 20; x <= 200; x += 24)
+                    {
+                        DrawLine(texture, x, 24, x, 58, silhouette, 2);
+                        FillTriangle(texture, new Vector2Int(x, 56), new Vector2Int(x + 18, 46), new Vector2Int(x, 36), silhouette);
+                    }
+                }
+            }
+            else if (stageNameKey == "stage.changban_rearguard")
+            {
+                if (layer == StageBackdropLayer.Far)
+                {
+                    DrawLine(texture, 0, 26, 60, 34, silhouette, 2);
+                    DrawLine(texture, 60, 34, 132, 24, silhouette, 2);
+                    DrawLine(texture, 132, 24, 220, 30, silhouette, 2);
+                    FillRect(texture, 0, 0, 220, 18, new Color(1f, 1f, 1f, 0.22f));
+                }
+                else
+                {
+                    FillRect(texture, 0, 18, 220, 24, silhouette);
+                    for (int x = 18; x <= 196; x += 22)
+                    {
+                        DrawLine(texture, x, 18, x + 8, 46, silhouette, 1);
+                    }
+                }
+            }
+            else
+            {
+                if (layer == StageBackdropLayer.Far)
+                {
+                    FillTriangle(texture, new Vector2Int(0, 22), new Vector2Int(52, 60), new Vector2Int(98, 22), silhouette);
+                    FillTriangle(texture, new Vector2Int(70, 22), new Vector2Int(126, 66), new Vector2Int(184, 22), silhouette);
+                    FillTriangle(texture, new Vector2Int(156, 22), new Vector2Int(196, 54), new Vector2Int(220, 22), silhouette);
+                }
+                else
+                {
+                    DrawLine(texture, 0, 20, 220, 20, silhouette, 2);
+                    for (int x = 14; x <= 206; x += 18)
+                    {
+                        DrawLine(texture, x, 20, x + 6, 44, silhouette, 1);
+                    }
+                }
+            }
+
+            texture.Apply();
+            return CreateSprite(texture, 220f);
+        }
+
+        private static Sprite CreateAmbientOverlaySprite(string presetId)
+        {
+            Texture2D texture = CreateTexture(180, 52, FilterMode.Bilinear);
+            if (presetId == "embers")
+            {
+                for (int x = 8; x < 172; x += 24)
+                {
+                    FillCircle(texture, x, 14 + (x % 3), 3, new Color(1f, 1f, 1f, 0.28f));
+                    FillCircle(texture, x + 8, 26 + (x % 5), 2, new Color(1f, 1f, 1f, 0.22f));
+                }
+            }
+            else if (presetId == "river-mist")
+            {
+                FillEllipse(texture, 48f, 26f, 36f, 10f, new Color(1f, 1f, 1f, 0.2f));
+                FillEllipse(texture, 112f, 22f, 44f, 12f, new Color(1f, 1f, 1f, 0.24f));
+                FillEllipse(texture, 146f, 28f, 28f, 8f, new Color(1f, 1f, 1f, 0.18f));
+            }
+            else if (presetId == "mountain-wind")
+            {
+                DrawLine(texture, 8, 12, 52, 34, new Color(1f, 1f, 1f, 0.16f), 1);
+                DrawLine(texture, 62, 18, 124, 32, new Color(1f, 1f, 1f, 0.22f), 1);
+                DrawLine(texture, 116, 10, 170, 30, new Color(1f, 1f, 1f, 0.15f), 1);
+            }
+            else
+            {
+                FillEllipse(texture, 48f, 18f, 18f, 8f, new Color(1f, 1f, 1f, 0.14f));
+                FillEllipse(texture, 92f, 26f, 26f, 9f, new Color(1f, 1f, 1f, 0.16f));
+                FillEllipse(texture, 136f, 20f, 18f, 7f, new Color(1f, 1f, 1f, 0.12f));
+            }
+
+            texture.Apply();
+            return CreateSprite(texture, 180f);
+        }
+
+        private static Sprite CreateVerticalGradientSprite(Color top, Color bottom)
+        {
+            Texture2D texture = CreateTexture(64, 64, FilterMode.Bilinear);
+            for (int y = 0; y < texture.height; y++)
+            {
+                float t = texture.height <= 1 ? 0f : (float)y / (texture.height - 1);
+                Color color = Color.Lerp(bottom, top, t);
+                for (int x = 0; x < texture.width; x++)
+                {
+                    texture.SetPixel(x, y, color);
+                }
+            }
+
+            texture.Apply();
+            return CreateSprite(texture, 64f);
+        }
+
+        private static Sprite CreateGridOverlaySprite(GridOverlayKind kind)
         {
             Texture2D texture = CreateTexture(32, 32);
-            uint hash = StableHash(unitId);
+            Color32 bright = new Color32(255, 255, 255, 255);
+            Color32 strong = new Color32(255, 255, 255, 212);
+            Color32 soft = new Color32(255, 255, 255, 72);
+            switch (kind)
+            {
+                case GridOverlayKind.Move:
+                    FillDiamond(texture, 16, 16, 11, soft);
+                    DrawDiamondFrame(texture, 16, 16, 12, bright);
+                    DrawDiamondFrame(texture, 16, 16, 8, strong);
+                    FillCircle(texture, 16, 16, 2, bright);
+                    break;
+                case GridOverlayKind.Attack:
+                    FillDiamond(texture, 16, 16, 11, soft);
+                    DrawDiamondFrame(texture, 16, 16, 12, bright);
+                    DrawLine(texture, 16, 5, 16, 27, strong, 1);
+                    DrawLine(texture, 5, 16, 27, 16, strong, 1);
+                    FillRect(texture, 14, 14, 18, 18, bright);
+                    break;
+                case GridOverlayKind.Skill:
+                    FillCircle(texture, 16, 16, 10, soft);
+                    DrawDiamondFrame(texture, 16, 16, 12, bright);
+                    DrawLine(texture, 16, 5, 16, 27, strong, 1);
+                    DrawLine(texture, 5, 16, 27, 16, strong, 1);
+                    DrawLine(texture, 8, 8, 24, 24, strong, 1);
+                    DrawLine(texture, 8, 24, 24, 8, strong, 1);
+                    FillCircle(texture, 16, 16, 2, bright);
+                    break;
+                default:
+                    FillDiamond(texture, 16, 16, 12, soft);
+                    DrawDiamondFrame(texture, 16, 16, 13, bright);
+                    DrawDiamondFrame(texture, 16, 16, 10, strong);
+                    FillRect(texture, 14, 2, 18, 5, bright);
+                    FillRect(texture, 14, 27, 18, 30, bright);
+                    FillRect(texture, 2, 14, 5, 18, bright);
+                    FillRect(texture, 27, 14, 30, 18, bright);
+                    break;
+            }
+
+            texture.Apply();
+            return CreateSprite(texture, 24f);
+        }
+
+        private static Sprite CreateUnitSprite(UnitVisualProfile profile)
+        {
+            Texture2D texture = CreateTexture(48, 48);
+            uint hash = StableHash(profile.UnitId ?? profile.Archetype.ToString());
             int variant = (int)(hash % 3u);
 
-            Color32 outline = new Color32(43, 29, 21, 255);
-            Color32 skin = new Color32(233, 202, 166, 255);
-            Color32 hair = new Color32(58, 42, 30, 255);
-            Color32 primary = GetPaletteColor(
-                faction,
-                (int)((hash / 7u) % 3u),
-                new[]
+            Color32 outline = new Color32(36, 23, 16, 255);
+            Color32 skin = GetSkinColor(profile.Archetype, variant);
+            Color32 hair = GetHairColor(profile.Archetype, variant);
+            Color32 primary = ToColor32(profile.PrimaryColor);
+            Color32 secondary = ToColor32(profile.SecondaryColor);
+            Color32 accent = ToColor32(profile.AccentColor);
+            Color32 primaryShadow = Darken(primary, 0.22f);
+            Color32 cloak = Darken(primary, 0.36f);
+            Color32 metal = Blend(secondary, new Color32(225, 220, 206, 255), 0.58f);
+
+            DrawFieldCloak(texture, profile.Role, cloak, outline);
+            DrawFieldBody(texture, profile.Role, primary, primaryShadow, accent, metal, outline);
+            DrawFieldHead(texture, profile.Role, profile.Archetype, skin, hair, accent, secondary, outline, variant);
+            DrawFieldRoleMarks(texture, profile.Role, accent, metal, outline);
+            DrawFieldSignature(texture, profile.Archetype, accent, metal, secondary, outline);
+
+            texture.Apply();
+            return CreateSprite(texture, 24f);
+        }
+
+        private static Sprite CreatePortraitSprite(UnitVisualProfile profile)
+        {
+            Texture2D texture = CreateTexture(84, 84);
+            uint hash = StableHash(profile.UnitId ?? profile.Archetype.ToString());
+            int variant = (int)(hash % 3u);
+
+            Color32 outline = new Color32(34, 21, 16, 255);
+            Color32 skin = GetSkinColor(profile.Archetype, variant);
+            Color32 hair = GetHairColor(profile.Archetype, variant);
+            Color32 primary = ToColor32(profile.PrimaryColor);
+            Color32 secondary = ToColor32(profile.SecondaryColor);
+            Color32 accent = ToColor32(profile.AccentColor);
+            Color32 cloak = Darken(primary, 0.38f);
+            Color32 armor = Blend(secondary, new Color32(230, 221, 204, 255), 0.48f);
+            Color32 glow = new Color32(accent.r, accent.g, accent.b, 74);
+
+            FillCircle(texture, 42, 48, 24, glow);
+            FillDiamond(texture, 42, 44, 28, new Color32(accent.r, accent.g, accent.b, 36));
+            DrawPortraitProp(texture, profile.Role, accent, outline);
+            DrawPortraitShoulders(texture, profile.Role, primary, cloak, armor, outline);
+            DrawPortraitHead(texture, profile.Role, profile.Archetype, skin, hair, accent, secondary, outline, variant);
+            DrawPortraitTrim(texture, profile.Role, accent, armor, outline);
+            DrawPortraitSignature(texture, profile.Archetype, accent, armor, secondary, outline);
+
+            texture.Apply();
+            return CreateSprite(texture, 42f);
+        }
+
+        private static void DrawFieldCloak(Texture2D texture, UnitRole role, Color cloak, Color outline)
+        {
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    FillRect(texture, 8, 11, 39, 27, cloak);
+                    StrokeRect(texture, 8, 11, 39, 27, outline);
+                    break;
+                case UnitRole.Guardian:
+                    FillRect(texture, 7, 10, 40, 25, cloak);
+                    StrokeRect(texture, 7, 10, 40, 25, outline);
+                    break;
+                case UnitRole.Ranger:
+                    FillRect(texture, 10, 11, 37, 25, cloak);
+                    StrokeRect(texture, 10, 11, 37, 25, outline);
+                    break;
+                case UnitRole.Scout:
+                    FillRect(texture, 11, 9, 35, 24, cloak);
+                    DrawLine(texture, 11, 9, 7, 4, cloak, 1);
+                    DrawLine(texture, 35, 10, 40, 5, cloak, 1);
+                    break;
+                case UnitRole.Raider:
+                    FillRect(texture, 9, 10, 38, 25, cloak);
+                    DrawLine(texture, 10, 10, 5, 4, cloak, 1);
+                    StrokeRect(texture, 9, 10, 38, 25, outline);
+                    break;
+            }
+        }
+
+        private static void DrawFieldBody(Texture2D texture, UnitRole role, Color primary, Color primaryShadow, Color accent, Color metal, Color outline)
+        {
+            FillRect(texture, 15, 0, 19, 9, primaryShadow);
+            FillRect(texture, 28, 0, 32, 9, primaryShadow);
+            FillRect(texture, 15, 10, 19, 20, primary);
+            FillRect(texture, 28, 10, 32, 20, primary);
+            FillRect(texture, 13, 21, 34, 38, primary);
+            FillRect(texture, 13, 21, 34, 24, accent);
+            FillRect(texture, 14, 25, 33, 38, primaryShadow);
+
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    FillRect(texture, 9, 24, 38, 38, primary);
+                    FillRect(texture, 18, 20, 29, 22, accent);
+                    break;
+                case UnitRole.Guardian:
+                    FillRect(texture, 8, 24, 39, 39, primary);
+                    FillRect(texture, 7, 24, 13, 31, metal);
+                    FillRect(texture, 34, 24, 40, 31, metal);
+                    break;
+                case UnitRole.Ranger:
+                    FillRect(texture, 13, 22, 32, 36, primary);
+                    FillRect(texture, 34, 21, 39, 36, Darken(accent, 0.28f));
+                    DrawLine(texture, 14, 36, 32, 26, accent, 1);
+                    break;
+                case UnitRole.Scout:
+                    FillRect(texture, 13, 22, 31, 35, primary);
+                    DrawLine(texture, 12, 32, 33, 21, accent, 1);
+                    DrawLine(texture, 13, 21, 20, 12, accent, 1);
+                    break;
+                case UnitRole.Raider:
+                    FillRect(texture, 11, 22, 36, 36, primary);
+                    FillRect(texture, 11, 20, 36, 22, accent);
+                    FillRect(texture, 8, 24, 12, 31, metal);
+                    break;
+            }
+
+            StrokeRect(texture, 13, 21, 34, 38, outline);
+            StrokeRect(texture, 15, 10, 19, 20, outline);
+            StrokeRect(texture, 28, 10, 32, 20, outline);
+        }
+
+        private static void DrawFieldHead(Texture2D texture, UnitRole role, UnitVisualArchetype archetype, Color skin, Color hair, Color accent, Color secondary, Color outline, int variant)
+        {
+            FillRect(texture, 16, 36, 31, 46, skin);
+            StrokeRect(texture, 16, 36, 31, 46, outline);
+            FillRect(texture, 15, 43, 32, 47, hair);
+            FillRect(texture, 15, 40, 18, 43, hair);
+            FillRect(texture, 29, 40, 32, 43, hair);
+            FillRect(texture, 20, 41, 21, 41, outline);
+            FillRect(texture, 26, 41, 27, 41, outline);
+
+            if (variant == 1)
+            {
+                FillRect(texture, 19, 36, 28, 37, secondary);
+            }
+            else if (variant == 2)
+            {
+                DrawLine(texture, 22, 38, 25, 35, outline, 1);
+            }
+
+            switch (archetype)
+            {
+                case UnitVisualArchetype.LiuBei:
+                    FillRect(texture, 18, 47, 29, 49, accent);
+                    FillRect(texture, 22, 49, 25, 52, accent);
+                    DrawLine(texture, 21, 37, 26, 37, outline, 1);
+                    break;
+                case UnitVisualArchetype.GuanYu:
+                    FillRect(texture, 17, 46, 30, 49, accent);
+                    FillRect(texture, 21, 35, 26, 46, outline);
+                    FillRect(texture, 22, 31, 25, 35, outline);
+                    break;
+                case UnitVisualArchetype.ZhangFei:
+                    FillRect(texture, 18, 46, 29, 48, hair);
+                    DrawLine(texture, 18, 36, 20, 38, outline, 1);
+                    DrawLine(texture, 29, 36, 27, 38, outline, 1);
+                    DrawLine(texture, 20, 32, 18, 28, outline, 1);
+                    DrawLine(texture, 27, 32, 29, 28, outline, 1);
+                    break;
+                case UnitVisualArchetype.HuangZhong:
+                    FillRect(texture, 17, 46, 30, 49, secondary);
+                    DrawLine(texture, 20, 35, 20, 31, secondary, 1);
+                    DrawLine(texture, 27, 35, 27, 31, secondary, 1);
+                    break;
+                case UnitVisualArchetype.YellowTurban:
+                case UnitVisualArchetype.YellowTurbanBoss:
+                    FillRect(texture, 15, 44, 32, 48, accent);
+                    if (archetype == UnitVisualArchetype.YellowTurbanBoss)
+                    {
+                        FillRect(texture, 21, 48, 26, 50, secondary);
+                    }
+
+                    break;
+                case UnitVisualArchetype.WeiCommander:
+                case UnitVisualArchetype.WeiGuardian:
+                case UnitVisualArchetype.WeiRanger:
+                case UnitVisualArchetype.WeiRaider:
+                    FillRect(texture, 14, 44, 33, 47, secondary);
+                    FillRect(texture, 18, 47, 29, 49, accent);
+                    break;
+                case UnitVisualArchetype.BossCommander:
+                    FillRect(texture, 17, 47, 30, 49, accent);
+                    FillRect(texture, 22, 49, 25, 54, accent);
+                    FillRect(texture, 18, 45, 20, 48, secondary);
+                    FillRect(texture, 27, 45, 29, 48, secondary);
+                    break;
+                default:
+                    if (role == UnitRole.Commander)
+                    {
+                        FillRect(texture, 18, 47, 29, 49, accent);
+                    }
+
+                    break;
+            }
+        }
+
+        private static void DrawFieldRoleMarks(Texture2D texture, UnitRole role, Color accent, Color metal, Color outline)
+        {
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    FillRect(texture, 10, 25, 13, 35, metal);
+                    FillRect(texture, 10, 33, 16, 36, accent);
+                    StrokeRect(texture, 10, 25, 13, 35, outline);
+                    break;
+                case UnitRole.Guardian:
+                    FillRect(texture, 35, 14, 41, 28, metal);
+                    StrokeRect(texture, 35, 14, 41, 28, outline);
+                    break;
+                case UnitRole.Ranger:
+                    DrawLine(texture, 35, 11, 41, 25, metal, 1);
+                    DrawLine(texture, 30, 16, 40, 16, accent, 1);
+                    break;
+                case UnitRole.Scout:
+                    DrawLine(texture, 10, 13, 15, 27, metal, 1);
+                    DrawLine(texture, 36, 13, 31, 27, metal, 1);
+                    break;
+                case UnitRole.Raider:
+                    DrawLine(texture, 7, 10, 39, 37, metal, 1);
+                    DrawLine(texture, 10, 8, 42, 32, metal, 1);
+                    break;
+            }
+        }
+
+        private static void DrawFieldSignature(Texture2D texture, UnitVisualArchetype archetype, Color accent, Color metal, Color secondary, Color outline)
+        {
+            switch (archetype)
+            {
+                case UnitVisualArchetype.LiuBei:
+                    DrawLine(texture, 20, 24, 24, 18, metal, 1);
+                    DrawLine(texture, 27, 24, 23, 18, metal, 1);
+                    break;
+                case UnitVisualArchetype.GuanYu:
+                    FillRect(texture, 21, 18, 25, 22, secondary);
+                    DrawLine(texture, 23, 18, 23, 13, secondary, 1);
+                    break;
+                case UnitVisualArchetype.ZhangFei:
+                    FillRect(texture, 18, 18, 29, 20, accent);
+                    break;
+                case UnitVisualArchetype.HuangZhong:
+                    DrawLine(texture, 18, 24, 29, 24, metal, 1);
+                    DrawLine(texture, 20, 26, 27, 26, secondary, 1);
+                    break;
+                case UnitVisualArchetype.YellowTurban:
+                case UnitVisualArchetype.YellowTurbanBoss:
+                    FillRect(texture, 18, 24, 29, 26, accent);
+                    if (archetype == UnitVisualArchetype.YellowTurbanBoss)
+                    {
+                        DrawLine(texture, 23, 24, 23, 18, outline, 1);
+                    }
+
+                    break;
+                case UnitVisualArchetype.BossCommander:
+                    FillRect(texture, 19, 23, 28, 25, metal);
+                    FillRect(texture, 22, 19, 25, 23, accent);
+                    break;
+            }
+        }
+
+        private static void DrawPortraitProp(Texture2D texture, UnitRole role, Color accent, Color outline)
+        {
+            Color weaponTint = Blend(ToColor32(accent), new Color32(240, 234, 221, 255), 0.45f);
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    DrawLine(texture, 14, 20, 14, 66, weaponTint, 1);
+                    FillRect(texture, 14, 46, 24, 54, accent);
+                    StrokeRect(texture, 14, 46, 24, 54, outline);
+                    break;
+                case UnitRole.Guardian:
+                    DrawLine(texture, 67, 12, 53, 62, weaponTint, 1);
+                    FillRect(texture, 56, 42, 70, 58, accent);
+                    StrokeRect(texture, 56, 42, 70, 58, outline);
+                    break;
+                case UnitRole.Ranger:
+                    DrawLine(texture, 67, 17, 67, 62, accent, 1);
+                    DrawLine(texture, 55, 17, 55, 62, accent, 1);
+                    DrawLine(texture, 55, 17, 67, 40, weaponTint, 1);
+                    DrawLine(texture, 55, 62, 67, 40, weaponTint, 1);
+                    break;
+                case UnitRole.Scout:
+                    DrawLine(texture, 16, 18, 28, 56, weaponTint, 1);
+                    DrawLine(texture, 68, 18, 55, 56, weaponTint, 1);
+                    break;
+                case UnitRole.Raider:
+                    DrawLine(texture, 10, 16, 74, 62, weaponTint, 1);
+                    DrawLine(texture, 14, 12, 77, 58, weaponTint, 1);
+                    break;
+            }
+        }
+
+        private static void DrawPortraitShoulders(Texture2D texture, UnitRole role, Color primary, Color cloak, Color armor, Color outline)
+        {
+            FillRect(texture, 17, 9, 66, 29, cloak);
+            FillRect(texture, 22, 18, 61, 38, primary);
+            FillRect(texture, 24, 30, 59, 45, Darken(primary, 0.18f));
+
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    FillRect(texture, 15, 23, 69, 35, primary);
+                    FillRect(texture, 20, 33, 58, 37, Blend(primary, armor, 0.25f));
+                    break;
+                case UnitRole.Guardian:
+                    FillRect(texture, 13, 21, 70, 39, primary);
+                    FillRect(texture, 12, 26, 23, 42, armor);
+                    FillRect(texture, 60, 26, 71, 42, armor);
+                    break;
+                case UnitRole.Ranger:
+                    FillRect(texture, 21, 21, 60, 35, primary);
+                    FillRect(texture, 57, 22, 65, 47, Darken(primary, 0.26f));
+                    break;
+                case UnitRole.Scout:
+                    FillRect(texture, 20, 21, 61, 34, primary);
+                    DrawLine(texture, 20, 25, 7, 12, cloak, 1);
+                    DrawLine(texture, 60, 25, 76, 14, cloak, 1);
+                    break;
+                case UnitRole.Raider:
+                    FillRect(texture, 18, 21, 64, 34, primary);
+                    FillRect(texture, 14, 23, 23, 36, armor);
+                    break;
+            }
+
+            StrokeRect(texture, 22, 18, 61, 38, outline);
+        }
+
+        private static void DrawPortraitHead(Texture2D texture, UnitRole role, UnitVisualArchetype archetype, Color skin, Color hair, Color accent, Color secondary, Color outline, int variant)
+        {
+            FillRect(texture, 28, 32, 55, 60, skin);
+            StrokeRect(texture, 28, 32, 55, 60, outline);
+            FillRect(texture, 26, 50, 57, 64, hair);
+            FillRect(texture, 26, 43, 31, 51, hair);
+            FillRect(texture, 52, 43, 57, 51, hair);
+            FillRect(texture, 34, 48, 35, 48, outline);
+            FillRect(texture, 46, 48, 47, 48, outline);
+            DrawLine(texture, 39, 42, 43, 42, new Color32(156, 116, 90, 255), 1);
+
+            if (variant == 1)
+            {
+                DrawLine(texture, 37, 35, 44, 35, outline, 1);
+                DrawLine(texture, 38, 34, 43, 34, outline, 1);
+            }
+            else if (variant == 2)
+            {
+                FillRect(texture, 35, 32, 46, 35, secondary);
+            }
+
+            switch (archetype)
+            {
+                case UnitVisualArchetype.LiuBei:
+                    FillRect(texture, 34, 64, 49, 69, accent);
+                    FillRect(texture, 39, 69, 44, 75, accent);
+                    break;
+                case UnitVisualArchetype.GuanYu:
+                    FillRect(texture, 33, 60, 50, 64, accent);
+                    FillRect(texture, 38, 32, 44, 59, outline);
+                    FillRect(texture, 39, 25, 43, 32, outline);
+                    break;
+                case UnitVisualArchetype.ZhangFei:
+                    FillRect(texture, 33, 60, 50, 64, hair);
+                    DrawLine(texture, 31, 42, 35, 45, outline, 1);
+                    DrawLine(texture, 52, 42, 48, 45, outline, 1);
+                    DrawLine(texture, 35, 33, 31, 27, outline, 1);
+                    DrawLine(texture, 48, 33, 52, 27, outline, 1);
+                    break;
+                case UnitVisualArchetype.HuangZhong:
+                    FillRect(texture, 33, 60, 50, 65, secondary);
+                    DrawLine(texture, 35, 41, 35, 31, secondary, 1);
+                    DrawLine(texture, 48, 41, 48, 31, secondary, 1);
+                    break;
+                case UnitVisualArchetype.YellowTurban:
+                case UnitVisualArchetype.YellowTurbanBoss:
+                    FillRect(texture, 26, 57, 57, 63, accent);
+                    if (archetype == UnitVisualArchetype.YellowTurbanBoss)
+                    {
+                        FillRect(texture, 36, 63, 47, 66, secondary);
+                    }
+
+                    break;
+                case UnitVisualArchetype.WeiCommander:
+                case UnitVisualArchetype.WeiGuardian:
+                case UnitVisualArchetype.WeiRanger:
+                case UnitVisualArchetype.WeiRaider:
+                    FillRect(texture, 25, 57, 58, 63, secondary);
+                    FillRect(texture, 31, 63, 52, 67, accent);
+                    break;
+                case UnitVisualArchetype.BossCommander:
+                    FillRect(texture, 33, 63, 50, 69, accent);
+                    FillRect(texture, 39, 69, 44, 77, accent);
+                    FillRect(texture, 31, 61, 34, 66, secondary);
+                    FillRect(texture, 49, 61, 52, 66, secondary);
+                    break;
+            }
+
+            if (role == UnitRole.Scout)
+            {
+                FillRect(texture, 28, 55, 55, 60, hair);
+            }
+        }
+
+        private static void DrawPortraitTrim(Texture2D texture, UnitRole role, Color accent, Color armor, Color outline)
+        {
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    FillRect(texture, 32, 21, 51, 25, accent);
+                    FillRect(texture, 37, 18, 45, 20, armor);
+                    break;
+                case UnitRole.Guardian:
+                    FillRect(texture, 32, 20, 51, 24, armor);
+                    FillRect(texture, 35, 24, 48, 29, accent);
+                    break;
+                case UnitRole.Ranger:
+                    DrawLine(texture, 27, 31, 56, 20, accent, 1);
+                    DrawLine(texture, 22, 23, 27, 48, armor, 1);
+                    break;
+                case UnitRole.Scout:
+                    DrawLine(texture, 26, 26, 56, 36, accent, 1);
+                    DrawLine(texture, 20, 20, 32, 35, armor, 1);
+                    break;
+                case UnitRole.Raider:
+                    FillRect(texture, 30, 22, 53, 25, accent);
+                    FillRect(texture, 26, 18, 32, 31, armor);
+                    break;
+            }
+
+            DrawLine(texture, 32, 20, 52, 20, outline, 1);
+        }
+
+        private static void DrawPortraitSignature(Texture2D texture, UnitVisualArchetype archetype, Color accent, Color armor, Color secondary, Color outline)
+        {
+            switch (archetype)
+            {
+                case UnitVisualArchetype.LiuBei:
+                    DrawLine(texture, 38, 25, 42, 18, armor, 1);
+                    DrawLine(texture, 45, 25, 41, 18, armor, 1);
+                    break;
+                case UnitVisualArchetype.GuanYu:
+                    FillRect(texture, 36, 18, 47, 22, accent);
+                    break;
+                case UnitVisualArchetype.ZhangFei:
+                    FillRect(texture, 31, 24, 52, 27, accent);
+                    break;
+                case UnitVisualArchetype.HuangZhong:
+                    DrawLine(texture, 32, 28, 50, 28, secondary, 1);
+                    DrawLine(texture, 36, 31, 47, 31, armor, 1);
+                    break;
+                case UnitVisualArchetype.YellowTurbanBoss:
+                    FillRect(texture, 34, 22, 49, 25, armor);
+                    DrawLine(texture, 41, 22, 41, 17, outline, 1);
+                    break;
+                case UnitVisualArchetype.BossCommander:
+                    FillRect(texture, 33, 23, 50, 26, armor);
+                    FillRect(texture, 38, 18, 45, 23, accent);
+                    break;
+            }
+        }
+
+        private static void FillBaseTile(Texture2D texture, Color32 border, Color32 fillA, Color32 fillB, Color32 accent)
+        {
+            for (int y = 0; y < texture.height; y++)
+            {
+                for (int x = 0; x < texture.width; x++)
                 {
-                    new Color32(63, 98, 173, 255),
-                    new Color32(47, 122, 118, 255),
-                    new Color32(86, 90, 162, 255),
-                },
-                new[]
-                {
-                    new Color32(174, 62, 49, 255),
-                    new Color32(145, 88, 34, 255),
-                    new Color32(132, 55, 72, 255),
-                });
-            Color32 accent = GetPaletteColor(
-                faction,
-                (int)((hash / 19u) % 3u),
-                new[]
-                {
-                    new Color32(233, 209, 99, 255),
-                    new Color32(189, 219, 122, 255),
-                    new Color32(133, 212, 216, 255),
-                },
-                new[]
-                {
-                    new Color32(242, 197, 86, 255),
-                    new Color32(233, 162, 78, 255),
-                    new Color32(220, 122, 107, 255),
-                });
+                    bool isBorder = x == 0 || y == 0 || x == texture.width - 1 || y == texture.height - 1;
+                    if (isBorder)
+                    {
+                        texture.SetPixel(x, y, border);
+                        continue;
+                    }
 
-            FillRect(texture, 12, 2, 15, 5, outline);
-            FillRect(texture, 17, 2, 20, 5, outline);
+                    float grain = (((x * 13) + (y * 11) + ((x * y) % 7)) % 23) / 22f;
+                    bool brushStroke = ((x + (y * 3)) % 7) < 2;
+                    Color32 baseColor = grain > 0.56f ? fillB : fillA;
+                    if (brushStroke && y > 2 && y < texture.height - 2)
+                    {
+                        baseColor = Blend(baseColor, accent, 0.18f);
+                    }
 
-            FillRect(texture, 8, 6, 23, 17, primary);
-            StrokeRect(texture, 8, 6, 23, 17, outline);
+                    texture.SetPixel(x, y, baseColor);
+                }
+            }
 
-            FillRect(texture, 10, 10, 21, 12, accent);
-            FillRect(texture, 7, 8, 8, 15, primary);
-            FillRect(texture, 23, 8, 24, 15, primary);
-            StrokeRect(texture, 7, 8, 8, 15, outline);
-            StrokeRect(texture, 23, 8, 24, 15, outline);
+            FillRect(texture, 2, texture.height - 5, 4, texture.height - 4, accent);
+            FillRect(texture, texture.width - 5, 2, texture.width - 3, 3, accent);
+            DrawLine(texture, 2, texture.height - 3, texture.width - 3, texture.height - 4, Blend(fillB, border, 0.28f), 1);
+            texture.Apply();
+        }
 
-            FillRect(texture, 11, 18, 20, 25, skin);
-            StrokeRect(texture, 11, 18, 20, 25, outline);
-            FillRect(texture, 10, 24, 21, 28, hair);
-            FillRect(texture, 14, 21, 14, 21, outline);
-            FillRect(texture, 17, 21, 17, 21, outline);
-
-            DrawUnitVariant(texture, variant, outline, accent, primary, faction);
+        private static Sprite CreatePlainOverlaySprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 grass = new Color32(215, 202, 150, 255);
+            DrawLine(texture, 4, 6, 6, 10, grass, 1);
+            DrawLine(texture, 7, 5, 8, 9, grass, 1);
+            DrawLine(texture, 13, 10, 15, 14, grass, 1);
+            DrawLine(texture, 15, 9, 16, 12, grass, 1);
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
 
-        private static void DrawUnitVariant(Texture2D texture, int variant, Color outline, Color accent, Color primary, UnitFaction faction)
+        private static Sprite CreateForestOverlaySprite()
         {
-            switch (variant)
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 canopy = new Color32(61, 86, 41, 255);
+            FillCircle(texture, 5, 14, 4, canopy);
+            FillCircle(texture, 13, 13, 5, canopy);
+            FillCircle(texture, 16, 16, 3, canopy);
+            FillRect(texture, 8, 4, 10, 8, new Color32(90, 66, 44, 255));
+            FillRect(texture, 12, 5, 14, 9, new Color32(90, 66, 44, 255));
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateFortOverlaySprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 wall = new Color32(116, 83, 52, 255);
+            FillRect(texture, 2, 12, 17, 14, wall);
+            for (int x = 3; x <= 16; x += 3)
             {
-                case 0:
-                    FillRect(texture, 14, 29, 17, 31, accent);
-                    FillRect(texture, 13, 27, 18, 28, accent);
-                    StrokeRect(texture, 13, 27, 18, 31, outline);
-                    break;
-                case 1:
-                    FillRect(texture, 9, 26, 12, 27, accent);
-                    FillRect(texture, 19, 26, 22, 27, accent);
-                    FillRect(texture, 14, 28, 17, 31, accent);
-                    StrokeRect(texture, 9, 26, 12, 27, outline);
-                    StrokeRect(texture, 19, 26, 22, 27, outline);
-                    StrokeRect(texture, 14, 28, 17, 31, outline);
-                    break;
-                default:
-                    FillRect(texture, 8, 20, 10, 23, primary);
-                    FillRect(texture, 21, 20, 23, 23, primary);
-                    StrokeRect(texture, 8, 20, 10, 23, outline);
-                    StrokeRect(texture, 21, 20, 23, 23, outline);
-                    break;
+                DrawLine(texture, x, 14, x, 18, wall, 1);
             }
 
-            if (faction == UnitFaction.Enemy)
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateHazardOverlaySprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 ember = new Color32(234, 130, 59, 255);
+            DrawLine(texture, 4, 15, 9, 10, ember, 1);
+            DrawLine(texture, 8, 10, 12, 12, ember, 1);
+            DrawLine(texture, 12, 12, 16, 7, ember, 1);
+            DrawLine(texture, 11, 5, 13, 3, ember, 1);
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateBlockedOverlaySprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 ridge = new Color32(48, 52, 58, 255);
+            FillRect(texture, 2, 11, 17, 18, ridge);
+            DrawLine(texture, 3, 11, 6, 16, Color.white, 1);
+            DrawLine(texture, 9, 12, 12, 18, Color.white, 1);
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateTreePropSprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 canopy = new Color32(43, 72, 35, 255);
+            Color32 trunk = new Color32(93, 63, 36, 255);
+            FillCircle(texture, 10, 13, 5, canopy);
+            FillCircle(texture, 6, 11, 3, canopy);
+            FillCircle(texture, 14, 11, 3, canopy);
+            FillRect(texture, 9, 2, 11, 9, trunk);
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateFortPropSprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 timber = new Color32(111, 76, 44, 255);
+            Color32 banner = new Color32(205, 170, 82, 255);
+            for (int x = 5; x <= 14; x += 4)
             {
-                FillRect(texture, 10, 13, 21, 14, outline);
+                DrawLine(texture, x, 4, x, 16, timber, 1);
+            }
+
+            FillRect(texture, 10, 10, 15, 14, banner);
+            DrawLine(texture, 9, 16, 15, 16, timber, 1);
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateFlamePropSprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 flame = new Color32(249, 173, 82, 255);
+            Color32 core = new Color32(255, 225, 162, 255);
+            FillTriangle(texture, new Vector2Int(10, 18), new Vector2Int(6, 6), new Vector2Int(12, 8), flame);
+            FillTriangle(texture, new Vector2Int(11, 16), new Vector2Int(9, 8), new Vector2Int(14, 10), core);
+            FillRect(texture, 8, 2, 12, 4, new Color32(96, 54, 36, 255));
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static Sprite CreateBoulderPropSprite()
+        {
+            Texture2D texture = CreateTexture(20, 20);
+            Color32 rock = new Color32(88, 92, 99, 255);
+            Color32 edge = new Color32(124, 131, 141, 255);
+            FillCircle(texture, 9, 10, 6, rock);
+            FillCircle(texture, 13, 11, 4, rock);
+            DrawLine(texture, 6, 12, 10, 15, edge, 1);
+            DrawLine(texture, 11, 9, 15, 12, edge, 1);
+            texture.Apply();
+            return CreateSprite(texture, 20f);
+        }
+
+        private static string GetTerrainResourceKey(TerrainType terrainType, bool blocked)
+        {
+            if (blocked)
+            {
+                return "blocked";
+            }
+
+            switch (terrainType)
+            {
+                case TerrainType.Forest:
+                    return "forest";
+                case TerrainType.Fort:
+                    return "fort";
+                case TerrainType.Hazard:
+                    return "hazard";
+                default:
+                    return "plain";
+            }
+        }
+
+        private static Color GetPaletteColor(string paletteId, string channel)
+        {
+            switch (string.IsNullOrWhiteSpace(paletteId) ? "frontier-plain" : paletteId)
+            {
+                case "guangzong-smoke":
+                    return GetGuangzongPaletteColor(channel);
+                case "changban-river":
+                    return GetChangbanPaletteColor(channel);
+                case "dingjun-stone":
+                    return GetDingjunPaletteColor(channel);
+                default:
+                    return GetFrontierPaletteColor(channel);
+            }
+        }
+
+        private static Color GetGuangzongPaletteColor(string channel)
+        {
+            switch (channel)
+            {
+                case "forest":
+                    return Hex("61543A");
+                case "fort":
+                    return Hex("6D5843");
+                case "hazard":
+                    return Hex("6F3D2D");
+                case "blocked":
+                    return Hex("403532");
+                case "overlay-plain":
+                    return Hex("E0C68A");
+                case "overlay-forest":
+                    return Hex("8C7C58");
+                case "overlay-fort":
+                    return Hex("C8AA7B");
+                case "overlay-hazard":
+                    return Hex("F0A05D");
+                case "overlay-blocked":
+                    return Hex("8B837A");
+                case "prop-forest":
+                    return Hex("7B6A4C");
+                case "prop-fort":
+                    return Hex("9D7146");
+                case "prop-hazard":
+                    return Hex("FFCD83");
+                case "prop-blocked":
+                    return Hex("A39B93");
+                default:
+                    return Hex("7A654A");
+            }
+        }
+
+        private static Color GetChangbanPaletteColor(string channel)
+        {
+            switch (channel)
+            {
+                case "forest":
+                    return Hex("58706F");
+                case "fort":
+                    return Hex("7B8278");
+                case "hazard":
+                    return Hex("70574D");
+                case "blocked":
+                    return Hex("39434B");
+                case "overlay-plain":
+                    return Hex("C0C6C0");
+                case "overlay-forest":
+                    return Hex("8CA39B");
+                case "overlay-fort":
+                    return Hex("D0D2C8");
+                case "overlay-hazard":
+                    return Hex("D59C7B");
+                case "overlay-blocked":
+                    return Hex("9DA7AD");
+                case "prop-forest":
+                    return Hex("7EA19A");
+                case "prop-fort":
+                    return Hex("A7A89B");
+                case "prop-hazard":
+                    return Hex("F3D6B6");
+                case "prop-blocked":
+                    return Hex("A8B2B9");
+                default:
+                    return Hex("77807C");
+            }
+        }
+
+        private static Color GetDingjunPaletteColor(string channel)
+        {
+            switch (channel)
+            {
+                case "forest":
+                    return Hex("596654");
+                case "fort":
+                    return Hex("827C6D");
+                case "hazard":
+                    return Hex("6C5A43");
+                case "blocked":
+                    return Hex("434741");
+                case "overlay-plain":
+                    return Hex("C8C2AD");
+                case "overlay-forest":
+                    return Hex("8B9A7A");
+                case "overlay-fort":
+                    return Hex("D1C5A6");
+                case "overlay-hazard":
+                    return Hex("D7AA72");
+                case "overlay-blocked":
+                    return Hex("B0B5AA");
+                case "prop-forest":
+                    return Hex("7E8A74");
+                case "prop-fort":
+                    return Hex("A68C61");
+                case "prop-hazard":
+                    return Hex("EBC98F");
+                case "prop-blocked":
+                    return Hex("B4B8AD");
+                default:
+                    return Hex("7E765F");
+            }
+        }
+
+        private static Color GetFrontierPaletteColor(string channel)
+        {
+            switch (channel)
+            {
+                case "forest":
+                    return Hex("6D7358");
+                case "fort":
+                    return Hex("8C7D69");
+                case "hazard":
+                    return Hex("83594A");
+                case "blocked":
+                    return Hex("4B4B4A");
+                case "overlay-plain":
+                    return Hex("D6C28C");
+                case "overlay-forest":
+                    return Hex("93A07C");
+                case "overlay-fort":
+                    return Hex("D1BC96");
+                case "overlay-hazard":
+                    return Hex("DA9A61");
+                case "overlay-blocked":
+                    return Hex("A2A59D");
+                case "prop-forest":
+                    return Hex("7A8966");
+                case "prop-fort":
+                    return Hex("AA875C");
+                case "prop-hazard":
+                    return Hex("F0C381");
+                case "prop-blocked":
+                    return Hex("B6BAB4");
+                default:
+                    return Hex("8E7752");
+            }
+        }
+
+        private static Color Hex(string html, float alpha = 1f)
+        {
+            if (!ColorUtility.TryParseHtmlString("#" + html, out Color color))
+            {
+                color = Color.white;
+            }
+
+            color.a = alpha;
+            return color;
+        }
+
+        private static Sprite TryLoadSpriteResource(string path)
+        {
+            return string.IsNullOrWhiteSpace(path) ? null : Resources.Load<Sprite>(path);
+        }
+
+        private static Color32 GetHairColor(UnitVisualArchetype archetype, int variant)
+        {
+            switch (archetype)
+            {
+                case UnitVisualArchetype.HuangZhong:
+                    return variant == 1 ? new Color32(202, 198, 187, 255) : new Color32(231, 224, 206, 255);
+                case UnitVisualArchetype.GuanYu:
+                case UnitVisualArchetype.ZhangFei:
+                case UnitVisualArchetype.BossCommander:
+                    return new Color32(46, 32, 25, 255);
+                case UnitVisualArchetype.YellowTurban:
+                case UnitVisualArchetype.YellowTurbanBoss:
+                    return new Color32(78, 52, 30, 255);
+                default:
+                    switch (variant)
+                    {
+                        case 1:
+                            return new Color32(52, 36, 28, 255);
+                        case 2:
+                            return new Color32(76, 52, 35, 255);
+                        default:
+                            return new Color32(60, 44, 31, 255);
+                    }
+            }
+        }
+
+        private static Color32 GetSkinColor(UnitVisualArchetype archetype, int variant)
+        {
+            switch (archetype)
+            {
+                case UnitVisualArchetype.ZhangFei:
+                    return new Color32(203, 168, 131, 255);
+                case UnitVisualArchetype.HuangZhong:
+                    return new Color32(225, 200, 169, 255);
+                case UnitVisualArchetype.YellowTurban:
+                case UnitVisualArchetype.YellowTurbanBoss:
+                    return new Color32(214, 179, 135, 255);
+                default:
+                    return variant == 2
+                        ? new Color32(228, 198, 162, 255)
+                        : new Color32(236, 205, 171, 255);
             }
         }
 
         private static Texture2D CreateTexture(int width, int height)
         {
-            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
-            texture.filterMode = FilterMode.Point;
-            texture.wrapMode = TextureWrapMode.Clamp;
+            return CreateTexture(width, height, FilterMode.Point);
+        }
 
+        private static Texture2D CreateTexture(int width, int height, FilterMode filterMode)
+        {
+            Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            texture.filterMode = filterMode;
+            texture.wrapMode = TextureWrapMode.Clamp;
             Color clear = new Color(0f, 0f, 0f, 0f);
             Color[] pixels = new Color[width * height];
             for (int index = 0; index < pixels.Length; index++)
@@ -393,6 +1755,11 @@ namespace PhalanxChronicle.Presentation
             {
                 for (int x = xMin; x <= xMax; x++)
                 {
+                    if (x < 0 || x >= texture.width || y < 0 || y >= texture.height)
+                    {
+                        continue;
+                    }
+
                     texture.SetPixel(x, y, color);
                 }
             }
@@ -402,14 +1769,127 @@ namespace PhalanxChronicle.Presentation
         {
             for (int x = xMin; x <= xMax; x++)
             {
-                texture.SetPixel(x, yMin, color);
-                texture.SetPixel(x, yMax, color);
+                PlotSlashPixel(texture, x, yMin, color);
+                PlotSlashPixel(texture, x, yMax, color);
             }
 
             for (int y = yMin; y <= yMax; y++)
             {
-                texture.SetPixel(xMin, y, color);
-                texture.SetPixel(xMax, y, color);
+                PlotSlashPixel(texture, xMin, y, color);
+                PlotSlashPixel(texture, xMax, y, color);
+            }
+        }
+
+        private static void FillCircle(Texture2D texture, int centerX, int centerY, int radius, Color color)
+        {
+            int squaredRadius = radius * radius;
+            for (int y = centerY - radius; y <= centerY + radius; y++)
+            {
+                for (int x = centerX - radius; x <= centerX + radius; x++)
+                {
+                    int deltaX = x - centerX;
+                    int deltaY = y - centerY;
+                    if ((deltaX * deltaX) + (deltaY * deltaY) > squaredRadius)
+                    {
+                        continue;
+                    }
+
+                    PlotSlashPixel(texture, x, y, color);
+                }
+            }
+        }
+
+        private static void FillDiamond(Texture2D texture, int centerX, int centerY, int radius, Color color)
+        {
+            for (int y = centerY - radius; y <= centerY + radius; y++)
+            {
+                for (int x = centerX - radius; x <= centerX + radius; x++)
+                {
+                    int distance = Mathf.Abs(x - centerX) + Mathf.Abs(y - centerY);
+                    if (distance <= radius)
+                    {
+                        PlotSlashPixel(texture, x, y, color);
+                    }
+                }
+            }
+        }
+
+        private static void FillEllipse(Texture2D texture, float centerX, float centerY, float radiusX, float radiusY, Color color)
+        {
+            float inverseRadiusX = 1f / Mathf.Max(0.01f, radiusX);
+            float inverseRadiusY = 1f / Mathf.Max(0.01f, radiusY);
+            for (int y = 0; y < texture.height; y++)
+            {
+                for (int x = 0; x < texture.width; x++)
+                {
+                    float normalizedX = (x - centerX) * inverseRadiusX;
+                    float normalizedY = (y - centerY) * inverseRadiusY;
+                    if ((normalizedX * normalizedX) + (normalizedY * normalizedY) <= 1f)
+                    {
+                        texture.SetPixel(x, y, color);
+                    }
+                }
+            }
+        }
+
+        private static void DrawEllipseRing(Texture2D texture, float centerX, float centerY, float radiusX, float radiusY, Color color, float thickness)
+        {
+            float inverseRadiusX = 1f / Mathf.Max(0.01f, radiusX);
+            float inverseRadiusY = 1f / Mathf.Max(0.01f, radiusY);
+            for (int y = 0; y < texture.height; y++)
+            {
+                for (int x = 0; x < texture.width; x++)
+                {
+                    float normalizedX = (x - centerX) * inverseRadiusX;
+                    float normalizedY = (y - centerY) * inverseRadiusY;
+                    float distance = (normalizedX * normalizedX) + (normalizedY * normalizedY);
+                    if (distance >= 1f - thickness && distance <= 1f + thickness)
+                    {
+                        texture.SetPixel(x, y, color);
+                    }
+                }
+            }
+        }
+
+        private static void FillTriangle(Texture2D texture, Vector2Int a, Vector2Int b, Vector2Int c, Color color)
+        {
+            int xMin = Mathf.Min(a.x, Mathf.Min(b.x, c.x));
+            int xMax = Mathf.Max(a.x, Mathf.Max(b.x, c.x));
+            int yMin = Mathf.Min(a.y, Mathf.Min(b.y, c.y));
+            int yMax = Mathf.Max(a.y, Mathf.Max(b.y, c.y));
+            for (int y = yMin; y <= yMax; y++)
+            {
+                for (int x = xMin; x <= xMax; x++)
+                {
+                    if (PointInTriangle(new Vector2(x + 0.5f, y + 0.5f), a, b, c))
+                    {
+                        PlotSlashPixel(texture, x, y, color);
+                    }
+                }
+            }
+        }
+
+        private static bool PointInTriangle(Vector2 point, Vector2Int a, Vector2Int b, Vector2Int c)
+        {
+            float denominator = ((b.y - c.y) * (a.x - c.x)) + ((c.x - b.x) * (a.y - c.y));
+            if (Mathf.Approximately(denominator, 0f))
+            {
+                return false;
+            }
+
+            float alpha = (((b.y - c.y) * (point.x - c.x)) + ((c.x - b.x) * (point.y - c.y))) / denominator;
+            float beta = (((c.y - a.y) * (point.x - c.x)) + ((a.x - c.x) * (point.y - c.y))) / denominator;
+            float gamma = 1f - alpha - beta;
+            return alpha >= 0f && beta >= 0f && gamma >= 0f;
+        }
+
+        private static void DrawDiamondFrame(Texture2D texture, int centerX, int centerY, int radius, Color color)
+        {
+            for (int offset = -radius; offset <= radius; offset++)
+            {
+                int mirrored = radius - Mathf.Abs(offset);
+                PlotSlashPixel(texture, centerX + offset, centerY + mirrored, color);
+                PlotSlashPixel(texture, centerX + offset, centerY - mirrored, color);
             }
         }
 
@@ -461,22 +1941,32 @@ namespace PhalanxChronicle.Presentation
             {
                 for (int offsetX = -radius; offsetX <= radius; offsetX++)
                 {
-                    int pixelX = x + offsetX;
-                    int pixelY = y + offsetY;
-                    if (pixelX < 0 || pixelX >= texture.width || pixelY < 0 || pixelY >= texture.height)
-                    {
-                        continue;
-                    }
-
-                    texture.SetPixel(pixelX, pixelY, color);
+                    PlotSlashPixel(texture, x + offsetX, y + offsetY, color);
                 }
             }
         }
 
-        private static Color32 GetPaletteColor(UnitFaction faction, int index, Color32[] playerPalette, Color32[] enemyPalette)
+        private static Color32 Blend(Color32 a, Color32 b, float t)
         {
-            Color32[] palette = faction == UnitFaction.Player ? playerPalette : enemyPalette;
-            return palette[index % palette.Length];
+            return new Color32(
+                (byte)Mathf.RoundToInt(Mathf.Lerp(a.r, b.r, t)),
+                (byte)Mathf.RoundToInt(Mathf.Lerp(a.g, b.g, t)),
+                (byte)Mathf.RoundToInt(Mathf.Lerp(a.b, b.b, t)),
+                (byte)Mathf.RoundToInt(Mathf.Lerp(a.a, b.a, t)));
+        }
+
+        private static Color32 Darken(Color32 color, float amount)
+        {
+            return new Color32(
+                (byte)Mathf.RoundToInt(color.r * (1f - amount)),
+                (byte)Mathf.RoundToInt(color.g * (1f - amount)),
+                (byte)Mathf.RoundToInt(color.b * (1f - amount)),
+                color.a);
+        }
+
+        private static Color32 ToColor32(Color color)
+        {
+            return (Color32)color;
         }
 
         private static uint StableHash(string value)
@@ -485,6 +1975,11 @@ namespace PhalanxChronicle.Presentation
             const uint prime = 16777619;
 
             uint hash = offset;
+            if (string.IsNullOrEmpty(value))
+            {
+                return hash;
+            }
+
             for (int index = 0; index < value.Length; index++)
             {
                 hash ^= value[index];
@@ -494,22 +1989,48 @@ namespace PhalanxChronicle.Presentation
             return hash;
         }
 
-        private static Font CreateDefaultFont()
+        private static Font CreateHeadingFont()
         {
-            Font dynamicFont = Font.CreateDynamicFontFromOSFont(
-                new[]
-                {
-                    "PingFang TC",
-                    "Noto Sans CJK TC",
-                    "Heiti TC",
-                    "Arial Unicode MS",
-                    "Microsoft JhengHei",
-                    "Segoe UI",
-                    "Arial",
-                },
-                28);
+            return Resources.Load<Font>("Fonts/SourceHanSerifTC") ??
+                   Resources.Load<Font>("Fonts/NotoSerifTC") ??
+                   TryCreateDynamicFont(
+                       new[]
+                       {
+                           "Source Han Serif TC",
+                           "Noto Serif CJK TC",
+                           "Songti TC",
+                           "PingFang TC",
+                           "Microsoft JhengHei",
+                           "Arial Unicode MS",
+                           "Arial",
+                       },
+                       28) ??
+                   Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
 
-            return dynamicFont != null ? dynamicFont : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        private static Font CreateBodyFont()
+        {
+            return Resources.Load<Font>("Fonts/NotoSansTC") ??
+                   Resources.Load<Font>("Fonts/BattleDisplay") ??
+                   TryCreateDynamicFont(
+                       new[]
+                       {
+                           "Noto Sans CJK TC",
+                           "PingFang TC",
+                           "Microsoft JhengHei",
+                           "Heiti TC",
+                           "Arial Unicode MS",
+                           "Segoe UI",
+                           "Arial",
+                       },
+                       26) ??
+                   Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+
+        private static Font TryCreateDynamicFont(string[] candidates, int size)
+        {
+            Font dynamicFont = Font.CreateDynamicFontFromOSFont(candidates, size);
+            return dynamicFont;
         }
     }
 }

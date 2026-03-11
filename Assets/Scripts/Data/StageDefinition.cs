@@ -15,6 +15,7 @@ namespace PhalanxChronicle.Data
         [SerializeField] private bool useRandomMap = true;
         [SerializeField] private int randomSeed;
         [SerializeField] private List<Vector2Int> blockedCells = new List<Vector2Int>();
+        [SerializeField] private List<TerrainPlacement> terrainTiles = new List<TerrainPlacement>();
         [SerializeField] private List<UnitSpawnData> unitSpawns = new List<UnitSpawnData>();
 
         public bool UseRandomMap => useRandomMap;
@@ -50,6 +51,7 @@ namespace PhalanxChronicle.Data
                 height,
                 spawnData,
                 blockedCells.Select(position => new GridPosition(position.x, position.y)).ToList(),
+                terrainTiles.Select(tile => tile.ToData()).ToList(),
                 false,
                 0);
         }
@@ -186,6 +188,18 @@ namespace PhalanxChronicle.Data
                     new Vector2Int(7, 6)),
             };
             return stage;
+        }
+
+        [System.Serializable]
+        private sealed class TerrainPlacement
+        {
+            [SerializeField] private TerrainType terrainType = TerrainType.Plain;
+            [SerializeField] private Vector2Int position;
+
+            public TerrainTileData ToData()
+            {
+                return new TerrainTileData(new GridPosition(position.x, position.y), terrainType);
+            }
         }
     }
 }

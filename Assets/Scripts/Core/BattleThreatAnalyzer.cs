@@ -116,23 +116,38 @@ namespace PhalanxChronicle.Core
                             focusUnit,
                             ActiveSkillRules.GetPowerStrikeBonus())
                         : 0;
+                case ActiveSkillType.PinningShot:
+                    return primaryTarget.Id == focusUnit.Id
+                        ? BattlePreviewCalculator.EstimateAttackDamage(
+                            context,
+                            caster,
+                            origin,
+                            focusUnit,
+                            ActiveSkillRules.GetPinningShotBonus())
+                        : 0;
                 case ActiveSkillType.Volley:
+                case ActiveSkillType.SkyVolley:
                     return BattlePreviewCalculator.GetVolleyTargets(context, primaryTarget).Any(unit => unit.Id == focusUnit.Id)
                         ? BattlePreviewCalculator.EstimateAttackDamage(
                             context,
                             caster,
                             origin,
                             focusUnit,
-                            ActiveSkillRules.GetVolleyBonus())
+                            caster.ActiveSkill == ActiveSkillType.SkyVolley
+                                ? ActiveSkillRules.GetSkyVolleyBonus()
+                                : ActiveSkillRules.GetVolleyBonus())
                         : 0;
                 case ActiveSkillType.GreenDragonSlash:
+                case ActiveSkillType.AzureDragonSlash:
                     return BattlePreviewCalculator.GetGreenDragonSlashTargets(context, origin, primaryTarget).Any(unit => unit.Id == focusUnit.Id)
                         ? BattlePreviewCalculator.EstimateAttackDamage(
                             context,
                             caster,
                             origin,
                             focusUnit,
-                            ActiveSkillRules.GetGreenDragonSlashBonus())
+                            caster.ActiveSkill == ActiveSkillType.AzureDragonSlash
+                                ? ActiveSkillRules.GetAzureDragonSlashBonus()
+                                : ActiveSkillRules.GetGreenDragonSlashBonus())
                         : 0;
                 default:
                     return 0;

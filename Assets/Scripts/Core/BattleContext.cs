@@ -27,6 +27,14 @@ namespace PhalanxChronicle.Core
                 }
             }
 
+            foreach (TerrainTileData terrainTile in stage.TerrainTiles)
+            {
+                if (terrainTile != null && cells.TryGetValue(terrainTile.Position, out GridCell cell))
+                {
+                    cell.SetTerrain(terrainTile.TerrainType);
+                }
+            }
+
             foreach (UnitSpawnData spawn in stage.UnitSpawns)
             {
                 UnitRuntimeState unit = new UnitRuntimeState(spawn.Definition, spawn.StartPosition);
@@ -66,6 +74,13 @@ namespace PhalanxChronicle.Core
             .ThenBy(position => position.X)
             .ToList();
 
+        public IReadOnlyList<TerrainTileData> TerrainTiles => cells.Values
+            .Where(cell => cell.TerrainType != TerrainType.Plain)
+            .Select(cell => new TerrainTileData(cell.Position, cell.TerrainType))
+            .OrderBy(tile => tile.Position.Y)
+            .ThenBy(tile => tile.Position.X)
+            .ToList();
+
         public bool IsInside(GridPosition position)
         {
             return position.X >= 0 &&
@@ -77,6 +92,11 @@ namespace PhalanxChronicle.Core
         public GridCell GetCell(GridPosition position)
         {
             return cells[position];
+        }
+
+        public TerrainType GetTerrainAt(GridPosition position)
+        {
+            return IsInside(position) ? cells[position].TerrainType : TerrainType.Plain;
         }
 
         public UnitRuntimeState GetUnit(string unitId)
@@ -217,6 +237,49 @@ namespace PhalanxChronicle.Core
             {
                 SetBattleOutcome(TurnSide.Enemy);
             }
+        }
+
+        public bool ApplyBattlefieldMutation(BattlefieldMutation mutation)
+        {
+            if (mutation == null || !mutation.HasAnyChange)
+            {
+                return false;
+            }
+
+            bool changed = false;
+            foreach (TerrainTileData terrainChange in mutation.TerrainChanges)
+            {
+                if (terrainChange == null || !cells.TryGetValue(terrainChange.Position, out GridCell cell))
+                {
+                    continue;
+                }
+
+                if (cell.TerrainType == terrainChange.TerrainType)
+                {
+                    continue;
+                }
+
+                cell.SetTerrain(terrainChange.TerrainType);
+                changed = true;
+            }
+
+            foreach (BlockedCellStateChange blockedChange in mutation.BlockedStateChanges)
+            {
+                if (blockedChange == null || !cells.TryGetValue(blockedChange.Position, out GridCell cell))
+                {
+                    continue;
+                }
+
+                if (cell.IsBlocked == blockedChange.IsBlocked || (blockedChange.IsBlocked && cell.IsOccupied))
+                {
+                    continue;
+                }
+
+                cell.SetBlocked(blockedChange.IsBlocked);
+                changed = true;
+            }
+
+            return changed;
         }
 
         private static Dictionary<GridPosition, GridCell> CreateCells(int width, int height)

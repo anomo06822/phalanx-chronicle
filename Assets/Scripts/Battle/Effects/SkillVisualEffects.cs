@@ -10,7 +10,9 @@ namespace PhalanxChronicle.Battle.Effects
     {
         public static bool ShouldAnimateLunge(ActiveSkillType skillType)
         {
-            return skillType == ActiveSkillType.PowerStrike || skillType == ActiveSkillType.GreenDragonSlash;
+            return skillType == ActiveSkillType.PowerStrike ||
+                   skillType == ActiveSkillType.GreenDragonSlash ||
+                   skillType == ActiveSkillType.AzureDragonSlash;
         }
 
         public static IEnumerator PlayCasterEffect(ActiveSkillType skillType, Unit casterView, Unit primaryTargetView)
@@ -24,6 +26,8 @@ namespace PhalanxChronicle.Battle.Effects
             switch (skillType)
             {
                 case ActiveSkillType.RoyalAid:
+                case ActiveSkillType.ImperialAid:
+                case ActiveSkillType.GuardOrder:
                     yield return PlayPulse(
                         "RoyalAidCast",
                         casterView.GetAnchorPosition(0.42f),
@@ -44,6 +48,8 @@ namespace PhalanxChronicle.Battle.Effects
                     yield return PlaySparkBurst(casterView.GetAnchorPosition(0.34f), accent, 0.12f, 0.72f);
                     break;
                 case ActiveSkillType.Volley:
+                case ActiveSkillType.SkyVolley:
+                case ActiveSkillType.PinningShot:
                     yield return PlayPulse(
                         "VolleyCast",
                         casterView.GetAnchorPosition(0.5f),
@@ -56,6 +62,7 @@ namespace PhalanxChronicle.Battle.Effects
                         -16f);
                     break;
                 case ActiveSkillType.GreenDragonSlash:
+                case ActiveSkillType.AzureDragonSlash:
                     yield return PlaySparkBurst(casterView.GetAnchorPosition(0.34f), accent, 0.12f, 0.7f);
                     if (primaryTargetView != null)
                     {
@@ -64,6 +71,7 @@ namespace PhalanxChronicle.Battle.Effects
 
                     break;
                 case ActiveSkillType.WarCry:
+                case ActiveSkillType.LionWarCry:
                     yield return PlayPulse(
                         "WarCryCast",
                         casterView.GetAnchorPosition(0.2f),
@@ -90,6 +98,8 @@ namespace PhalanxChronicle.Battle.Effects
             switch (skillType)
             {
                 case ActiveSkillType.RoyalAid:
+                case ActiveSkillType.ImperialAid:
+                case ActiveSkillType.GuardOrder:
                     yield return PlayPulse(
                         "RoyalAidTarget",
                         targetView.GetAnchorPosition(0.5f),
@@ -116,13 +126,17 @@ namespace PhalanxChronicle.Battle.Effects
                         22f);
                     break;
                 case ActiveSkillType.Volley:
+                case ActiveSkillType.SkyVolley:
+                case ActiveSkillType.PinningShot:
                     yield return PlayArrowStrike(targetView.GetAnchorPosition(0.18f), accent, isPrimaryTarget ? 0.96f : 0.76f);
                     break;
                 case ActiveSkillType.GreenDragonSlash:
+                case ActiveSkillType.AzureDragonSlash:
                     yield return PlaySlashArc(targetView.GetAnchorPosition(0.24f), accent, isPrimaryTarget ? 1.08f : 0.8f);
                     yield return PlaySparkBurst(targetView.GetAnchorPosition(0.24f), new Color(0.8f, 1f, 0.85f, 1f), 0.12f, isPrimaryTarget ? 0.7f : 0.54f);
                     break;
                 case ActiveSkillType.WarCry:
+                case ActiveSkillType.LionWarCry:
                     yield return PlayPulse(
                         "WarCryTarget",
                         targetView.GetAnchorPosition(0.4f),

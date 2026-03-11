@@ -9,13 +9,21 @@ namespace PhalanxChronicle.Core
             string scenarioName,
             string scenarioNameKey,
             StageDefinitionData stage,
-            IReadOnlyList<ScenarioTrigger> triggers)
+            IReadOnlyList<ScenarioTrigger> triggers,
+            int recommendedLevel = 1,
+            int victoryExpReward = 45,
+            int defeatExpReward = 20,
+            RewardBundle rewardBundle = null)
         {
             ScenarioId = scenarioId;
             ScenarioName = scenarioName;
             ScenarioNameKey = scenarioNameKey;
             Stage = stage;
             Triggers = triggers ?? new List<ScenarioTrigger>();
+            RecommendedLevel = recommendedLevel < 1 ? 1 : recommendedLevel;
+            VictoryExpReward = victoryExpReward < 0 ? 0 : victoryExpReward;
+            DefeatExpReward = defeatExpReward < 0 ? 0 : defeatExpReward;
+            RewardBundle = rewardBundle ?? new RewardBundle(0, 0);
         }
 
         public string ScenarioId { get; }
@@ -27,5 +35,13 @@ namespace PhalanxChronicle.Core
         public StageDefinitionData Stage { get; }
 
         public IReadOnlyList<ScenarioTrigger> Triggers { get; }
+
+        public int RecommendedLevel { get; }
+
+        public int VictoryExpReward { get; }
+
+        public int DefeatExpReward { get; }
+
+        public RewardBundle RewardBundle { get; }
     }
 }

@@ -128,7 +128,7 @@ namespace PhalanxChronicle.UI
             rectTransform.sizeDelta = size;
 
             Image image = panel.GetComponent<Image>();
-            image.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
             image.color = BattleUiTheme.PanelSurface;
 
             Outline outline = panel.AddComponent<Outline>();
@@ -142,7 +142,7 @@ namespace PhalanxChronicle.UI
             GameObject panel = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(LayoutElement));
             panel.transform.SetParent(parent, false);
             Image image = panel.GetComponent<Image>();
-            image.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
             image.color = color;
 
             LayoutElement layoutElement = panel.GetComponent<LayoutElement>();
@@ -164,7 +164,7 @@ namespace PhalanxChronicle.UI
             layoutElement.flexibleWidth = 1f;
 
             Image image = buttonObject.GetComponent<Image>();
-            image.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
             image.color = BattleUiTheme.ButtonPrimary;
 
             Outline outline = buttonObject.AddComponent<Outline>();
@@ -217,7 +217,7 @@ namespace PhalanxChronicle.UI
             textObject.transform.SetParent(parent, false);
             Text text = textObject.GetComponent<Text>();
             text.text = content;
-            text.font = RuntimeSpriteLibrary.DefaultFont;
+            text.font = RuntimeSpriteLibrary.GetUiFont(size, fontStyle);
             text.fontSize = size;
             text.fontStyle = fontStyle;
             text.alignment = alignment;

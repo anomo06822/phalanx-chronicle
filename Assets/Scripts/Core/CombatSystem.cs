@@ -47,6 +47,17 @@ namespace PhalanxChronicle.Core
                 context.RemoveUnit(defender.Id);
             }
 
+            int experience = ExperienceSystem.CalculateDamageReward(
+                attacker,
+                defender,
+                damage,
+                attacker.RegisterContribution("damage:" + defender.Id));
+            if (!defender.IsAlive)
+            {
+                experience += ExperienceSystem.CalculateKillBonus(attacker, defender);
+            }
+
+            int levelsGained = attacker.AddExperience(experience);
             context.EvaluateBattleOutcome();
 
             return new CombatResult(
@@ -54,7 +65,9 @@ namespace PhalanxChronicle.Core
                 defender.Id,
                 damage,
                 defender.CurrentHp,
-                !defender.IsAlive);
+                !defender.IsAlive,
+                experience,
+                levelsGained);
         }
     }
 }

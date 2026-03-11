@@ -71,8 +71,8 @@ namespace PhalanxChronicle.Core
         private AiCandidate CreateIdleCandidate(BattleContext context, UnitRuntimeState enemyUnit, GridPosition destination)
         {
             int nearestOpponentDistance = CalculateNearestOpponentDistance(context, enemyUnit.Faction, destination, null);
-            float pressure = CalculatePressureScore(nearestOpponentDistance);
-            float risk = EstimateExposure(context, enemyUnit, destination, null);
+            float pressure = CalculatePressureScore(nearestOpponentDistance) + GetProfilePressureBonus(context, enemyUnit, destination);
+            float risk = EstimateExposure(context, enemyUnit, destination, null) * GetRiskMultiplier(enemyUnit.AiProfile);
             return new AiCandidate(
                 destination,
                 AiActionType.None,
@@ -95,9 +95,9 @@ namespace PhalanxChronicle.Core
             int realizedDamage = rawDamage > target.CurrentHp ? target.CurrentHp : rawDamage;
             HashSet<string> defeatedUnitIds = targetDies ? new HashSet<string> { target.Id } : null;
             int nearestOpponentDistance = CalculateNearestOpponentDistance(context, enemyUnit.Faction, destination, defeatedUnitIds);
-            float pressure = CalculatePressureScore(nearestOpponentDistance);
-            float risk = EstimateExposure(context, enemyUnit, destination, defeatedUnitIds);
-            float reward = 6f + (realizedDamage * DamageWeight) + (targetDies ? KillBonus : 0f);
+            float pressure = CalculatePressureScore(nearestOpponentDistance) + GetProfilePressureBonus(context, enemyUnit, destination);
+            float risk = EstimateExposure(context, enemyUnit, destination, defeatedUnitIds) * GetRiskMultiplier(enemyUnit.AiProfile);
+            float reward = 6f + (realizedDamage * DamageWeight) + (targetDies ? KillBonus : 0f) + GetActionBias(enemyUnit.AiProfile, false, targetDies);
 
             return new AiCandidate(
                 destination,
@@ -118,13 +118,13 @@ namespace PhalanxChronicle.Core
         {
             SkillEvaluation evaluation = EvaluateSkill(context, enemyUnit, destination, target);
             int nearestOpponentDistance = CalculateNearestOpponentDistance(context, enemyUnit.Faction, destination, evaluation.DefeatedUnitIds);
-            float pressure = CalculatePressureScore(nearestOpponentDistance);
-            float risk = EstimateExposure(context, enemyUnit, destination, evaluation.DefeatedUnitIds);
+            float pressure = CalculatePressureScore(nearestOpponentDistance) + GetProfilePressureBonus(context, enemyUnit, destination);
+            float risk = EstimateExposure(context, enemyUnit, destination, evaluation.DefeatedUnitIds) * GetRiskMultiplier(enemyUnit.AiProfile);
             return new AiCandidate(
                 destination,
                 AiActionType.Skill,
                 target.Id,
-                evaluation.Reward + pressure - risk,
+                evaluation.Reward + GetActionBias(enemyUnit.AiProfile, true, evaluation.DefeatedUnitIds.Count > 0) + pressure - risk,
                 risk,
                 target.CurrentHp,
                 nearestOpponentDistance,
@@ -140,14 +140,22 @@ namespace PhalanxChronicle.Core
             switch (enemyUnit.ActiveSkill)
             {
                 case ActiveSkillType.RoyalAid:
+                case ActiveSkillType.ImperialAid:
                     return EvaluateRoyalAid(target);
+                case ActiveSkillType.GuardOrder:
+                    return EvaluateGuardOrder(context, enemyUnit, target);
                 case ActiveSkillType.PowerStrike:
                     return EvaluatePowerStrike(context, enemyUnit, destination, target);
+                case ActiveSkillType.PinningShot:
+                    return EvaluatePinningShot(context, enemyUnit, destination, target);
                 case ActiveSkillType.Volley:
+                case ActiveSkillType.SkyVolley:
                     return EvaluateVolley(context, enemyUnit, destination, target);
                 case ActiveSkillType.GreenDragonSlash:
+                case ActiveSkillType.AzureDragonSlash:
                     return EvaluateGreenDragonSlash(context, enemyUnit, destination, target);
                 case ActiveSkillType.WarCry:
+                case ActiveSkillType.LionWarCry:
                     return EvaluateWarCry(context, enemyUnit, destination);
                 default:
                     return new SkillEvaluation(0f, new HashSet<string>());
@@ -164,6 +172,36 @@ namespace PhalanxChronicle.Core
             }
 
             return new SkillEvaluation(reward - 3f, new HashSet<string>());
+        }
+
+        private static SkillEvaluation EvaluateGuardOrder(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            UnitRuntimeState target)
+        {
+            IReadOnlyList<UnitRuntimeState> affectedUnits = context.GetUnits(enemyUnit.Faction)
+                .Where(unit => unit.Id == target.Id || unit.Position.ManhattanDistance(target.Position) == 1)
+                .OrderBy(unit => unit.Id == target.Id ? 0 : 1)
+                .ThenBy(unit => unit.Id)
+                .ToList();
+
+            int healedAmount = BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetGuardOrderHealAmount());
+            int freshGuardApplications = affectedUnits.Count(unit => !unit.HasStatus(StatusEffectType.Guarded));
+            float reward = (healedAmount * HealingWeight) +
+                           (freshGuardApplications * (StatusBonus + 2f)) +
+                           ((affectedUnits.Count - 1) * 2f) -
+                           2f;
+            if (target.CurrentHp <= target.MaxHp / 2)
+            {
+                reward += 5f;
+            }
+
+            if (healedAmount == 0 && freshGuardApplications == 0)
+            {
+                reward -= 10f;
+            }
+
+            return new SkillEvaluation(reward, new HashSet<string>());
         }
 
         private static SkillEvaluation EvaluatePowerStrike(
@@ -184,6 +222,30 @@ namespace PhalanxChronicle.Core
             if (!targetDies && !target.HasStatus(StatusEffectType.ShatteredArmor))
             {
                 reward += StatusBonus;
+            }
+
+            HashSet<string> defeatedUnitIds = targetDies ? new HashSet<string> { target.Id } : new HashSet<string>();
+            return new SkillEvaluation(reward - SkillCommitmentPenalty, defeatedUnitIds);
+        }
+
+        private static SkillEvaluation EvaluatePinningShot(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            UnitRuntimeState target)
+        {
+            int rawDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                context,
+                enemyUnit,
+                destination,
+                target,
+                ActiveSkillRules.GetPinningShotBonus());
+            bool targetDies = rawDamage >= target.CurrentHp;
+            int realizedDamage = rawDamage > target.CurrentHp ? target.CurrentHp : rawDamage;
+            float reward = 4f + (realizedDamage * SkillDamageWeight) + (targetDies ? KillBonus : 0f);
+            if (!targetDies && !target.HasStatus(StatusEffectType.Rooted))
+            {
+                reward += StatusBonus + 2f;
             }
 
             HashSet<string> defeatedUnitIds = targetDies ? new HashSet<string> { target.Id } : new HashSet<string>();
@@ -366,26 +428,35 @@ namespace PhalanxChronicle.Core
                     continue;
                 }
 
-                int skillDamage = opposingUnit.ActiveSkill == ActiveSkillType.PowerStrike
-                    ? BattlePreviewCalculator.EstimateAttackDamage(
-                        context,
-                        opposingUnit,
-                        origin,
-                        enemyUnit,
-                        ActiveSkillRules.GetPowerStrikeBonus())
-                    : opposingUnit.ActiveSkill == ActiveSkillType.GreenDragonSlash
-                        ? BattlePreviewCalculator.EstimateAttackDamage(
-                            context,
-                            opposingUnit,
-                            origin,
-                            enemyUnit,
-                            ActiveSkillRules.GetGreenDragonSlashBonus())
-                        : BattlePreviewCalculator.EstimateAttackDamage(
-                            context,
-                            opposingUnit,
-                            origin,
-                            enemyUnit,
-                            ActiveSkillRules.GetVolleyBonus());
+                int bonusDamage;
+                switch (opposingUnit.ActiveSkill)
+                {
+                    case ActiveSkillType.PowerStrike:
+                        bonusDamage = ActiveSkillRules.GetPowerStrikeBonus();
+                        break;
+                    case ActiveSkillType.PinningShot:
+                        bonusDamage = ActiveSkillRules.GetPinningShotBonus();
+                        break;
+                    case ActiveSkillType.GreenDragonSlash:
+                        bonusDamage = ActiveSkillRules.GetGreenDragonSlashBonus();
+                        break;
+                    case ActiveSkillType.AzureDragonSlash:
+                        bonusDamage = ActiveSkillRules.GetAzureDragonSlashBonus();
+                        break;
+                    case ActiveSkillType.SkyVolley:
+                        bonusDamage = ActiveSkillRules.GetSkyVolleyBonus();
+                        break;
+                    default:
+                        bonusDamage = ActiveSkillRules.GetVolleyBonus();
+                        break;
+                }
+
+                int skillDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                    context,
+                    opposingUnit,
+                    origin,
+                    enemyUnit,
+                    bonusDamage);
                 if (skillDamage > bestDamage)
                 {
                     bestDamage = skillDamage;
@@ -400,6 +471,59 @@ namespace PhalanxChronicle.Core
             return nearestOpponentDistance < 0
                 ? PressureBaseScore
                 : PressureBaseScore - (nearestOpponentDistance * PressureDistancePenalty);
+        }
+
+        private static float GetRiskMultiplier(AiProfileType aiProfile)
+        {
+            switch (aiProfile)
+            {
+                case AiProfileType.Aggressor:
+                    return 0.9f;
+                case AiProfileType.Protector:
+                    return 1.1f;
+                case AiProfileType.Support:
+                    return 1.2f;
+                case AiProfileType.Boss:
+                    return 0.82f;
+                default:
+                    return 1f;
+            }
+        }
+
+        private static float GetActionBias(AiProfileType aiProfile, bool skillAction, bool lethal)
+        {
+            switch (aiProfile)
+            {
+                case AiProfileType.Aggressor:
+                    return skillAction ? 4f : lethal ? 6f : 2f;
+                case AiProfileType.Protector:
+                    return skillAction ? 2f : lethal ? 1f : 0f;
+                case AiProfileType.Support:
+                    return skillAction ? 6f : -1f;
+                case AiProfileType.Boss:
+                    return skillAction ? 5f : 4f;
+                default:
+                    return 0f;
+            }
+        }
+
+        private static float GetProfilePressureBonus(BattleContext context, UnitRuntimeState enemyUnit, GridPosition destination)
+        {
+            switch (enemyUnit.AiProfile)
+            {
+                case AiProfileType.Aggressor:
+                    return 4f;
+                case AiProfileType.Protector:
+                    return context.GetUnits(enemyUnit.Faction)
+                        .Count(ally => ally.Id != enemyUnit.Id && ally.Position.ManhattanDistance(destination) <= 2) * 1.5f;
+                case AiProfileType.Support:
+                    return context.GetUnits(enemyUnit.Faction)
+                        .Count(ally => ally.Id != enemyUnit.Id && ally.CurrentHp < ally.MaxHp) * 2f;
+                case AiProfileType.Boss:
+                    return 6f;
+                default:
+                    return 0f;
+            }
         }
 
         private static int CalculateNearestOpponentDistance(

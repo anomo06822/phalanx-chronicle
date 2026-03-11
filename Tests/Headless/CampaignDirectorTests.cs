@@ -1,0 +1,96 @@
+using PhalanxChronicle.Core;
+using Xunit;
+
+namespace PhalanxChronicle.Headless.Tests
+{
+    public sealed class CampaignDirectorTests
+    {
+        [Fact]
+        public void Campaign_DefaultProgressUnlocksOnlyFirstStage()
+        {
+            CampaignDirector director = new CampaignDirector(CampaignCatalog.CreateLiuBeiLegend());
+
+            Assert.True(director.IsStageUnlocked(0));
+            Assert.False(director.IsStageUnlocked(1));
+            Assert.False(director.IsStageUnlocked(2));
+            Assert.False(director.IsStageUnlocked(3));
+            Assert.False(director.IsStageUnlocked(4));
+            Assert.False(director.IsStageUnlocked(5));
+            Assert.Equal(0, director.GetRecommendedStageIndex());
+        }
+
+        [Fact]
+        public void Campaign_PlayerVictoryUnlocksNextStageAndKeepsClearedStagesReplayable()
+        {
+            CampaignDirector director = new CampaignDirector(CampaignCatalog.CreateLiuBeiLegend());
+
+            director.RecordBattleResult(new BattleResultSummary(
+                BattleScenarioCatalog.GuangzongScenarioId,
+                TurnSide.Player,
+                3,
+                new[] { "player-liu-bei", "player-guan-yu" }));
+
+            Assert.True(director.IsStageCleared(0));
+            Assert.True(director.IsStageUnlocked(0));
+            Assert.True(director.IsStageUnlocked(1));
+            Assert.False(director.IsStageUnlocked(2));
+            Assert.False(director.IsStageUnlocked(3));
+            Assert.Equal(1, director.GetRecommendedStageIndex());
+        }
+
+        [Fact]
+        public void Campaign_DefeatDoesNotUnlockAdditionalStages()
+        {
+            CampaignDirector director = new CampaignDirector(CampaignCatalog.CreateLiuBeiLegend());
+
+            director.RecordBattleResult(new BattleResultSummary(
+                BattleScenarioCatalog.GuangzongScenarioId,
+                TurnSide.Enemy,
+                2,
+                new string[0]));
+
+            Assert.False(director.IsStageCleared(0));
+            Assert.True(director.IsStageUnlocked(0));
+            Assert.False(director.IsStageUnlocked(1));
+            Assert.False(director.IsStageUnlocked(5));
+            Assert.Equal(0, director.GetRecommendedStageIndex());
+        }
+
+        [Fact]
+        public void Campaign_ClaimedRewards_DoNotAffectUnlockOrReplayAccess()
+        {
+            CampaignProgress progress = new CampaignProgress();
+            CampaignDirector director = new CampaignDirector(CampaignCatalog.CreateLiuBeiLegend(), progress);
+
+            director.RecordBattleResult(new BattleResultSummary(
+                BattleScenarioCatalog.GuangzongScenarioId,
+                TurnSide.Player,
+                3,
+                new[] { "player-liu-bei", "player-guan-yu" }));
+            progress.MarkRewardClaimed(BattleScenarioCatalog.GuangzongScenarioId);
+
+            Assert.True(director.IsStageCleared(0));
+            Assert.True(director.IsStageUnlocked(0));
+            Assert.True(director.IsStageUnlocked(1));
+            Assert.True(progress.IsRewardClaimed(BattleScenarioCatalog.GuangzongScenarioId));
+        }
+
+        [Fact]
+        public void Campaign_ClearingAllSixStagesUnlocksFullWarMap()
+        {
+            CampaignDirector director = new CampaignDirector(CampaignCatalog.CreateLiuBeiLegend());
+
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.GuangzongScenarioId, TurnSide.Player, 3, new[] { "player-liu-bei" }));
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.BowangpoScenarioId, TurnSide.Player, 3, new[] { "player-liu-bei" }));
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.ChangbanScenarioId, TurnSide.Player, 4, new[] { "player-liu-bei" }));
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.JiamengPassScenarioId, TurnSide.Player, 5, new[] { "player-liu-bei" }));
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.HanshuiScenarioId, TurnSide.Player, 5, new[] { "player-liu-bei" }));
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.DingjunScenarioId, TurnSide.Player, 6, new[] { "player-liu-bei" }));
+
+            Assert.Equal(5, director.Progress.UnlockedStageIndex);
+            Assert.True(director.IsStageUnlocked(5));
+            Assert.True(director.IsStageCleared(5));
+            Assert.Equal(5, director.GetRecommendedStageIndex());
+        }
+    }
+}

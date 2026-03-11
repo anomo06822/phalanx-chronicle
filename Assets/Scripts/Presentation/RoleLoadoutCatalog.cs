@@ -115,6 +115,18 @@ namespace PhalanxChronicle.Presentation
                     return new Color(0.44f, 0.94f, 0.5f, 1f);
                 case ActiveSkillType.WarCry:
                     return new Color(0.97f, 0.44f, 0.34f, 1f);
+                case ActiveSkillType.ImperialAid:
+                    return new Color(0.42f, 0.9f, 0.62f, 1f);
+                case ActiveSkillType.GuardOrder:
+                    return new Color(0.46f, 0.82f, 0.72f, 1f);
+                case ActiveSkillType.AzureDragonSlash:
+                    return new Color(0.58f, 0.96f, 0.52f, 1f);
+                case ActiveSkillType.LionWarCry:
+                    return new Color(1f, 0.52f, 0.36f, 1f);
+                case ActiveSkillType.SkyVolley:
+                    return new Color(0.42f, 0.86f, 0.94f, 1f);
+                case ActiveSkillType.PinningShot:
+                    return new Color(0.5f, 0.88f, 1f, 1f);
                 default:
                     return BattleUiTheme.AccentGold;
             }

@@ -5,26 +5,57 @@ namespace PhalanxChronicle.Core
 {
     public static class BattleScenarioCatalog
     {
-        public const string JieqiaoFiresScenarioId = "scenario.jieqiao_fires";
-        public const string ReinforcementsArrivedFlag = "flag.reinforcements_arrived";
+        public const string GuangzongScenarioId = "scenario.guangzong";
+        public const string BowangpoScenarioId = "scenario.bowangpo";
+        public const string ChangbanScenarioId = "scenario.changban_rearguard";
+        public const string JiamengPassScenarioId = "scenario.jiameng_pass";
+        public const string HanshuiScenarioId = "scenario.hanshui";
+        public const string DingjunScenarioId = "scenario.dingjun_mountain";
 
-        public static BattleScenarioData CreateJieqiaoFires()
+        public const string GuangzongReinforcementsArrivedFlag = "flag.guangzong.reinforcements_arrived";
+        public const string BowangpoFireTrapSprungFlag = "flag.bowangpo.fire_trap_sprung";
+        public const string ChangbanFlankersArrivedFlag = "flag.changban.flankers_arrived";
+        public const string JiamengBossArrivedFlag = "flag.jiameng.boss_arrived";
+        public const string HanshuiCounterattackFlag = "flag.hanshui.counterattack";
+        public const string DingjunBossArrivedFlag = "flag.dingjun.boss_arrived";
+
+        public static BattleScenarioData CreateScenario(string scenarioId)
         {
-            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>
+            switch (scenarioId)
             {
-                new UnitSpawnData(CreateDefinition("player-liu-bei", "Liu Bei", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.RoyalAid, 30, 9, 5, 3, 1), new GridPosition(1, 4)),
-                new UnitSpawnData(CreateDefinition("player-guan-yu", "Guan Yu", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.ArmorBreak, ActiveSkillType.GreenDragonSlash, 34, 12, 5, 3, 1), new GridPosition(1, 6)),
-                new UnitSpawnData(CreateDefinition("player-zhang-fei", "Zhang Fei", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.Vanguard, ActiveSkillType.WarCry, 36, 11, 6, 3, 1), new GridPosition(1, 2)),
-                new UnitSpawnData(CreateDefinition("player-huang-zhong", "Huang Zhong", UnitFaction.Player, UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 28, 10, 3, 3, 2), new GridPosition(0, 5)),
-                new UnitSpawnData(CreateDefinition("enemy-zhang-bao", "Zhang Bao", UnitFaction.Enemy, UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 32, 10, 4, 3, 1), new GridPosition(8, 4)),
-                new UnitSpawnData(CreateDefinition("enemy-han-raider", "Han Raider", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 24, 9, 3, 4, 1), new GridPosition(7, 2)),
-                new UnitSpawnData(CreateDefinition("enemy-armored-captain", "Armored Captain", UnitFaction.Enemy, UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 8, 6, 2, 1), new GridPosition(7, 6)),
-                new UnitSpawnData(CreateDefinition("enemy-yellow-turban-archer", "Yellow Turban Archer", UnitFaction.Enemy, UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 22, 9, 3, 3, 2), new GridPosition(8, 2)),
-            };
+                case BowangpoScenarioId:
+                    return CreateBowangpo();
+                case ChangbanScenarioId:
+                    return CreateChangbanRearguard();
+                case JiamengPassScenarioId:
+                    return CreateJiamengPass();
+                case HanshuiScenarioId:
+                    return CreateHanshui();
+                case DingjunScenarioId:
+                    return CreateDingjunMountain();
+                case GuangzongScenarioId:
+                default:
+                    return CreateGuangzong();
+            }
+        }
+
+        public static BattleScenarioData CreateGuangzong()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
+            AddCoreSquad(
+                openingSpawns,
+                new GridPosition(1, 4),
+                new GridPosition(1, 6),
+                new GridPosition(1, 2),
+                new GridPosition(0, 5));
+            openingSpawns.Add(SpawnEnemy("enemy-zhang-bao", "Zhang Bao", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 32, 10, 4, 3, 1, new GridPosition(8, 4), AiProfileType.Boss));
+            openingSpawns.Add(SpawnEnemy("enemy-yellow_turban_raider", "Yellow Turban Raider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 24, 9, 3, 4, 1, new GridPosition(7, 2), AiProfileType.Aggressor));
+            openingSpawns.Add(SpawnEnemy("enemy-armored_zealot", "Armored Zealot", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 8, 6, 2, 1, new GridPosition(7, 6), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-yellow_turban_archer", "Yellow Turban Archer", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 22, 9, 3, 3, 2, new GridPosition(8, 2), AiProfileType.Support));
 
             StageDefinitionData stage = new StageDefinitionData(
-                "Jieqiao Fires",
-                "stage.jieqiao_fires",
+                "Battle of Guangzong",
+                "stage.guangzong",
                 10,
                 10,
                 openingSpawns,
@@ -42,98 +73,105 @@ namespace PhalanxChronicle.Core
                     new GridPosition(6, 2),
                     new GridPosition(6, 7),
                     new GridPosition(6, 8),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(2, 2), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(2, 7), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(4, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(7, 3), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 6), TerrainType.Hazard),
                 });
 
             ObjectiveState openingObjective = new ObjectiveState(
-                "objective.jieqiao.opening",
-                "Defeat Han Raider and the Armored Captain.",
-                "objective.jieqiao.failure",
+                "objective.guangzong.opening",
+                "Defeat the Yellow Turban Raider and the Armored Zealot.",
+                "objective.guangzong.failure",
                 "Liu Bei falls or all allies are defeated.");
             ObjectiveState finalObjective = new ObjectiveState(
-                "objective.jieqiao.final",
+                "objective.guangzong.final",
                 "Defeat Zhang Bao and Zhang Liang.",
-                "objective.jieqiao.failure",
+                "objective.guangzong.failure",
                 "Liu Bei falls or all allies are defeated.");
-
-            List<UnitSpawnData> reinforcementSpawns = new List<UnitSpawnData>
-            {
-                new UnitSpawnData(CreateDefinition("enemy-zhang-liang", "Zhang Liang", UnitFaction.Enemy, UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 30, 9, 4, 3, 1), new GridPosition(9, 1)),
-                new UnitSpawnData(CreateDefinition("enemy-raider-jia", "Raider Jia", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 9, 4, 4, 1), new GridPosition(9, 3)),
-                new UnitSpawnData(CreateDefinition("enemy-raider-yi", "Raider Yi", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 9, 4, 4, 1), new GridPosition(9, 6)),
-            };
 
             List<ScenarioDirective> reinforcementDirectives = new List<ScenarioDirective>
             {
-                ScenarioDirective.SetFlag(ReinforcementsArrivedFlag),
-                ScenarioDirective.SpawnUnits(reinforcementSpawns),
+                ScenarioDirective.SetFlag(GuangzongReinforcementsArrivedFlag),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-zhang-liang", "Zhang Liang", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 30, 9, 4, 3, 1, new GridPosition(9, 1), AiProfileType.Boss),
+                    SpawnEnemy("enemy-yellow_turban_hunter", "Yellow Turban Hunter", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 9, 4, 4, 1, new GridPosition(9, 3), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-fervent_spearman", "Fervent Spearman", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 9, 4, 4, 1, new GridPosition(9, 6), AiProfileType.Aggressor),
+                }),
                 ScenarioDirective.UpdateObjective(finalObjective),
                 ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
                 {
-                    new ScenarioDialogueLine("unit.zhang_liang", "Zhang Liang", "dialogue.jieqiao.mid.1", "Liu Bei, you stepped right into our encirclement!"),
-                    new ScenarioDialogueLine("unit.guan_yu", "Guan Yu", "dialogue.jieqiao.mid.2", "Their reinforcements have arrived. Then we cut down both commanders."),
-                    new ScenarioDialogueLine("unit.liu_bei", "Liu Bei", "dialogue.jieqiao.mid.3", "Hold the line. Take Zhang Bao and Zhang Liang before the bridge burns."),
+                    Line("unit.enemy_zhang_liang", "Zhang Liang", "dialogue.guangzong.mid.1", "Liu Bei, you broke the outer line only to walk into the heart of Guangzong."),
+                    Line("unit.guan_yu", "Guan Yu", "dialogue.guangzong.mid.2", "Then we cut down both brothers here and end this breach cleanly."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.guangzong.mid.3", "Hold formation. Strike through before the rebels can seal the road again."),
                 }),
             };
 
             List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
             {
                 new ScenarioTrigger(
-                    "jieqiao-intro",
+                    "guangzong-intro",
                     ScenarioCheckpoint.BattleStart,
                     new List<ScenarioDirective>
                     {
                         ScenarioDirective.UpdateObjective(openingObjective),
                         ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
                         {
-                            new ScenarioDialogueLine("unit.liu_bei", "Liu Bei", "dialogue.jieqiao.opening.1", "If Jieqiao's supply route falls, the whole front collapses."),
-                            new ScenarioDialogueLine("unit.huang_zhong", "Huang Zhong", "dialogue.jieqiao.opening.2", "Smoke rises from the east. Zhang Bao is already near the bridgehead."),
-                            new ScenarioDialogueLine("unit.zhang_fei", "Zhang Fei", "dialogue.jieqiao.opening.3", "Then let them come. I'll break their charge and roar the rest away."),
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.guangzong.opening.1", "Guangzong burns on every side. If this breach closes, the people behind us are lost."),
+                            Line("unit.huang_zhong", "Huang Zhong", "dialogue.guangzong.opening.2", "Zhang Bao holds the center while armored zealots lock the approach."),
+                            Line("unit.zhang_fei", "Zhang Fei", "dialogue.guangzong.opening.3", "Then we smash the front and drag the rebel brothers out ourselves."),
                         }),
                     }),
                 new ScenarioTrigger(
-                    "jieqiao-reinforcements-kill",
+                    "guangzong-reinforcements-kill",
                     ScenarioCheckpoint.ActionResolved,
                     reinforcementDirectives,
-                    requiredDefeatedUnitIds: new List<string> { "enemy-han-raider", "enemy-armored-captain" },
-                    exclusivityGroupId: "reinforcements"),
+                    requiredDefeatedUnitIds: new List<string> { "enemy-yellow_turban_raider", "enemy-armored_zealot" },
+                    exclusivityGroupId: "guangzong-reinforcements"),
                 new ScenarioTrigger(
-                    "jieqiao-reinforcements-round",
+                    "guangzong-reinforcements-round",
                     ScenarioCheckpoint.EnemyTurnStart,
                     reinforcementDirectives,
                     minimumRoundNumber: 3,
-                    exclusivityGroupId: "reinforcements"),
+                    exclusivityGroupId: "guangzong-reinforcements"),
                 new ScenarioTrigger(
-                    "jieqiao-liu-bei-falls",
+                    "guangzong-liu-bei-falls",
                     ScenarioCheckpoint.ActionResolved,
                     new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
                     requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
                 new ScenarioTrigger(
-                    "jieqiao-bosses-fall",
+                    "guangzong-bosses-fall",
                     ScenarioCheckpoint.ActionResolved,
                     new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
                     requiredDefeatedUnitIds: new List<string> { "enemy-zhang-bao", "enemy-zhang-liang" },
-                    requiredFlags: new List<string> { ReinforcementsArrivedFlag }),
+                    requiredFlags: new List<string> { GuangzongReinforcementsArrivedFlag }),
                 new ScenarioTrigger(
-                    "jieqiao-victory-dialogue",
+                    "guangzong-victory-dialogue",
                     ScenarioCheckpoint.PreBattleOutcome,
                     new List<ScenarioDirective>
                     {
                         ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
                         {
-                            new ScenarioDialogueLine("unit.liu_bei", "Liu Bei", "dialogue.jieqiao.victory.1", "The raiders break. Jieqiao stands for one more night."),
-                            new ScenarioDialogueLine("unit.guan_yu", "Guan Yu", "dialogue.jieqiao.victory.2", "Zhang Liang has withdrawn, but this war will not end here."),
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.guangzong.victory.1", "The rebel line is broken. Guangzong can breathe for one more night."),
+                            Line("unit.guan_yu", "Guan Yu", "dialogue.guangzong.victory.2", "Word of this field will travel. Greater wars will follow it soon enough."),
                         }),
                     },
                     requiresBattleEnded: true,
                     requiredWinningSide: TurnSide.Player),
                 new ScenarioTrigger(
-                    "jieqiao-defeat-dialogue",
+                    "guangzong-defeat-dialogue",
                     ScenarioCheckpoint.PreBattleOutcome,
                     new List<ScenarioDirective>
                     {
                         ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
                         {
-                            new ScenarioDialogueLine("speaker.narrator", "Narrator", "dialogue.jieqiao.defeat.1", "Flames swallow the grain road, and the line at Jieqiao collapses."),
+                            Line("speaker.narrator", "Narrator", "dialogue.guangzong.defeat.1", "The breach collapses beneath smoke and banners, and Guangzong is swallowed by the rebellion."),
                         }),
                     },
                     requiresBattleEnded: true,
@@ -141,11 +179,921 @@ namespace PhalanxChronicle.Core
             };
 
             return new BattleScenarioData(
-                JieqiaoFiresScenarioId,
-                "Jieqiao Fires",
-                "scenario.jieqiao_fires",
+                GuangzongScenarioId,
+                "Battle of Guangzong",
+                "scenario.guangzong",
                 stage,
-                triggers);
+                triggers,
+                1,
+                60,
+                24,
+                new RewardBundle(120, 1, "yellow-turban-signet"));
+        }
+
+        public static BattleScenarioData CreateBowangpo()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
+            AddCoreSquad(
+                openingSpawns,
+                new GridPosition(1, 4),
+                new GridPosition(2, 5),
+                new GridPosition(2, 3),
+                new GridPosition(1, 6));
+            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(1, 2)));
+            openingSpawns.Add(SpawnEnemy("enemy-bowang-vanguard", "Wei Vanguard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 6, 2, 1, new GridPosition(8, 4), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-bowang-archer", "Wei Archer", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(9, 2), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-bowang-rider", "Wei Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 26, 10, 3, 4, 1, new GridPosition(9, 6), AiProfileType.Aggressor));
+            openingSpawns.Add(SpawnEnemy("enemy-bowang-shield", "Wei Shieldwall", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 8, 6, 2, 1, new GridPosition(10, 4), AiProfileType.Protector));
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Bowangpo",
+                "stage.bowangpo",
+                12,
+                10,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(4, 0),
+                    new GridPosition(4, 1),
+                    new GridPosition(4, 8),
+                    new GridPosition(4, 9),
+                    new GridPosition(5, 1),
+                    new GridPosition(5, 8),
+                    new GridPosition(6, 1),
+                    new GridPosition(6, 8),
+                    new GridPosition(7, 0),
+                    new GridPosition(7, 1),
+                    new GridPosition(7, 8),
+                    new GridPosition(7, 9),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(3, 2), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(3, 7), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(5, 3), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(5, 6), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(8, 3), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(8, 6), TerrainType.Forest),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.bowangpo.opening",
+                "Hold the pass until Zhuge Liang springs the fire trap.",
+                "objective.bowangpo.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.bowangpo.final",
+                "Defeat Xiahou Dun after the flames spread through the pass.",
+                "objective.bowangpo.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            BattlefieldMutation fireTrapMutation = new BattlefieldMutation(
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(7, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 3), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 4), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 5), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 6), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 7), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 3), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 4), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 5), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 6), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 7), TerrainType.Hazard),
+                },
+                new List<BlockedCellStateChange>
+                {
+                    new BlockedCellStateChange(new GridPosition(10, 1), true),
+                    new BlockedCellStateChange(new GridPosition(10, 8), true),
+                    new BlockedCellStateChange(new GridPosition(11, 2), true),
+                    new BlockedCellStateChange(new GridPosition(11, 7), true),
+                });
+
+            List<ScenarioDirective> fireTrapDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(BowangpoFireTrapSprungFlag),
+                ScenarioDirective.ApplyBattlefieldMutation(fireTrapMutation),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-xiahou-dun", "Xiahou Dun", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 34, 11, 5, 3, 1, new GridPosition(11, 4), AiProfileType.Boss),
+                    SpawnEnemy("enemy-bowang-escort", "Wei Escort", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 8, 5, 2, 1, new GridPosition(10, 5), AiProfileType.Protector),
+                    SpawnEnemy("enemy-bowang-rearguard", "Wei Rearguard", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 24, 9, 3, 4, 1, new GridPosition(10, 3), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-bowang-hunter", "Hidden Bow", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.None, 22, 8, 3, 3, 2, new GridPosition(9, 7), AiProfileType.Support),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.bowangpo.mid.1", "Now. Light the slope and close the rear. Let the pass itself strike for us."),
+                    Line("unit.enemy_xiahou_dun", "Xiahou Dun", "dialogue.bowangpo.mid.2", "Fire? You dare trade steel for smoke in Bowangpo?"),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.bowangpo.mid.3", "The trap is sprung. Break their command before they regroup out of the flames."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "bowangpo-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.bowangpo.opening.1", "Bowangpo is narrow enough. If they commit one more step, the ground will fight for us."),
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.bowangpo.opening.2", "Then we hold steady. Do not break formation before the signal."),
+                            Line("unit.guan_yu", "Guan Yu", "dialogue.bowangpo.opening.3", "Let the vanguard press in. We only need them to believe we are yielding."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "bowangpo-firetrap-kill",
+                    ScenarioCheckpoint.ActionResolved,
+                    fireTrapDirectives,
+                    requiredDefeatedUnitIds: new List<string>
+                    {
+                        "enemy-bowang-vanguard",
+                        "enemy-bowang-rider",
+                        "enemy-bowang-archer",
+                        "enemy-bowang-shield",
+                    },
+                    exclusivityGroupId: "bowangpo-firetrap"),
+                new ScenarioTrigger(
+                    "bowangpo-firetrap-round",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    fireTrapDirectives,
+                    minimumRoundNumber: 3,
+                    exclusivityGroupId: "bowangpo-firetrap"),
+                new ScenarioTrigger(
+                    "bowangpo-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "bowangpo-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-xiahou-dun" },
+                    requiredFlags: new List<string> { BowangpoFireTrapSprungFlag }),
+                new ScenarioTrigger(
+                    "bowangpo-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.bowangpo.victory.1", "Bowangpo holds. The pass burned bright enough to buy us a future."),
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.bowangpo.victory.2", "If my plans are of use, then let me continue at your side from this day onward."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+                new ScenarioTrigger(
+                    "bowangpo-defeat-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("speaker.narrator", "Narrator", "dialogue.bowangpo.defeat.1", "The fire never takes hold, and Bowangpo becomes a killing ground for Liu Bei's retreating force."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Enemy),
+            };
+
+            return new BattleScenarioData(
+                BowangpoScenarioId,
+                "Bowangpo",
+                "scenario.bowangpo",
+                stage,
+                triggers,
+                2,
+                72,
+                28,
+                new RewardBundle(150, 2, "bowang-fire-token", new[] { "player-zhuge-liang" }));
+        }
+
+        public static BattleScenarioData CreateChangbanRearguard()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
+            AddCoreSquad(
+                openingSpawns,
+                new GridPosition(1, 4),
+                new GridPosition(2, 5),
+                new GridPosition(2, 3),
+                new GridPosition(1, 6));
+            openingSpawns.Add(SpawnEnemy("enemy-pursuit_commander", "Pursuit Commander", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 32, 10, 4, 3, 1, new GridPosition(9, 4), AiProfileType.Boss));
+            openingSpawns.Add(SpawnEnemy("enemy-tiger_guard", "Tiger Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 6, 2, 1, new GridPosition(10, 5), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-wei_bow_captain", "Wei Bow Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(9, 6), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-cavalry_scout", "Cavalry Scout", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 26, 9, 3, 4, 1, new GridPosition(10, 3), AiProfileType.Aggressor));
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Changban Rearguard",
+                "stage.changban_rearguard",
+                12,
+                10,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(5, 0),
+                    new GridPosition(5, 1),
+                    new GridPosition(5, 2),
+                    new GridPosition(5, 3),
+                    new GridPosition(5, 6),
+                    new GridPosition(5, 7),
+                    new GridPosition(5, 8),
+                    new GridPosition(5, 9),
+                    new GridPosition(6, 0),
+                    new GridPosition(6, 1),
+                    new GridPosition(6, 2),
+                    new GridPosition(6, 3),
+                    new GridPosition(6, 6),
+                    new GridPosition(6, 7),
+                    new GridPosition(6, 8),
+                    new GridPosition(6, 9),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(3, 4), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(3, 5), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(8, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(8, 5), TerrainType.Fort),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.changban.opening",
+                "Hold the crossing until the fifth round and keep Liu Bei alive.",
+                "objective.changban.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState pressureObjective = new ObjectiveState(
+                "objective.changban.pressure",
+                "Flank riders have arrived. Keep Liu Bei alive until the fifth round.",
+                "objective.changban.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            List<ScenarioDirective> flankDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(ChangbanFlankersArrivedFlag),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-tiger_leopard_rider_a", "Tiger Leopard Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 24, 10, 3, 4, 1, new GridPosition(0, 1), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-tiger_leopard_rider_b", "Tiger Leopard Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 24, 10, 3, 4, 1, new GridPosition(0, 8), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-pursuit_bowman", "Pursuit Bowman", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.None, 22, 8, 3, 3, 2, new GridPosition(1, 9), AiProfileType.Support),
+                }),
+                ScenarioDirective.UpdateObjective(pressureObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.huang_zhong", "Huang Zhong", "dialogue.changban.mid.1", "Horsemen on the flank. They are trying to cut behind the crossing."),
+                    Line("unit.zhang_fei", "Zhang Fei", "dialogue.changban.mid.2", "Let them come. I will hold this ford even if the river itself rises against us."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.changban.mid.3", "Just a little longer. Keep the road open until the column clears."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "changban-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.changban.opening.1", "Cao Cao is on our heels. If this crossing falls too soon, the whole retreat is finished."),
+                            Line("unit.guan_yu", "Guan Yu", "dialogue.changban.opening.2", "Then we hold the ford. Let the pursuers break against us until the people are away."),
+                            Line("unit.zhang_fei", "Zhang Fei", "dialogue.changban.opening.3", "Good. I have no use for a quiet road anyway."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "changban-flankers",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    flankDirectives,
+                    minimumRoundNumber: 3,
+                    exclusivityGroupId: "changban-flankers"),
+                new ScenarioTrigger(
+                    "changban-hold-complete",
+                    ScenarioCheckpoint.PlayerTurnStart,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredAliveUnitIds: new List<string> { "player-liu-bei" },
+                    minimumRoundNumber: 5),
+                new ScenarioTrigger(
+                    "changban-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "changban-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.changban.victory.1", "The road is clear. Pull back in order, every one of you."),
+                            Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.changban.victory.2", "If you will have me, I will ride with this banner from Changban onward."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+                new ScenarioTrigger(
+                    "changban-defeat-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("speaker.narrator", "Narrator", "dialogue.changban.defeat.1", "The ford is overrun, and the retreat at Changban dissolves into chaos."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Enemy),
+            };
+
+            return new BattleScenarioData(
+                ChangbanScenarioId,
+                "Changban Rearguard",
+                "scenario.changban_rearguard",
+                stage,
+                triggers,
+                3,
+                85,
+                30,
+                new RewardBundle(180, 2, "changban-scout-map", new[] { "player-zhao-yun" }));
+        }
+
+        public static BattleScenarioData CreateJiamengPass()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
+            AddCoreSquad(
+                openingSpawns,
+                new GridPosition(4, 1),
+                new GridPosition(3, 2),
+                new GridPosition(5, 2),
+                new GridPosition(2, 1));
+            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(6, 1)));
+            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(4, 3)));
+            openingSpawns.Add(SpawnEnemy("enemy-jiameng-gatewarden", "Gate Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 32, 10, 6, 2, 1, new GridPosition(4, 10), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-jiameng-bow-captain", "Bow Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 25, 9, 3, 3, 2, new GridPosition(5, 11), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-jiameng-lancer", "Pass Lancer", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 26, 10, 3, 4, 1, new GridPosition(4, 12), AiProfileType.Aggressor));
+            openingSpawns.Add(SpawnEnemy("enemy-jiameng-sentry", "Stonewall Sentry", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 8, 5, 2, 1, new GridPosition(5, 9), AiProfileType.Protector));
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Jiameng Pass",
+                "stage.jiameng_pass",
+                10,
+                14,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(1, 4),
+                    new GridPosition(1, 5),
+                    new GridPosition(1, 6),
+                    new GridPosition(1, 7),
+                    new GridPosition(1, 8),
+                    new GridPosition(2, 5),
+                    new GridPosition(2, 8),
+                    new GridPosition(3, 6),
+                    new GridPosition(3, 7),
+                    new GridPosition(6, 6),
+                    new GridPosition(6, 7),
+                    new GridPosition(7, 5),
+                    new GridPosition(7, 8),
+                    new GridPosition(8, 4),
+                    new GridPosition(8, 5),
+                    new GridPosition(8, 6),
+                    new GridPosition(8, 7),
+                    new GridPosition(8, 8),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(4, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(4, 8), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 8), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(2, 10), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(7, 10), TerrainType.Forest),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.jiameng.opening",
+                "Break the gate warden line and force Jiameng Pass open.",
+                "objective.jiameng.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.jiameng.final",
+                "Defeat the Jiameng commandant after the pass line breaks.",
+                "objective.jiameng.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            List<ScenarioDirective> bossDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(JiamengBossArrivedFlag),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-jiameng-commandant", "Jiameng Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 34, 11, 5, 3, 1, new GridPosition(4, 13), AiProfileType.Boss),
+                    SpawnEnemy("enemy-jiameng-guard-a", "Gate Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 9, 5, 2, 1, new GridPosition(3, 12), AiProfileType.Protector),
+                    SpawnEnemy("enemy-jiameng-guard-b", "Gate Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 9, 5, 2, 1, new GridPosition(6, 12), AiProfileType.Protector),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.enemy_jiameng_commandant", "Jiameng Commandant", "dialogue.jiameng.mid.1", "You cracked the outer wall, but Jiameng still answers to me."),
+                    Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.jiameng.mid.2", "The pass is narrow enough. One last push and their center breaks completely."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.jiameng.mid.3", "Forward. End the stand-off here before they can seal the ridge again."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "jiameng-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.jiameng.opening.1", "Jiameng Pass is long but thin. Break one joint in the line and the whole gate wavers."),
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.jiameng.opening.2", "Then we strike the center and keep the pressure forward."),
+                            Line("unit.zhang_fei", "Zhang Fei", "dialogue.jiameng.opening.3", "Good. I am tired of staring at their walls from a distance."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "jiameng-boss-arrives-kill",
+                    ScenarioCheckpoint.ActionResolved,
+                    bossDirectives,
+                    requiredDefeatedUnitIds: new List<string> { "enemy-jiameng-gatewarden", "enemy-jiameng-bow-captain" },
+                    exclusivityGroupId: "jiameng-boss"),
+                new ScenarioTrigger(
+                    "jiameng-boss-arrives-round",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    bossDirectives,
+                    minimumRoundNumber: 4,
+                    exclusivityGroupId: "jiameng-boss"),
+                new ScenarioTrigger(
+                    "jiameng-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "jiameng-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-jiameng-commandant" },
+                    requiredFlags: new List<string> { JiamengBossArrivedFlag }),
+                new ScenarioTrigger(
+                    "jiameng-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.jiameng.victory.1", "Jiameng Pass is open. This field changes more than the road ahead."),
+                            Line("unit.player_ma_chao", "Ma Chao", "dialogue.jiameng.victory.2", "A line like that deserves riders who can keep pace. From this battle on, I will ride under your banner."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+                new ScenarioTrigger(
+                    "jiameng-defeat-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("speaker.narrator", "Narrator", "dialogue.jiameng.defeat.1", "The mountain gate holds fast, and Jiameng remains closed under its defenders."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Enemy),
+            };
+
+            return new BattleScenarioData(
+                JiamengPassScenarioId,
+                "Jiameng Pass",
+                "scenario.jiameng_pass",
+                stage,
+                triggers,
+                4,
+                95,
+                34,
+                new RewardBundle(220, 3, "jiameng-oath-banner", new[] { "player-ma-chao" }));
+        }
+
+        public static BattleScenarioData CreateHanshui()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>
+            {
+                SpawnPlayerLiuBei(new GridPosition(1, 4)),
+                SpawnPlayerHuangZhong(new GridPosition(2, 5)),
+                SpawnPlayerZhaoYun(new GridPosition(2, 3)),
+                SpawnPlayerZhugeLiang(new GridPosition(1, 6)),
+                SpawnPlayerMaChao(new GridPosition(1, 2)),
+                SpawnEnemy("enemy-hanshui-shield-captain", "Shield Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 32, 9, 6, 2, 1, new GridPosition(10, 4), AiProfileType.Protector),
+                SpawnEnemy("enemy-hanshui-bow-captain", "Bow Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 26, 9, 3, 3, 2, new GridPosition(11, 2), AiProfileType.Support),
+                SpawnEnemy("enemy-hanshui-river-rider", "River Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 26, 10, 3, 4, 1, new GridPosition(11, 6), AiProfileType.Aggressor),
+                SpawnEnemy("enemy-hanshui-guard", "River Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 8, 5, 2, 1, new GridPosition(12, 4), AiProfileType.Protector),
+            };
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Hanshui",
+                "stage.hanshui",
+                14,
+                10,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(5, 1),
+                    new GridPosition(5, 2),
+                    new GridPosition(5, 7),
+                    new GridPosition(5, 8),
+                    new GridPosition(6, 2),
+                    new GridPosition(6, 7),
+                    new GridPosition(7, 2),
+                    new GridPosition(7, 7),
+                    new GridPosition(8, 1),
+                    new GridPosition(8, 2),
+                    new GridPosition(8, 7),
+                    new GridPosition(8, 8),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(4, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(4, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(9, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(9, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(3, 2), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(3, 7), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(10, 1), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(10, 8), TerrainType.Hazard),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.hanshui.opening",
+                "Hold the Han camp through the third round and keep Liu Bei alive.",
+                "objective.hanshui.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.hanshui.final",
+                "Counterattack and defeat the Hanshui field commander.",
+                "objective.hanshui.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            List<ScenarioDirective> counterattackDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(HanshuiCounterattackFlag),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-hanshui-commander", "Hanshui Commander", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 35, 11, 5, 3, 1, new GridPosition(13, 4), AiProfileType.Boss),
+                    SpawnEnemy("enemy-hanshui-deadeye", "Wei Deadeye", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(12, 1), AiProfileType.Support),
+                    SpawnEnemy("enemy-hanshui-raider", "Hanshui Raider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 25, 9, 3, 4, 1, new GridPosition(12, 7), AiProfileType.Aggressor),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.hanshui.mid.1", "Their advance has spent itself. Now we drive back across the river road."),
+                    Line("unit.huang_zhong", "Huang Zhong", "dialogue.hanshui.mid.2", "Good. I have had enough of trading arrows from the bank."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.hanshui.mid.3", "Counterattack. Break the field commander before the river line can form again."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "hanshui-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.hanshui.opening.1", "Hanshui rewards patience. Hold the camp line until their first wave commits too far."),
+                            Line("unit.huang_zhong", "Huang Zhong", "dialogue.hanshui.opening.2", "Then Zhao Yun and I strike once their front foot slips."),
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.hanshui.opening.3", "Steady the line. We answer only when the riverbank favors us."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "hanshui-counterattack-round",
+                    ScenarioCheckpoint.PlayerTurnStart,
+                    counterattackDirectives,
+                    minimumRoundNumber: 4,
+                    requiredAliveUnitIds: new List<string> { "player-liu-bei" },
+                    exclusivityGroupId: "hanshui-counterattack"),
+                new ScenarioTrigger(
+                    "hanshui-counterattack-kill",
+                    ScenarioCheckpoint.ActionResolved,
+                    counterattackDirectives,
+                    requiredDefeatedUnitIds: new List<string>
+                    {
+                        "enemy-hanshui-shield-captain",
+                        "enemy-hanshui-bow-captain",
+                        "enemy-hanshui-river-rider",
+                        "enemy-hanshui-guard",
+                    },
+                    requiredAliveUnitIds: new List<string> { "player-liu-bei" },
+                    exclusivityGroupId: "hanshui-counterattack"),
+                new ScenarioTrigger(
+                    "hanshui-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "hanshui-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-hanshui-commander" },
+                    requiredFlags: new List<string> { HanshuiCounterattackFlag }),
+                new ScenarioTrigger(
+                    "hanshui-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.huang_zhong", "Huang Zhong", "dialogue.hanshui.victory.1", "Hanshui breaks our way. That counterstroke will echo across the whole river line."),
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.hanshui.victory.2", "Then we carry that momentum forward. The next ridge must fall with it."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+                new ScenarioTrigger(
+                    "hanshui-defeat-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("speaker.narrator", "Narrator", "dialogue.hanshui.defeat.1", "The Han camp is driven from the riverbank, and the chance to reverse the line at Hanshui is lost."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Enemy),
+            };
+
+            return new BattleScenarioData(
+                HanshuiScenarioId,
+                "Hanshui",
+                "scenario.hanshui",
+                stage,
+                triggers,
+                5,
+                104,
+                36,
+                new RewardBundle(230, 3, "hanshui-command-seal"));
+        }
+
+        public static BattleScenarioData CreateDingjunMountain()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>
+            {
+                SpawnPlayerLiuBei(new GridPosition(1, 6)),
+                SpawnPlayerGuanYu(new GridPosition(2, 7)),
+                SpawnPlayerHuangZhong(new GridPosition(1, 4)),
+                SpawnPlayerZhaoYun(new GridPosition(2, 5)),
+                SpawnPlayerZhugeLiang(new GridPosition(0, 6)),
+                SpawnPlayerMaChao(new GridPosition(1, 8)),
+                SpawnEnemy("enemy-wei_vanguard_captain", "Wei Vanguard Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.PowerStrike, 30, 10, 6, 2, 1, new GridPosition(8, 5), AiProfileType.Protector),
+                SpawnEnemy("enemy-wei_archer_captain", "Wei Archer Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 26, 9, 3, 3, 2, new GridPosition(8, 7), AiProfileType.Support),
+                SpawnEnemy("enemy-wei_shieldman", "Wei Shieldman", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 8, 6, 2, 1, new GridPosition(10, 5), AiProfileType.Protector),
+                SpawnEnemy("enemy-wei_skirmisher", "Wei Skirmisher", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 24, 9, 3, 4, 1, new GridPosition(10, 8), AiProfileType.Aggressor),
+            };
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Dingjun Mountain",
+                "stage.dingjun_mountain",
+                12,
+                12,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(4, 1),
+                    new GridPosition(4, 2),
+                    new GridPosition(4, 3),
+                    new GridPosition(4, 8),
+                    new GridPosition(4, 9),
+                    new GridPosition(4, 10),
+                    new GridPosition(5, 3),
+                    new GridPosition(5, 8),
+                    new GridPosition(6, 3),
+                    new GridPosition(6, 8),
+                    new GridPosition(8, 2),
+                    new GridPosition(8, 3),
+                    new GridPosition(8, 8),
+                    new GridPosition(8, 9),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(3, 5), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(3, 6), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(7, 6), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(9, 6), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(10, 4), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(10, 8), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(6, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 6), TerrainType.Fort),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.dingjun.opening",
+                "Defeat the Wei Vanguard Captain and the Wei Archer Captain.",
+                "objective.dingjun.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.dingjun.final",
+                "Defeat Xiahou Yuan.",
+                "objective.dingjun.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            List<ScenarioDirective> bossDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(DingjunBossArrivedFlag),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-xiahou-yuan", "Xiahou Yuan", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 36, 12, 5, 4, 1, new GridPosition(11, 6), AiProfileType.Boss),
+                    SpawnEnemy("enemy-tiger_guard_captain", "Tiger Guard Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 6, 2, 1, new GridPosition(10, 4), AiProfileType.Protector),
+                    SpawnEnemy("enemy-wei_deadeye", "Wei Deadeye", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(10, 8), AiProfileType.Support),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.enemy_xiahou_yuan", "Xiahou Yuan", "dialogue.dingjun.mid.1", "So this is the spearpoint that broke my forward camp. Come and test yourselves against me."),
+                    Line("unit.huang_zhong", "Huang Zhong", "dialogue.dingjun.mid.2", "The mountain mouth is open. Xiahou Yuan has finally shown himself."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.dingjun.mid.3", "Press the advantage. Finish this here and the Hanzhong line opens before us."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "dingjun-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.dingjun.opening.1", "Break the forward camp first. Once the pass opens, Xiahou Yuan will have to answer in person."),
+                            Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.dingjun.opening.2", "Their shield line is narrow but stubborn. We strike cleanly, then drive through."),
+                            Line("unit.huang_zhong", "Huang Zhong", "dialogue.dingjun.opening.3", "Good. Once the pass opens, my arrows will finish what the mountain begins."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "dingjun-boss-arrives",
+                    ScenarioCheckpoint.ActionResolved,
+                    bossDirectives,
+                    requiredDefeatedUnitIds: new List<string> { "enemy-wei_vanguard_captain", "enemy-wei_archer_captain" },
+                    exclusivityGroupId: "dingjun-boss"),
+                new ScenarioTrigger(
+                    "dingjun-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "dingjun-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-xiahou-yuan" },
+                    requiredFlags: new List<string> { DingjunBossArrivedFlag }),
+                new ScenarioTrigger(
+                    "dingjun-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.dingjun.victory.1", "Dingjun Mountain is ours. The road into Hanzhong has changed hands today."),
+                            Line("unit.huang_zhong", "Huang Zhong", "dialogue.dingjun.victory.2", "Xiahou Yuan is down. The Wei camp will not recover its footing before dawn."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+                new ScenarioTrigger(
+                    "dingjun-defeat-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("speaker.narrator", "Narrator", "dialogue.dingjun.defeat.1", "The mountain road closes again under Wei banners, and the chance at Dingjun slips away."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Enemy),
+            };
+
+            return new BattleScenarioData(
+                DingjunScenarioId,
+                "Dingjun Mountain",
+                "scenario.dingjun_mountain",
+                stage,
+                triggers,
+                6,
+                118,
+                40,
+                new RewardBundle(260, 4, "dingjun-war-banner"));
+        }
+
+        private static void AddCoreSquad(
+            ICollection<UnitSpawnData> spawns,
+            GridPosition liuBeiPosition,
+            GridPosition guanYuPosition,
+            GridPosition zhangFeiPosition,
+            GridPosition huangZhongPosition)
+        {
+            spawns.Add(SpawnPlayerLiuBei(liuBeiPosition));
+            spawns.Add(SpawnPlayerGuanYu(guanYuPosition));
+            spawns.Add(SpawnPlayerZhangFei(zhangFeiPosition));
+            spawns.Add(SpawnPlayerHuangZhong(huangZhongPosition));
+        }
+
+        private static UnitSpawnData SpawnPlayerLiuBei(GridPosition position)
+        {
+            return SpawnPlayer("player-liu-bei", "Liu Bei", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.RoyalAid, 30, 9, 5, 3, 1, position, 20, AiProfileType.Protector);
+        }
+
+        private static UnitSpawnData SpawnPlayerGuanYu(GridPosition position)
+        {
+            return SpawnPlayer("player-guan-yu", "Guan Yu", UnitRole.Guardian, PassiveSkillType.ArmorBreak, ActiveSkillType.GreenDragonSlash, 34, 12, 5, 3, 1, position, 20, AiProfileType.Protector);
+        }
+
+        private static UnitSpawnData SpawnPlayerZhangFei(GridPosition position)
+        {
+            return SpawnPlayer("player-zhang-fei", "Zhang Fei", UnitRole.Guardian, PassiveSkillType.Vanguard, ActiveSkillType.WarCry, 36, 11, 6, 3, 1, position, 20, AiProfileType.Aggressor);
+        }
+
+        private static UnitSpawnData SpawnPlayerHuangZhong(GridPosition position)
+        {
+            return SpawnPlayer("player-huang-zhong", "Huang Zhong", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 28, 10, 3, 3, 2, position, 20, AiProfileType.Support);
+        }
+
+        private static UnitSpawnData SpawnPlayerZhugeLiang(GridPosition position)
+        {
+            return SpawnPlayer("player-zhuge-liang", "Zhuge Liang", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.RoyalAid, 26, 8, 3, 3, 1, position, 26, AiProfileType.Support);
+        }
+
+        private static UnitSpawnData SpawnPlayerZhaoYun(GridPosition position)
+        {
+            return SpawnPlayer("player-zhao-yun", "Zhao Yun", UnitRole.Scout, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 31, 11, 4, 4, 1, position, 18, AiProfileType.Aggressor);
+        }
+
+        private static UnitSpawnData SpawnPlayerMaChao(GridPosition position)
+        {
+            return SpawnPlayer("player-ma-chao", "Ma Chao", UnitRole.Raider, PassiveSkillType.Vanguard, ActiveSkillType.PowerStrike, 33, 12, 4, 4, 1, position, 18, AiProfileType.Aggressor);
+        }
+
+        private static UnitSpawnData SpawnPlayer(
+            string id,
+            string displayName,
+            UnitRole role,
+            PassiveSkillType passiveSkill,
+            ActiveSkillType activeSkill,
+            int maxHp,
+            int attack,
+            int defense,
+            int moveRange,
+            int attackRange,
+            GridPosition position,
+            int maxMana,
+            AiProfileType aiProfile)
+        {
+            return Spawn(
+                CreateDefinition(id, displayName, UnitFaction.Player, role, passiveSkill, activeSkill, maxHp, attack, defense, moveRange, attackRange, maxMana, aiProfile),
+                position);
+        }
+
+        private static UnitSpawnData SpawnEnemy(
+            string id,
+            string displayName,
+            UnitRole role,
+            PassiveSkillType passiveSkill,
+            ActiveSkillType activeSkill,
+            int maxHp,
+            int attack,
+            int defense,
+            int moveRange,
+            int attackRange,
+            GridPosition position,
+            AiProfileType aiProfile)
+        {
+            return Spawn(
+                CreateDefinition(id, displayName, UnitFaction.Enemy, role, passiveSkill, activeSkill, maxHp, attack, defense, moveRange, attackRange, 20, aiProfile),
+                position);
+        }
+
+        private static UnitSpawnData Spawn(UnitDefinitionData definition, GridPosition position)
+        {
+            return new UnitSpawnData(definition, position);
+        }
+
+        private static ScenarioDialogueLine Line(string speakerNameKey, string speakerFallback, string textKey, string textFallback)
+        {
+            return new ScenarioDialogueLine(speakerNameKey, speakerFallback, textKey, textFallback);
         }
 
         private static UnitDefinitionData CreateDefinition(
@@ -159,7 +1107,9 @@ namespace PhalanxChronicle.Core
             int attack,
             int defense,
             int moveRange,
-            int attackRange)
+            int attackRange,
+            int maxMana,
+            AiProfileType aiProfile = AiProfileType.Default)
         {
             return new UnitDefinitionData(
                 id,
@@ -178,7 +1128,15 @@ namespace PhalanxChronicle.Core
                 attack,
                 defense,
                 moveRange,
-                attackRange);
+                attackRange,
+                maxMana,
+                null,
+                null,
+                aiProfile,
+                null,
+                1,
+                0,
+                null);
         }
 
         private static string ToLocalizationKeySegment(string value)

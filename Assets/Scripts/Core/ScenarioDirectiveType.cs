@@ -7,5 +7,6 @@ namespace PhalanxChronicle.Core
         SpawnUnits = 2,
         SetBattleOutcome = 3,
         SetFlag = 4,
+        ApplyBattlefieldMutation = 5,
     }
 }

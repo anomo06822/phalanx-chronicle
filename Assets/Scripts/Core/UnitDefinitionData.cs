@@ -22,7 +22,8 @@ namespace PhalanxChronicle.Core
             int attack,
             int defense,
             int moveRange,
-            int attackRange) : this(
+            int attackRange)
+            : this(
                 id,
                 displayName,
                 displayNameKey,
@@ -40,7 +41,14 @@ namespace PhalanxChronicle.Core
                 defense,
                 moveRange,
                 attackRange,
-                20)
+                20,
+                null,
+                null,
+                AiProfileType.Default,
+                null,
+                1,
+                0,
+                null)
         {
         }
 
@@ -63,6 +71,62 @@ namespace PhalanxChronicle.Core
             int moveRange,
             int attackRange,
             int maxMana)
+            : this(
+                id,
+                displayName,
+                displayNameKey,
+                faction,
+                role,
+                roleNameKey,
+                passiveSkill,
+                passiveSkillNameKey,
+                passiveSkillDescriptionKey,
+                activeSkill,
+                activeSkillNameKey,
+                activeSkillDescriptionKey,
+                maxHp,
+                attack,
+                defense,
+                moveRange,
+                attackRange,
+                maxMana,
+                null,
+                null,
+                AiProfileType.Default,
+                null,
+                1,
+                0,
+                null)
+        {
+        }
+
+        public UnitDefinitionData(
+            string id,
+            string displayName,
+            string displayNameKey,
+            UnitFaction faction,
+            UnitRole role,
+            string roleNameKey,
+            PassiveSkillType passiveSkill,
+            string passiveSkillNameKey,
+            string passiveSkillDescriptionKey,
+            ActiveSkillType activeSkill,
+            string activeSkillNameKey,
+            string activeSkillDescriptionKey,
+            int maxHp,
+            int attack,
+            int defense,
+            int moveRange,
+            int attackRange,
+            int maxMana,
+            string classId,
+            string growthProfileId,
+            AiProfileType aiProfile,
+            EquipmentLoadout equipmentLoadout,
+            int startingLevel,
+            int startingExp,
+            BondState bondState,
+            bool progressionResolved = false)
         {
             Id = id;
             DisplayName = displayName;
@@ -82,6 +146,14 @@ namespace PhalanxChronicle.Core
             MoveRange = moveRange;
             AttackRange = attackRange;
             MaxMana = maxMana;
+            ClassId = string.IsNullOrWhiteSpace(classId) ? UnitClassCatalog.GetDefaultClassId(role) : classId;
+            GrowthProfileId = string.IsNullOrWhiteSpace(growthProfileId) ? ClassId : growthProfileId;
+            AiProfile = aiProfile == AiProfileType.Default ? UnitClassCatalog.Get(ClassId).DefaultAiProfile : aiProfile;
+            EquipmentLoadout = equipmentLoadout ?? EquipmentLoadout.Empty;
+            StartingLevel = startingLevel < 1 ? 1 : startingLevel;
+            StartingExp = startingExp < 0 ? 0 : startingExp;
+            BondState = bondState ?? new BondState();
+            ProgressionResolved = progressionResolved;
         }
 
         public string Id { get; }
@@ -119,5 +191,21 @@ namespace PhalanxChronicle.Core
         public int AttackRange { get; }
 
         public int MaxMana { get; }
+
+        public string ClassId { get; }
+
+        public string GrowthProfileId { get; }
+
+        public AiProfileType AiProfile { get; }
+
+        public EquipmentLoadout EquipmentLoadout { get; }
+
+        public int StartingLevel { get; }
+
+        public int StartingExp { get; }
+
+        public BondState BondState { get; }
+
+        public bool ProgressionResolved { get; }
     }
 }

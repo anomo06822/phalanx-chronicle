@@ -1,5 +1,6 @@
 using PhalanxChronicle.Core;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace PhalanxChronicle.Data
 {
@@ -24,6 +25,14 @@ namespace PhalanxChronicle.Data
         [SerializeField] private int moveRange = 3;
         [SerializeField] private int attackRange = 1;
         [SerializeField] private int maxMana = 20;
+        [SerializeField] private string classId = string.Empty;
+        [SerializeField] private string growthProfileId = string.Empty;
+        [SerializeField] private AiProfileType aiProfile = AiProfileType.Default;
+        [SerializeField] private string weaponId = string.Empty;
+        [FormerlySerializedAs("accessoryId")]
+        [SerializeField] private string armorId = string.Empty;
+        [SerializeField] private int startingLevel = 1;
+        [SerializeField] private int startingExp;
 
         public string DisplayName => displayName;
 
@@ -49,7 +58,14 @@ namespace PhalanxChronicle.Data
                 defense,
                 moveRange,
                 attackRange,
-                maxMana);
+                maxMana,
+                classId,
+                growthProfileId,
+                aiProfile,
+                new EquipmentLoadout(weaponId, armorId),
+                startingLevel,
+                startingExp,
+                new BondState());
         }
 
         public static UnitDefinition CreateRuntime(
@@ -70,7 +86,14 @@ namespace PhalanxChronicle.Data
             int defense,
             int moveRange,
             int attackRange,
-            int maxMana = 20)
+            int maxMana = 20,
+            string classId = "",
+            string growthProfileId = "",
+            AiProfileType aiProfile = AiProfileType.Default,
+            string weaponId = "",
+            string armorId = "",
+            int startingLevel = 1,
+            int startingExp = 0)
         {
             UnitDefinition definition = CreateInstance<UnitDefinition>();
             definition.unitId = unitId;
@@ -91,6 +114,13 @@ namespace PhalanxChronicle.Data
             definition.moveRange = moveRange;
             definition.attackRange = attackRange;
             definition.maxMana = maxMana;
+            definition.classId = classId;
+            definition.growthProfileId = growthProfileId;
+            definition.aiProfile = aiProfile;
+            definition.weaponId = weaponId;
+            definition.armorId = armorId;
+            definition.startingLevel = startingLevel;
+            definition.startingExp = startingExp;
             return definition;
         }
     }

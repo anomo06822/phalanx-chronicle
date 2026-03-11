@@ -406,6 +406,11 @@ namespace PhalanxChronicle.Battle.States
             BattleManager.ShowResult(LocalizationService.Text("ui.result.victory", "Victory"));
             BattleManager.SetEndTurnEnabled(false);
         }
+
+        public override void OnConfirmRequested()
+        {
+            BattleManager.ConfirmBattleResult();
+        }
     }
 
     public sealed class BattleDefeatState : BattleStateBase
@@ -424,6 +429,11 @@ namespace PhalanxChronicle.Battle.States
             BattleManager.SetLog(LocalizationService.Text("ui.log.defeat", "All player units have fallen."));
             BattleManager.ShowResult(LocalizationService.Text("ui.result.defeat", "Defeat"));
             BattleManager.SetEndTurnEnabled(false);
+        }
+
+        public override void OnConfirmRequested()
+        {
+            BattleManager.ConfirmBattleResult();
         }
     }
 }

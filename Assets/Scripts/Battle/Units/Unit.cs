@@ -11,8 +11,9 @@ namespace PhalanxChronicle.Battle.Units
     [RequireComponent(typeof(BoxCollider2D))]
     public sealed class Unit : MonoBehaviour
     {
-        private const float HpBarWidth = 0.88f;
-        private const float BaseNameCharacterSize = 0.075f;
+        private const float HpBarWidth = 0.72f;
+        private const float BaseNameCharacterSize = 0.048f;
+        private const float GlobalVisualScale = 0.9f;
 
         private Action<Unit> clickHandler;
         private Action<Unit, bool> hoverChangedHandler;
@@ -20,20 +21,18 @@ namespace PhalanxChronicle.Battle.Units
         private SpriteRenderer shadowRenderer;
         private SpriteRenderer frameRenderer;
         private SpriteRenderer factionRingRenderer;
-        private SpriteRenderer roleAuraRenderer;
-        private SpriteRenderer weaponRenderer;
-        private SpriteRenderer namePlateRenderer;
-        private SpriteRenderer roleRibbonRenderer;
         private SpriteRenderer statusBadgeRenderer;
         private SpriteRenderer skillReadyRenderer;
+        private SpriteRenderer namePlateRenderer;
         private SpriteRenderer hpBackRenderer;
         private SpriteRenderer hpFillRenderer;
         private TextMesh nameText;
-        private TextMesh roleText;
-        private TextMesh statusText;
+        private GameObject infoRoot;
+        private UnitVisualProfile visualProfile;
 
-        private Vector3 restingScale = new Vector3(0.9f, 0.9f, 1f);
+        private Vector3 restingScale = new Vector3(0.94f, 0.94f, 1f);
         private bool isSelected;
+        private bool isHovered;
 
         public UnitRuntimeState RuntimeState { get; private set; }
 
@@ -44,17 +43,31 @@ namespace PhalanxChronicle.Battle.Units
             RuntimeState = runtimeState;
             clickHandler = onClicked;
             hoverChangedHandler = onHoverChanged;
+            visualProfile = UnitVisualCatalog.GetProfile(runtimeState.Id, runtimeState.Faction, runtimeState.Role);
             spriteRenderer = GetComponent<SpriteRenderer>();
-            spriteRenderer.sprite = RuntimeSpriteLibrary.GetUnitSprite(runtimeState.Id, runtimeState.Faction);
+            spriteRenderer.sprite = RuntimeSpriteLibrary.GetUnitSprite(visualProfile);
             spriteRenderer.color = Color.white;
             spriteRenderer.sortingOrder = 30;
 
             BoxCollider2D colliderComponent = GetComponent<BoxCollider2D>();
-            colliderComponent.size = new Vector2(0.8f, 1.1f);
+            colliderComponent.size = new Vector2(0.78f, 1.02f);
             colliderComponent.offset = new Vector2(0f, 0.02f);
             colliderComponent.isTrigger = false;
+            float scaledSize = visualProfile.BattleScale * GlobalVisualScale;
+            restingScale = new Vector3(scaledSize, scaledSize, 1f);
             transform.localScale = restingScale;
             gameObject.name = LocalizationService.Text(runtimeState.DisplayNameKey, runtimeState.DisplayName);
+
+            if (visualProfile.IdleAnimationController != null)
+            {
+                Animator animator = GetComponent<Animator>();
+                if (animator == null)
+                {
+                    animator = gameObject.AddComponent<Animator>();
+                }
+
+                animator.runtimeAnimatorController = visualProfile.IdleAnimationController;
+            }
 
             BuildDecorations();
             SyncVisualState();
@@ -82,9 +95,17 @@ namespace PhalanxChronicle.Battle.Units
         {
             isSelected = selected;
             ApplySelectionState();
+            UpdateInfoVisibility();
         }
 
-        public Vector3 GetAnchorPosition(float yOffset = 0.88f)
+        public void SetHovered(bool hovered)
+        {
+            isHovered = hovered;
+            ApplySelectionState();
+            UpdateInfoVisibility();
+        }
+
+        public Vector3 GetAnchorPosition(float yOffset = 0.82f)
         {
             return transform.position + new Vector3(0f, yOffset, 0f);
         }
@@ -141,8 +162,8 @@ namespace PhalanxChronicle.Battle.Units
                 elapsed += Time.deltaTime;
                 float progress = Mathf.Clamp01(elapsed / duration);
                 float wave = Mathf.Sin(progress * Mathf.PI);
-                spriteRenderer.color = Color.Lerp(baseColor, flashColor, wave * 0.7f);
-                transform.localScale = Vector3.Lerp(baseScale, restingScale * 1.12f, wave);
+                spriteRenderer.color = Color.Lerp(baseColor, flashColor, wave * 0.6f);
+                transform.localScale = Vector3.Lerp(baseScale, restingScale * 1.1f, wave);
                 yield return null;
             }
 
@@ -152,68 +173,88 @@ namespace PhalanxChronicle.Battle.Units
 
         private void BuildDecorations()
         {
-            shadowRenderer = CreateSpriteChild("Shadow", RuntimeSpriteLibrary.WhiteSprite, new Color(0f, 0f, 0f, 0.2f), new Vector3(0f, -0.4f, 0f), new Vector3(0.92f, 0.22f, 1f), 20);
+            shadowRenderer = CreateSpriteChild("Shadow", transform, RuntimeSpriteLibrary.MistBandSprite, new Color(0f, 0f, 0f, 0.22f), new Vector3(0f, -0.46f, 0f), new Vector3(0.42f, 0.1f, 1f), 20);
             factionRingRenderer = CreateSpriteChild(
-                "FactionRing",
-                RuntimeSpriteLibrary.WhiteSprite,
-                BattleUiTheme.GetFactionRingColor(RuntimeState.Faction, exhausted: false),
+                "FactionMarker",
+                transform,
+                RuntimeSpriteLibrary.GetFactionMarkerSprite(visualProfile),
+                visualProfile.MarkerColor,
                 new Vector3(0f, -0.46f, 0f),
-                new Vector3(0.92f, 0.16f, 1f),
+                new Vector3(0.88f, 0.24f, 1f),
                 21);
-            roleAuraRenderer = CreateSpriteChild("RoleAura", RuntimeSpriteLibrary.WhiteSprite, GetRoleColor(RuntimeState.Role, 0.18f), new Vector3(0f, -0.04f, 0f), new Vector3(1.02f, 1.2f, 1f), 24);
-            WeaponPose weaponPose = GetWeaponPose(RuntimeState.Role);
-            weaponRenderer = CreateSpriteChild(
-                "Weapon",
-                RuntimeSpriteLibrary.GetWeaponSprite(RuntimeState.Role, RuntimeState.Faction),
-                GetWeaponColor(RuntimeState.Role, RuntimeState.Faction, false),
-                weaponPose.Position,
-                weaponPose.Scale,
-                31);
-            weaponRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, weaponPose.Rotation);
-            frameRenderer = CreateSpriteChild("SelectionFrame", RuntimeSpriteLibrary.FrameSprite, BattleUiTheme.SelectedHighlight, new Vector3(0f, 0f, 0f), new Vector3(1.22f, 1.34f, 1f), 29);
+            frameRenderer = CreateSpriteChild(
+                "SelectionFrame",
+                transform,
+                visualProfile.SelectionFrame != null ? visualProfile.SelectionFrame : RuntimeSpriteLibrary.FrameSprite,
+                visualProfile.FrameColor,
+                new Vector3(0f, 0.02f, 0f),
+                new Vector3(1.24f, 1.28f, 1f),
+                29);
             frameRenderer.enabled = false;
+
+            statusBadgeRenderer = CreateSpriteChild(
+                "StatusBadge",
+                transform,
+                RuntimeSpriteLibrary.SparkSprite,
+                Color.white,
+                new Vector3(0.36f, 0.56f, 0f),
+                new Vector3(0.16f, 0.16f, 1f),
+                34);
+            statusBadgeRenderer.enabled = false;
+
+            skillReadyRenderer = CreateSpriteChild(
+                "SkillReady",
+                transform,
+                RuntimeSpriteLibrary.RingSprite,
+                Color.white,
+                new Vector3(0f, 0.88f, 0f),
+                new Vector3(0.18f, 0.18f, 1f),
+                35);
+            skillReadyRenderer.enabled = false;
+
+            infoRoot = new GameObject("InfoRoot");
+            infoRoot.transform.SetParent(transform, false);
+            infoRoot.transform.localPosition = new Vector3(0f, 0.82f, 0f);
 
             namePlateRenderer = CreateSpriteChild(
                 "NamePlate",
+                infoRoot.transform,
                 RuntimeSpriteLibrary.BannerSprite,
                 BattleUiTheme.GetFactionPlateColor(RuntimeState.Faction, exhausted: false),
-                new Vector3(0f, 0.8f, 0f),
-                new Vector3(1.08f, 0.34f, 1f),
-                34);
-            roleRibbonRenderer = CreateSpriteChild(
-                "RoleRibbon",
-                RuntimeSpriteLibrary.BannerSprite,
-                GetRoleColor(RuntimeState.Role, 0.96f),
-                new Vector3(0f, 1.14f, 0f),
-                new Vector3(0.74f, 0.18f, 1f),
+                new Vector3(0f, 0f, 0f),
+                new Vector3(0.82f, 0.2f, 1f),
                 36);
-            statusBadgeRenderer = CreateSpriteChild(
-                "StatusBadge",
-                RuntimeSpriteLibrary.BannerSprite,
-                new Color(0.52f, 0.18f, 0.12f, 0.94f),
-                new Vector3(0f, 0.48f, 0f),
-                new Vector3(0.78f, 0.18f, 1f),
-                35);
-            skillReadyRenderer = CreateSpriteChild(
-                "SkillReady",
-                RuntimeSpriteLibrary.WhiteSprite,
-                new Color(0.99f, 0.84f, 0.34f, 0.98f),
-                new Vector3(0.48f, 1.12f, 0f),
-                new Vector3(0.1f, 0.1f, 1f),
-                38);
-            skillReadyRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, 45f);
 
             string localizedName = LocalizationService.Text(RuntimeState.DisplayNameKey, RuntimeState.DisplayName);
-            nameText = CreateTextChild("NameText", localizedName, new Vector3(0f, 0.8f, 0f), 35, GetNameCharacterSize(localizedName), TextAlignment.Center, TextAnchor.MiddleCenter);
-            nameText.color = new Color(0.96f, 0.93f, 0.84f, 1f);
-            roleText = CreateTextChild("RoleText", GetRoleShortText(RuntimeState.Role), new Vector3(0f, 1.14f, 0f), 37, 0.055f, TextAlignment.Center, TextAnchor.MiddleCenter);
-            roleText.color = new Color(0.14f, 0.1f, 0.08f, 1f);
+            nameText = CreateTextChild(
+                "NameText",
+                infoRoot.transform,
+                localizedName,
+                new Vector3(0f, 0f, -0.01f),
+                37,
+                GetNameCharacterSize(localizedName),
+                TextAlignment.Center,
+                TextAnchor.MiddleCenter);
+            nameText.color = BattleUiTheme.TextPrimary;
 
-            statusText = CreateTextChild("StatusText", string.Empty, new Vector3(0f, 0.48f, 0f), 35, 0.05f, TextAlignment.Center, TextAnchor.MiddleCenter);
-            statusText.color = new Color(0.99f, 0.87f, 0.5f, 1f);
+            hpBackRenderer = CreateSpriteChild(
+                "HpBack",
+                infoRoot.transform,
+                RuntimeSpriteLibrary.WhiteSprite,
+                new Color(0.11f, 0.1f, 0.09f, 0.92f),
+                new Vector3(0f, -0.16f, 0f),
+                new Vector3(HpBarWidth, 0.06f, 1f),
+                36);
+            hpFillRenderer = CreateSpriteChild(
+                "HpFill",
+                infoRoot.transform,
+                RuntimeSpriteLibrary.WhiteSprite,
+                new Color(0.45f, 0.82f, 0.39f, 1f),
+                new Vector3(0f, -0.16f, 0f),
+                new Vector3(HpBarWidth, 0.05f, 1f),
+                37);
 
-            hpBackRenderer = CreateSpriteChild("HpBack", RuntimeSpriteLibrary.WhiteSprite, new Color(0.16f, 0.12f, 0.1f, 0.9f), new Vector3(0f, -0.82f, 0f), new Vector3(HpBarWidth, 0.12f, 1f), 33);
-            hpFillRenderer = CreateSpriteChild("HpFill", RuntimeSpriteLibrary.WhiteSprite, new Color(0.45f, 0.82f, 0.39f, 1f), new Vector3(0f, -0.82f, 0f), new Vector3(HpBarWidth, 0.08f, 1f), 34);
+            infoRoot.SetActive(false);
         }
 
         private void SyncVisualState()
@@ -225,111 +266,41 @@ namespace PhalanxChronicle.Battle.Units
 
             bool hasActed = RuntimeState.HasActed;
             float hpRatio = RuntimeState.MaxHp > 0 ? (float)RuntimeState.CurrentHp / RuntimeState.MaxHp : 0f;
-            Color spriteTint = hasActed ? new Color(0.68f, 0.68f, 0.68f, 1f) : Color.white;
-            Color roleColor = GetRoleColor(RuntimeState.Role, hasActed ? 0.54f : 0.96f);
-            Color plateColor = BattleUiTheme.GetFactionPlateColor(RuntimeState.Faction, hasActed);
-            string statusBadgeText = BuildStatusBadgeText(RuntimeState);
             string localizedName = LocalizationService.Text(RuntimeState.DisplayNameKey, RuntimeState.DisplayName);
 
-            spriteRenderer.color = spriteTint;
-            factionRingRenderer.color = BattleUiTheme.GetFactionRingColor(RuntimeState.Faction, hasActed);
-            roleAuraRenderer.color = GetRoleColor(RuntimeState.Role, hasActed ? 0.08f : 0.18f);
-            weaponRenderer.color = GetWeaponColor(RuntimeState.Role, RuntimeState.Faction, hasActed);
-            namePlateRenderer.color = plateColor;
-            roleRibbonRenderer.color = roleColor;
-            nameText.text = localizedName;
-            nameText.characterSize = GetNameCharacterSize(localizedName);
-            roleText.text = GetRoleShortText(RuntimeState.Role);
-            statusText.text = statusBadgeText;
-            statusText.color = hasActed ? new Color(0.95f, 0.84f, 0.72f, 1f) : new Color(0.98f, 0.93f, 0.82f, 1f);
-            statusBadgeRenderer.enabled = !string.IsNullOrEmpty(statusBadgeText);
-            statusText.gameObject.SetActive(!string.IsNullOrEmpty(statusBadgeText));
+            spriteRenderer.color = hasActed
+                ? Color.Lerp(Color.white, new Color(0.58f, 0.6f, 0.62f, 1f), 0.5f)
+                : Color.white;
+            factionRingRenderer.color = hasActed
+                ? Color.Lerp(visualProfile.MarkerColor, new Color(0.34f, 0.35f, 0.39f, 1f), 0.42f)
+                : visualProfile.MarkerColor;
+            frameRenderer.color = visualProfile.FrameColor;
+
+            Sprite statusSprite = GetStatusSprite(RuntimeState);
+            statusBadgeRenderer.sprite = statusSprite;
+            statusBadgeRenderer.color = GetStatusColor(RuntimeState);
+            statusBadgeRenderer.enabled = statusSprite != null;
+
+            skillReadyRenderer.color = Color.Lerp(visualProfile.AccentColor, Color.white, 0.36f);
             skillReadyRenderer.enabled = RuntimeState.CanUseSkill && !RuntimeState.HasActed && RuntimeState.IsAlive;
 
+            namePlateRenderer.color = Color.Lerp(
+                BattleUiTheme.GetFactionPlateColor(RuntimeState.Faction, hasActed),
+                visualProfile.SecondaryColor,
+                0.2f);
+            nameText.text = localizedName;
+            nameText.characterSize = GetNameCharacterSize(localizedName);
+
             float fillWidth = Mathf.Max(0.01f, HpBarWidth * hpRatio);
-            hpFillRenderer.transform.localScale = new Vector3(fillWidth, 0.08f, 1f);
-            hpFillRenderer.transform.localPosition = new Vector3(-((HpBarWidth - fillWidth) * 0.5f), -0.82f, 0f);
+            hpFillRenderer.transform.localScale = new Vector3(fillWidth, 0.05f, 1f);
+            hpFillRenderer.transform.localPosition = new Vector3(-((HpBarWidth - fillWidth) * 0.5f), -0.16f, 0f);
             hpFillRenderer.color = hpRatio > 0.55f
                 ? new Color(0.41f, 0.83f, 0.37f, 1f)
                 : hpRatio > 0.3f
                     ? new Color(0.9f, 0.72f, 0.21f, 1f)
                     : new Color(0.9f, 0.33f, 0.27f, 1f);
-        }
 
-        private static Color GetRoleColor(UnitRole role, float alpha)
-        {
-            Color baseColor;
-            switch (role)
-            {
-                case UnitRole.Commander:
-                    baseColor = new Color(0.91f, 0.75f, 0.28f, alpha);
-                    break;
-                case UnitRole.Guardian:
-                    baseColor = new Color(0.55f, 0.69f, 0.83f, alpha);
-                    break;
-                case UnitRole.Ranger:
-                    baseColor = new Color(0.28f, 0.77f, 0.61f, alpha);
-                    break;
-                case UnitRole.Scout:
-                    baseColor = new Color(0.56f, 0.84f, 0.35f, alpha);
-                    break;
-                case UnitRole.Raider:
-                    baseColor = new Color(0.88f, 0.42f, 0.33f, alpha);
-                    break;
-                default:
-                    baseColor = new Color(0.78f, 0.78f, 0.78f, alpha);
-                    break;
-            }
-
-            return baseColor;
-        }
-
-        private static string GetRoleShortText(UnitRole role)
-        {
-            switch (role)
-            {
-                case UnitRole.Commander:
-                    return LocalizationService.Text("ui.role.short.commander", "CMD");
-                case UnitRole.Guardian:
-                    return LocalizationService.Text("ui.role.short.guardian", "GDN");
-                case UnitRole.Ranger:
-                    return LocalizationService.Text("ui.role.short.ranger", "RNG");
-                case UnitRole.Scout:
-                    return LocalizationService.Text("ui.role.short.scout", "SCT");
-                case UnitRole.Raider:
-                    return LocalizationService.Text("ui.role.short.raider", "RDR");
-                default:
-                    return LocalizationService.Text("ui.role.short.unknown", "UNIT");
-            }
-        }
-
-        private static Color GetWeaponColor(UnitRole role, UnitFaction faction, bool exhausted)
-        {
-            Color metal = faction == UnitFaction.Player
-                ? new Color(0.98f, 0.94f, 0.84f, 1f)
-                : new Color(0.92f, 0.84f, 0.74f, 1f);
-            Color roleTint = GetRoleColor(role, 1f);
-            Color mixed = Color.Lerp(metal, roleTint, 0.28f);
-            return exhausted ? Color.Lerp(mixed, new Color(0.52f, 0.52f, 0.56f, 1f), 0.42f) : mixed;
-        }
-
-        private static WeaponPose GetWeaponPose(UnitRole role)
-        {
-            switch (role)
-            {
-                case UnitRole.Commander:
-                    return new WeaponPose(new Vector3(0.42f, 0.2f, 0f), new Vector3(0.58f, 0.58f, 1f), -16f);
-                case UnitRole.Guardian:
-                    return new WeaponPose(new Vector3(0.52f, 0.12f, 0f), new Vector3(0.72f, 0.72f, 1f), -28f);
-                case UnitRole.Ranger:
-                    return new WeaponPose(new Vector3(0.48f, 0.18f, 0f), new Vector3(0.68f, 0.68f, 1f), 8f);
-                case UnitRole.Scout:
-                    return new WeaponPose(new Vector3(0.46f, 0.08f, 0f), new Vector3(0.6f, 0.6f, 1f), -8f);
-                case UnitRole.Raider:
-                    return new WeaponPose(new Vector3(0.58f, 0.22f, 0f), new Vector3(0.8f, 0.8f, 1f), -36f);
-                default:
-                    return new WeaponPose(new Vector3(0.44f, 0.14f, 0f), new Vector3(0.62f, 0.62f, 1f), -12f);
-            }
+            UpdateInfoVisibility();
         }
 
         private void ApplySelectionState()
@@ -339,37 +310,73 @@ namespace PhalanxChronicle.Battle.Units
                 frameRenderer.enabled = isSelected && RuntimeState != null && RuntimeState.IsAlive;
             }
 
-            transform.localScale = isSelected ? restingScale * 1.08f : restingScale;
+            transform.localScale = isSelected
+                ? restingScale * 1.06f
+                : isHovered
+                    ? restingScale * 1.02f
+                    : restingScale;
         }
 
-        private static string BuildStatusBadgeText(UnitRuntimeState runtimeState)
+        private void UpdateInfoVisibility()
+        {
+            if (infoRoot == null || RuntimeState == null)
+            {
+                return;
+            }
+
+            bool lowHealth = RuntimeState.MaxHp > 0 && ((float)RuntimeState.CurrentHp / RuntimeState.MaxHp) <= 0.45f;
+            bool showInfo = RuntimeState.IsAlive && !isSelected && (isHovered || lowHealth);
+            infoRoot.SetActive(showInfo);
+        }
+
+        private static Sprite GetStatusSprite(UnitRuntimeState runtimeState)
         {
             if (runtimeState == null)
             {
-                return string.Empty;
-            }
-
-            if (runtimeState.HasActed)
-            {
-                return LocalizationService.Text("ui.status.done", "DONE");
+                return null;
             }
 
             if (runtimeState.HasStatus(StatusEffectType.Inspired))
             {
-                return LocalizationService.Text("ui.status.short.inspired", "INS");
+                return RuntimeSpriteLibrary.SparkSprite;
             }
 
             if (runtimeState.HasStatus(StatusEffectType.ShatteredArmor))
             {
-                return LocalizationService.Text("ui.status.short.shattered_armor", "BRK");
+                return RuntimeSpriteLibrary.SlashSprite;
             }
 
             if (runtimeState.HasStatus(StatusEffectType.Intimidated))
             {
-                return LocalizationService.Text("ui.status.short.intimidated", "INT");
+                return RuntimeSpriteLibrary.ArrowSprite;
             }
 
-            return string.Empty;
+            return null;
+        }
+
+        private static Color GetStatusColor(UnitRuntimeState runtimeState)
+        {
+            if (runtimeState == null)
+            {
+                return Color.white;
+            }
+
+            if (runtimeState.HasStatus(StatusEffectType.Inspired))
+            {
+                return new Color(0.97f, 0.89f, 0.46f, 1f);
+            }
+
+            if (runtimeState.HasStatus(StatusEffectType.ShatteredArmor))
+            {
+                return new Color(0.98f, 0.58f, 0.42f, 1f);
+            }
+
+            if (runtimeState.HasStatus(StatusEffectType.Intimidated))
+            {
+                return new Color(0.72f, 0.84f, 0.98f, 1f);
+            }
+
+            return Color.white;
         }
 
         private static float GetNameCharacterSize(string localizedName)
@@ -387,20 +394,20 @@ namespace PhalanxChronicle.Battle.Units
 
             if (visibleLength <= 6)
             {
-                return 0.067f;
+                return 0.044f;
             }
 
             if (visibleLength <= 9)
             {
-                return 0.058f;
+                return 0.04f;
             }
 
             if (visibleLength <= 12)
             {
-                return 0.05f;
+                return 0.036f;
             }
 
-            return 0.045f;
+            return 0.033f;
         }
 
         private IEnumerator AnimateBetween(Vector3 start, Vector3 end, float duration)
@@ -415,10 +422,17 @@ namespace PhalanxChronicle.Battle.Units
             }
         }
 
-        private SpriteRenderer CreateSpriteChild(string childName, Sprite sprite, Color color, Vector3 localPosition, Vector3 localScale, int sortingOrder)
+        private SpriteRenderer CreateSpriteChild(
+            string childName,
+            Transform parent,
+            Sprite sprite,
+            Color color,
+            Vector3 localPosition,
+            Vector3 localScale,
+            int sortingOrder)
         {
             GameObject child = new GameObject(childName);
-            child.transform.SetParent(transform, false);
+            child.transform.SetParent(parent, false);
             child.transform.localPosition = localPosition;
             child.transform.localScale = localScale;
 
@@ -431,6 +445,7 @@ namespace PhalanxChronicle.Battle.Units
 
         private TextMesh CreateTextChild(
             string childName,
+            Transform parent,
             string content,
             Vector3 localPosition,
             int sortingOrder,
@@ -439,12 +454,12 @@ namespace PhalanxChronicle.Battle.Units
             TextAnchor anchor)
         {
             GameObject child = new GameObject(childName);
-            child.transform.SetParent(transform, false);
-            child.transform.localPosition = localPosition + new Vector3(0f, 0f, -0.01f);
+            child.transform.SetParent(parent, false);
+            child.transform.localPosition = localPosition;
 
             TextMesh textMesh = child.AddComponent<TextMesh>();
             textMesh.text = content;
-            textMesh.font = RuntimeSpriteLibrary.DefaultFont;
+            textMesh.font = RuntimeSpriteLibrary.HeadingFont;
             textMesh.fontSize = 64;
             textMesh.characterSize = characterSize;
             textMesh.alignment = alignment;
@@ -469,6 +484,7 @@ namespace PhalanxChronicle.Battle.Units
         {
             if (RuntimeState != null && RuntimeState.IsAlive)
             {
+                SetHovered(true);
                 hoverChangedHandler?.Invoke(this, true);
             }
         }
@@ -477,24 +493,9 @@ namespace PhalanxChronicle.Battle.Units
         {
             if (RuntimeState != null)
             {
+                SetHovered(false);
                 hoverChangedHandler?.Invoke(this, false);
             }
-        }
-
-        private readonly struct WeaponPose
-        {
-            public WeaponPose(Vector3 position, Vector3 scale, float rotation)
-            {
-                Position = position;
-                Scale = scale;
-                Rotation = rotation;
-            }
-
-            public Vector3 Position { get; }
-
-            public Vector3 Scale { get; }
-
-            public float Rotation { get; }
         }
     }
 }

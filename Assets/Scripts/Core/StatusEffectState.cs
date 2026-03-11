@@ -12,12 +12,15 @@ namespace PhalanxChronicle.Core
 
         public int RemainingOwnTurnEnds { get; private set; }
 
-        public void Refresh(int duration)
+        public bool Refresh(int duration)
         {
             if (duration > RemainingOwnTurnEnds)
             {
                 RemainingOwnTurnEnds = duration;
+                return true;
             }
+
+            return false;
         }
 
         public void AdvanceOwnTurnEnd()

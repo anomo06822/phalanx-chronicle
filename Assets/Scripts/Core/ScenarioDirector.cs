@@ -44,12 +44,13 @@ namespace PhalanxChronicle.Core
         {
             if (scenario == null || context == null)
             {
-                return new ScenarioEvaluationResult(new List<string>(), false, false, false);
+                return new ScenarioEvaluationResult(new List<string>(), false, false, false, false);
             }
 
             List<string> spawnedUnitIds = new List<string>();
             bool objectiveChanged = false;
             bool battleOutcomeChanged = false;
+            bool battlefieldChanged = false;
 
             foreach (ScenarioTrigger trigger in scenario.Triggers)
             {
@@ -120,11 +121,19 @@ namespace PhalanxChronicle.Core
                                 activeFlags.Add(directive.FlagName);
                             }
                             break;
+                        case ScenarioDirectiveType.ApplyBattlefieldMutation:
+                            if (directive.BattlefieldMutation != null &&
+                                directive.BattlefieldMutation.HasAnyChange &&
+                                context.ApplyBattlefieldMutation(directive.BattlefieldMutation))
+                            {
+                                battlefieldChanged = true;
+                            }
+                            break;
                     }
                 }
             }
 
-            return new ScenarioEvaluationResult(spawnedUnitIds, objectiveChanged, battleOutcomeChanged, pendingDialogue.Count > 0);
+            return new ScenarioEvaluationResult(spawnedUnitIds, objectiveChanged, battleOutcomeChanged, pendingDialogue.Count > 0, battlefieldChanged);
         }
     }
 }

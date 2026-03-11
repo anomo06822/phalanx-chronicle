@@ -24,6 +24,7 @@ namespace PhalanxChronicle.Battle
         private BattleScenarioDefinition scenarioDefinition;
         private BattleScenarioData scenarioData;
         private ScenarioDirector scenarioDirector;
+        private Action<BattleResultSummary> battleCompletedHandler;
         private BattleSimulation simulation;
         private GridManager gridManager;
         private BattleHUD battleHUD;
@@ -39,10 +40,17 @@ namespace PhalanxChronicle.Battle
         private Type pendingDialogueResumeState;
         private string currentTurnText = string.Empty;
         private string currentInstructionText = string.Empty;
+        private bool autoStartScenario = true;
+        private bool battleRewardsGranted;
+        private string battleResultSummaryText = string.Empty;
 
         public bool IsDialogueVisible => battleHUD != null && battleHUD.IsDialogueVisible;
 
         public bool IsRerollVisible => battleHUD != null && battleHUD.IsRerollVisible;
+
+        public bool IsResultVisible => battleHUD != null && battleHUD.IsResultVisible;
+
+        public bool IsCampaignOverlayVisible => battleHUD != null && battleHUD.IsCampaignOverlayVisible;
 
         public bool IsActionMenuVisible => actionMenuPanel != null && actionMenuPanel.IsVisible;
 
@@ -56,9 +64,68 @@ namespace PhalanxChronicle.Battle
 
         public BattleSimulation Simulation => simulation;
 
-        public void Initialize(BattleScenarioDefinition scenario)
+        public BattleScenarioData CurrentScenarioData => scenarioData;
+
+        public void Initialize(BattleScenarioDefinition scenario, bool autoStart = true, Action<BattleResultSummary> onBattleCompleted = null)
         {
             scenarioDefinition = scenario != null ? scenario : BattleScenarioDefinition.CreateDefault();
+            autoStartScenario = autoStart;
+            battleCompletedHandler = onBattleCompleted;
+        }
+
+        public void SetBattleCompletedHandler(Action<BattleResultSummary> handler)
+        {
+            battleCompletedHandler = handler;
+        }
+
+        public void StartScenario(BattleScenarioData data)
+        {
+            if (data == null)
+            {
+                return;
+            }
+
+            scenarioDefinition = BattleScenarioDefinition.CreateRuntime(data.ScenarioId);
+            autoStartScenario = true;
+            if (!initialized)
+            {
+                return;
+            }
+
+            HideCampaignOverlay();
+            LoadScenario(data);
+            ChangeState<BattleStartState>();
+        }
+
+        public void ShowCampaignStageSelect(CampaignStageSelectModel model, Action<int> onStageSelected)
+        {
+            battleHUD.ShowCampaignStageSelect(model, onStageSelected);
+        }
+
+        public void ShowCampaignInterlude(CampaignInterludeModel model, Action onPrimary, Action onSecondary = null)
+        {
+            battleHUD.ShowCampaignInterlude(model, onPrimary, onSecondary);
+        }
+
+        public void ShowCampaignOptionList(CampaignOptionListModel model, Action<string> onOptionSelected, Action onPrimary, Action onSecondary = null)
+        {
+            battleHUD.ShowCampaignOptionList(model, onOptionSelected, onPrimary, onSecondary);
+        }
+
+        public void HideCampaignOverlay()
+        {
+            battleHUD.HideCampaignOverlay();
+        }
+
+        public void ConfirmBattleResult()
+        {
+            if (simulation == null || scenarioData == null)
+            {
+                return;
+            }
+
+            battleHUD.HideResult();
+            battleCompletedHandler?.Invoke(BuildBattleResultSummary());
         }
 
         public void ChangeState<TState>() where TState : IBattleState
@@ -98,7 +165,7 @@ namespace PhalanxChronicle.Battle
 
         public void ShowResult(string text)
         {
-            battleHUD.ShowResult(text);
+            battleHUD.ShowResult(BuildBattleResultText(text));
         }
 
         public void ShowCurrentScenarioDialogue()
@@ -204,7 +271,6 @@ namespace PhalanxChronicle.Battle
 
             gridManager.ClearHighlights();
             gridManager.ShowMoveRange(simulation.GetMoveDestinations(selected.Id));
-            gridManager.ShowAttackRange(simulation.GetProjectedAttackRange(selected.Id));
             gridManager.HighlightSelectedCell(selected.Position);
             RefreshAllVisuals();
         }
@@ -656,14 +722,20 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
+            RegisterStates();
+            initialized = true;
+
+            if (!autoStartScenario)
+            {
+                return;
+            }
+
             if (scenarioDefinition == null)
             {
                 scenarioDefinition = BattleScenarioDefinition.CreateDefault();
             }
 
-            RegisterStates();
             LoadScenario(scenarioDefinition.ToData());
-            initialized = true;
             ChangeState<BattleStartState>();
         }
 
@@ -677,16 +749,22 @@ namespace PhalanxChronicle.Battle
             canvasObject.transform.SetParent(transform, false);
             Canvas canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.pixelPerfect = true;
 
             CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1600f, 900f);
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
             scaler.matchWidthOrHeight = 0.5f;
 
             GameObject hudObject = new GameObject("BattleHUD");
             hudObject.transform.SetParent(canvasObject.transform, false);
             battleHUD = hudObject.AddComponent<BattleHUD>();
-            battleHUD.Initialize(canvasObject.transform, HandleEndTurnRequested, HandleRerollRequested, HandleDialogueAdvanceRequested);
+            battleHUD.Initialize(
+                canvasObject.transform,
+                HandleEndTurnRequested,
+                HandleRerollRequested,
+                HandleDialogueAdvanceRequested,
+                HandleResultAdvanceRequested);
 
             GameObject actionMenuObject = new GameObject("ActionMenuPanel");
             actionMenuObject.transform.SetParent(canvasObject.transform, false);
@@ -742,11 +820,26 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
+            StageVisualDefinition stageVisual = StageVisualCatalog.GetDefinition(simulation.Context.StageNameKey);
             mainCamera.clearFlags = CameraClearFlags.SolidColor;
             mainCamera.orthographic = true;
-            mainCamera.backgroundColor = new Color(0.31f, 0.34f, 0.28f, 1f);
-            mainCamera.transform.position = new Vector3(0f, 0f, -10f);
-            mainCamera.orthographicSize = Mathf.Max(simulation.Context.Width, simulation.Context.Height) * 0.68f;
+            mainCamera.backgroundColor = stageVisual.SkyTopColor;
+            float boardWidth = simulation.Context.Width + 2f;
+            float boardHeight = simulation.Context.Height + 2.1f;
+            float aspect = Mathf.Max(0.1f, mainCamera.aspect);
+            const float leftHudReserve = 0.23f;
+            const float rightHudReserve = 0.22f;
+            const float topHudReserve = 0.15f;
+            const float bottomHudReserve = 0.06f;
+            float usableWidth = Mathf.Max(0.2f, 1f - leftHudReserve - rightHudReserve);
+            float usableHeight = Mathf.Max(0.2f, 1f - topHudReserve - bottomHudReserve);
+            float orthographicSizeForHeight = (boardHeight * 0.5f) / usableHeight;
+            float orthographicSizeForWidth = (boardWidth * 0.5f) / (aspect * usableWidth);
+            float orthographicSize = Mathf.Max(orthographicSizeForHeight, orthographicSizeForWidth);
+            float verticalOffset = (topHudReserve - bottomHudReserve) * orthographicSize * 0.45f;
+
+            mainCamera.transform.position = new Vector3(0f, verticalOffset, -10f);
+            mainCamera.orthographicSize = orthographicSize;
         }
 
         private void RegisterStates()
@@ -861,6 +954,11 @@ namespace PhalanxChronicle.Battle
             currentState?.OnConfirmRequested();
         }
 
+        private void HandleResultAdvanceRequested()
+        {
+            currentState?.OnConfirmRequested();
+        }
+
         private UnitRuntimeState GetSelectedUnit()
         {
             return string.IsNullOrEmpty(selectedUnitId) ? null : simulation.Context.GetUnit(selectedUnitId);
@@ -953,6 +1051,15 @@ namespace PhalanxChronicle.Battle
                 yield return new WaitForSeconds(0.05f);
             }
 
+            if (casterView != null && skillResult.CasterExpGained > 0)
+            {
+                FloatingText.Spawn(FormatExpGainText(skillResult.CasterExpGained), casterView.GetAnchorPosition(1.2f), new Color(0.76f, 0.98f, 0.58f, 1f));
+                if (skillResult.CasterLevelsGained > 0)
+                {
+                    FloatingText.Spawn(LocalizationService.Text("ui.exp.level_up", "LEVEL UP"), casterView.GetAnchorPosition(1.36f), new Color(0.98f, 0.9f, 0.52f, 1f));
+                }
+            }
+
             yield return new WaitForSeconds(0.18f);
             battleHUD.ClearForecast();
             RefreshAllVisuals();
@@ -979,6 +1086,15 @@ namespace PhalanxChronicle.Battle
                 if (combatResult.DefenderDied)
                 {
                     FloatingText.Spawn(LocalizationService.Text("ui.combat.popup_ko", "KO"), defenderView.GetAnchorPosition(1.24f), new Color(1f, 0.56f, 0.42f, 1f));
+                }
+
+                if (combatResult.AttackerExpGained > 0)
+                {
+                    FloatingText.Spawn(FormatExpGainText(combatResult.AttackerExpGained), attackerView.GetAnchorPosition(1.2f), new Color(0.76f, 0.98f, 0.58f, 1f));
+                    if (combatResult.AttackerLevelsGained > 0)
+                    {
+                        FloatingText.Spawn(LocalizationService.Text("ui.exp.level_up", "LEVEL UP"), attackerView.GetAnchorPosition(1.36f), new Color(0.98f, 0.9f, 0.52f, 1f));
+                    }
                 }
             }
 
@@ -1075,6 +1191,8 @@ namespace PhalanxChronicle.Battle
             }
 
             RoleLoadoutProfile loadoutProfile = RoleLoadoutCatalog.GetProfile(selected.Role);
+            ItemDefinition weapon = ItemCatalog.Get(selected.EquipmentLoadout.WeaponId);
+            ItemDefinition armor = ItemCatalog.Get(selected.EquipmentLoadout.ArmorId);
             string cooldownText = selected.ActiveSkill == ActiveSkillType.None
                 ? LocalizationService.Format("ui.label.cooldown_value", "Cooldown: {0}", LocalizationService.Text("ui.cooldown.none", "-"))
                 : LocalizationService.Format(
@@ -1104,20 +1222,33 @@ namespace PhalanxChronicle.Battle
                 UnitId = selected.Id,
                 DisplayName = GetUnitDisplayName(selected.Id),
                 Role = selected.Role,
-                RoleLabel = LocalizationService.Text(selected.RoleNameKey, selected.Role.ToString()),
-                PositionLabel = LocalizationService.Format("ui.position.value", "Position ({0}, {1})", selected.Position.X, selected.Position.Y),
+                RoleLabel = LocalizationService.Format(
+                    "ui.selected.role_level",
+                    "{0}  Lv {1}",
+                    LocalizationService.Text(UnitClassCatalog.Get(selected.ClassId).DisplayNameKey, LocalizationService.Text(selected.RoleNameKey, selected.Role.ToString())),
+                    selected.Level),
+                PositionLabel = LocalizationService.Format(
+                    "ui.position.terrain",
+                    "Position ({0}, {1}) | {2}",
+                    selected.Position.X,
+                    selected.Position.Y,
+                    GetTerrainDisplayName(simulation.Context.GetTerrainAt(selected.Position))),
                 Faction = selected.Faction,
                 CurrentHp = selected.CurrentHp,
                 MaxHp = selected.MaxHp,
                 CurrentMana = selected.CurrentMana,
                 MaxMana = selected.MaxMana,
-                Attack = selected.Attack + PassiveSkillRules.GetAttackBonus(simulation.Context, selected) + StatusEffectRules.GetAttackModifier(selected),
-                Defense = selected.Defense + PassiveSkillRules.GetDefenseBonus(selected) + StatusEffectRules.GetDefenseModifier(selected),
+                Level = selected.Level,
+                CurrentExp = selected.CurrentExp,
+                NextLevelExp = selected.NextLevelExp,
+                Attack = selected.Attack + PassiveSkillRules.GetPersonalAttackBonus(selected) + PassiveSkillRules.GetAttackBonus(simulation.Context, selected) + SupportRules.GetAttackBonus(simulation.Context, selected, selected.Position) + StatusEffectRules.GetAttackModifier(selected),
+                Defense = selected.Defense + PassiveSkillRules.GetDefenseBonus(selected) + SupportRules.GetDefenseBonus(simulation.Context, selected) + TerrainRules.GetDefenseBonus(simulation.Context.GetTerrainAt(selected.Position)) + StatusEffectRules.GetDefenseModifier(selected),
                 MoveRange = PassiveSkillRules.GetMoveRange(selected),
                 AttackRange = PassiveSkillRules.GetAttackRange(selected),
                 WeaponTypeLabel = LocalizationService.Text(loadoutProfile.WeaponTypeKey, loadoutProfile.WeaponTypeFallback),
-                WeaponName = LocalizationService.Text(loadoutProfile.WeaponNameKey, loadoutProfile.WeaponNameFallback),
-                WeaponDescription = LocalizationService.Text(loadoutProfile.WeaponDescriptionKey, loadoutProfile.WeaponDescriptionFallback),
+                WeaponName = weapon != null ? LocalizationService.Text(weapon.NameKey, weapon.NameFallback) : LocalizationService.Text(loadoutProfile.WeaponNameKey, loadoutProfile.WeaponNameFallback),
+                WeaponDescription = weapon != null ? LocalizationService.Text(weapon.DescriptionKey, weapon.DescriptionFallback) : LocalizationService.Text(loadoutProfile.WeaponDescriptionKey, loadoutProfile.WeaponDescriptionFallback),
+                ArmorSummary = BuildArmorSummary(armor),
                 WeaponAccentColor = loadoutProfile.AccentColor,
                 PassiveName = LocalizationService.Text(selected.PassiveSkillNameKey, selected.PassiveSkill.ToString()),
                 PassiveDescription = LocalizationService.Text(selected.PassiveSkillDescriptionKey, selected.PassiveSkill.ToString()),
@@ -1134,6 +1265,30 @@ namespace PhalanxChronicle.Battle
                 ThreatSummary = threatSummaryText,
                 ThreatDetail = threatDetailText,
             };
+        }
+
+        private string BuildArmorSummary(ItemDefinition armor)
+        {
+            if (armor == null)
+            {
+                return string.Empty;
+            }
+
+            List<string> parts = new List<string>
+            {
+                LocalizationService.Format("ui.label.armor_value", "Armor: {0}", LocalizationService.Text(armor.NameKey, armor.NameFallback)),
+            };
+            if (armor.DefenseBonus != 0)
+            {
+                parts.Add(LocalizationService.Format("camp.item.defense", "DEF +{0}", armor.DefenseBonus));
+            }
+
+            if (armor.HpBonus != 0)
+            {
+                parts.Add(LocalizationService.Format("camp.item.hp", "HP +{0}", armor.HpBonus));
+            }
+
+            return string.Join("  ", parts);
         }
 
         private IReadOnlyList<BattleRosterEntryModel> BuildRosterEntries(UnitFaction faction, BattleThreatSummary threatSummary)
@@ -1273,6 +1428,23 @@ namespace PhalanxChronicle.Battle
         {
             int damage = BattlePreviewCalculator.EstimateAttackDamage(simulation.Context, attacker, attacker.Position, defender);
             bool defenderFalls = damage >= defender.CurrentHp;
+            int effectiveAttack = attacker.Attack +
+                                  PassiveSkillRules.GetPersonalAttackBonus(attacker) +
+                                  PassiveSkillRules.GetAttackBonus(simulation.Context, attacker) +
+                                  SupportRules.GetAttackBonus(simulation.Context, attacker, attacker.Position) +
+                                  PassiveSkillRules.GetDamageBonus(attacker) +
+                                  StatusEffectRules.GetAttackModifier(attacker);
+            int effectiveDefense = defender.Defense +
+                                   PassiveSkillRules.GetDefenseBonus(defender) +
+                                   SupportRules.GetDefenseBonus(simulation.Context, defender) +
+                                   TerrainRules.GetDefenseBonus(simulation.Context.GetTerrainAt(defender.Position)) +
+                                   StatusEffectRules.GetDefenseModifier(defender) -
+                                   PassiveSkillRules.GetIgnoredDefense(attacker);
+            if (effectiveDefense < 0)
+            {
+                effectiveDefense = 0;
+            }
+
             return new BattleForecastModel
             {
                 Header = LocalizationService.Text("ui.forecast.attack.header", "Attack Forecast"),
@@ -1283,8 +1455,8 @@ namespace PhalanxChronicle.Battle
                 Detail = LocalizationService.Format(
                     "ui.forecast.attack.detail",
                     "ATK {0} vs DEF {1}",
-                    attacker.Attack + PassiveSkillRules.GetAttackBonus(simulation.Context, attacker) + StatusEffectRules.GetAttackModifier(attacker),
-                    defender.Defense + PassiveSkillRules.GetDefenseBonus(defender) + StatusEffectRules.GetDefenseModifier(defender)),
+                    effectiveAttack,
+                    effectiveDefense),
                 Footer = BuildAttackForecastFooter(attacker, defender),
                 AccentColor = attacker.Faction == UnitFaction.Player ? new Color(0.28f, 0.58f, 0.98f, 1f) : new Color(0.92f, 0.36f, 0.28f, 1f),
             };
@@ -1309,6 +1481,37 @@ namespace PhalanxChronicle.Battle
                     footer = manaText;
                     accent = new Color(0.34f, 0.82f, 0.58f, 1f);
                     break;
+                case ActiveSkillType.ImperialAid:
+                    IReadOnlyList<UnitRuntimeState> imperialAidTargets = simulation.GetSkillAffectedTargets(caster.Id, primaryTarget.Id);
+                    int imperialPrimaryHeal = BattlePreviewCalculator.EstimateHealing(primaryTarget, ActiveSkillRules.GetRoyalAidAmount());
+                    summary = LocalizationService.Format(
+                        "ui.forecast.skill.volley",
+                        "Primary {0} | Splash {1} | {2} targets",
+                        imperialPrimaryHeal,
+                        Mathf.Max(0, imperialAidTargets.Count - 1),
+                        imperialAidTargets.Count);
+                    detail = LocalizationService.Format(
+                        "ui.forecast.skill.targets",
+                        "Affects {0}",
+                        string.Join(", ", imperialAidTargets.Select(unit => GetUnitDisplayName(unit.Id))));
+                    footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Inspired)) + " | " + manaText;
+                    accent = new Color(0.34f, 0.82f, 0.58f, 1f);
+                    break;
+                case ActiveSkillType.GuardOrder:
+                    IReadOnlyList<UnitRuntimeState> guardOrderTargets = simulation.GetSkillAffectedTargets(caster.Id, primaryTarget.Id);
+                    int guardOrderHeal = BattlePreviewCalculator.EstimateHealing(primaryTarget, ActiveSkillRules.GetGuardOrderHealAmount());
+                    summary = LocalizationService.Format(
+                        "ui.forecast.skill.guard_order",
+                        "Heal {0} | Guard {1} allies",
+                        guardOrderHeal,
+                        guardOrderTargets.Count);
+                    detail = LocalizationService.Format(
+                        "ui.forecast.skill.targets",
+                        "Affects {0}",
+                        string.Join(", ", guardOrderTargets.Select(unit => GetUnitDisplayName(unit.Id))));
+                    footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Guarded)) + " | " + manaText;
+                    accent = new Color(0.38f, 0.82f, 0.72f, 1f);
+                    break;
                 case ActiveSkillType.PowerStrike:
                     int powerStrikeDamage = BattlePreviewCalculator.EstimateAttackDamage(
                         simulation.Context,
@@ -1324,6 +1527,25 @@ namespace PhalanxChronicle.Battle
                         ? LocalizationService.Text("ui.forecast.skill.power_strike_ko", "The target falls before armor can shatter.")
                         : LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.ShatteredArmor));
                     footer = manaText;
+                    break;
+                case ActiveSkillType.AzureDragonSlash:
+                    IReadOnlyList<UnitRuntimeState> azureTargets = BattlePreviewCalculator.GetGreenDragonSlashTargets(simulation.Context, caster.Position, primaryTarget);
+                    int azureDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                        simulation.Context,
+                        caster,
+                        caster.Position,
+                        primaryTarget,
+                        ActiveSkillRules.GetAzureDragonSlashBonus());
+                    summary = LocalizationService.Format(
+                        "ui.forecast.skill.green_dragon",
+                        "Primary {0} | Cleave {1}",
+                        azureDamage,
+                        azureTargets.Count);
+                    detail = LocalizationService.Format(
+                        "ui.forecast.skill.targets",
+                        "Affects {0}",
+                        string.Join(", ", azureTargets.Select(unit => GetUnitDisplayName(unit.Id))));
+                    footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0} to surviving targets", GetStatusDisplayName(StatusEffectType.ShatteredArmor)) + " | " + manaText;
                     break;
                 case ActiveSkillType.Volley:
                     IReadOnlyList<UnitRuntimeState> volleyTargets = BattlePreviewCalculator.GetVolleyTargets(simulation.Context, primaryTarget);
@@ -1344,6 +1566,45 @@ namespace PhalanxChronicle.Battle
                         "Affects {0}",
                         string.Join(", ", volleyTargets.Select(unit => GetUnitDisplayName(unit.Id))));
                     footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0} to surviving targets", GetStatusDisplayName(StatusEffectType.ShatteredArmor)) + " | " + manaText;
+                    break;
+                case ActiveSkillType.SkyVolley:
+                    IReadOnlyList<UnitRuntimeState> skyVolleyTargets = BattlePreviewCalculator.GetVolleyTargets(simulation.Context, primaryTarget);
+                    int skyVolleyDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                        simulation.Context,
+                        caster,
+                        caster.Position,
+                        primaryTarget,
+                        ActiveSkillRules.GetSkyVolleyBonus());
+                    summary = LocalizationService.Format(
+                        "ui.forecast.skill.volley",
+                        "Primary {0} | Splash {1} | {2} targets",
+                        skyVolleyDamage,
+                        Mathf.Max(0, skyVolleyTargets.Count - 1),
+                        skyVolleyTargets.Count);
+                    detail = LocalizationService.Format(
+                        "ui.forecast.skill.targets",
+                        "Affects {0}",
+                        string.Join(", ", skyVolleyTargets.Select(unit => GetUnitDisplayName(unit.Id))));
+                    footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0} to surviving targets", GetStatusDisplayName(StatusEffectType.ShatteredArmor)) + " | " + manaText;
+                    break;
+                case ActiveSkillType.PinningShot:
+                    int pinningShotDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                        simulation.Context,
+                        caster,
+                        caster.Position,
+                        primaryTarget,
+                        ActiveSkillRules.GetPinningShotBonus());
+                    bool pinningShotKo = pinningShotDamage >= primaryTarget.CurrentHp;
+                    summary = pinningShotKo
+                        ? LocalizationService.Format("ui.forecast.attack.ko", "Projected damage {0} | KO", pinningShotDamage)
+                        : LocalizationService.Format("ui.forecast.attack.damage", "Projected damage {0} | {1} HP left", pinningShotDamage, Mathf.Max(0, primaryTarget.CurrentHp - pinningShotDamage));
+                    detail = pinningShotKo
+                        ? string.Empty
+                        : LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Rooted));
+                    footer = pinningShotKo
+                        ? manaText
+                        : LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Rooted)) + " | " + manaText;
+                    accent = new Color(0.42f, 0.82f, 0.98f, 1f);
                     break;
                 case ActiveSkillType.GreenDragonSlash:
                     IReadOnlyList<UnitRuntimeState> slashTargets = BattlePreviewCalculator.GetGreenDragonSlashTargets(simulation.Context, caster.Position, primaryTarget);
@@ -1374,6 +1635,18 @@ namespace PhalanxChronicle.Battle
                     detail = LocalizationService.Format("ui.forecast.skill.targets", "Affects {0}", string.Join(", ", warCryTargets.Select(unit => GetUnitDisplayName(unit.Id))));
                     footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Intimidated)) + " | " + manaText;
                     break;
+                case ActiveSkillType.LionWarCry:
+                    IReadOnlyList<UnitRuntimeState> lionWarCryTargets = simulation.Context.GetUnits(primaryTarget.Faction)
+                        .Where(unit => caster.Position.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(caster))
+                        .OrderBy(unit => caster.Position.ManhattanDistance(unit.Position))
+                        .ThenBy(unit => unit.Id)
+                        .ToList();
+                    summary = LocalizationService.Format("ui.forecast.skill.war_cry", "Affects {0} nearby foes", lionWarCryTargets.Count);
+                    detail = LocalizationService.Format("ui.forecast.skill.targets", "Affects {0}", string.Join(", ", lionWarCryTargets.Select(unit => GetUnitDisplayName(unit.Id))));
+                    footer = LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Intimidated)) + " | " +
+                             LocalizationService.Format("ui.forecast.skill.status", "Applies {0}", GetStatusDisplayName(StatusEffectType.Inspired)) + " | " +
+                             manaText;
+                    break;
                 default:
                     summary = LocalizationService.Text("ui.forecast.skill.none", "No forecast available.");
                     detail = string.Empty;
@@ -1403,7 +1676,7 @@ namespace PhalanxChronicle.Battle
                     ? LocalizationService.Format("ui.combat.ko", "-{0} HP   KO", combatResult.Damage)
                     : LocalizationService.Format("ui.combat.damage", "-{0} HP   {1} left", combatResult.Damage, combatResult.DefenderRemainingHp),
                 Detail = string.Empty,
-                Footer = BuildCombatLog(combatResult),
+                Footer = BuildCombatLog(combatResult) + (combatResult.AttackerExpGained > 0 ? " | " + FormatExpGainText(combatResult.AttackerExpGained) : string.Empty),
                 AccentColor = new Color(0.96f, 0.42f, 0.26f, 1f),
             };
         }
@@ -1420,7 +1693,7 @@ namespace PhalanxChronicle.Battle
                 Detail = skillResult.Effects.Count > 1
                     ? LocalizationService.Format("ui.forecast.skill.targets", "Affects {0}", string.Join(", ", skillResult.Effects.Select(effect => GetUnitDisplayName(effect.UnitId))))
                     : string.Empty,
-                Footer = BuildSkillLog(skillResult),
+                Footer = BuildSkillLog(skillResult) + (skillResult.CasterExpGained > 0 ? " | " + FormatExpGainText(skillResult.CasterExpGained) : string.Empty),
                 AccentColor = new Color(0.32f, 0.72f, 0.98f, 1f),
             };
         }
@@ -1428,19 +1701,30 @@ namespace PhalanxChronicle.Battle
         private string BuildAttackForecastFooter(UnitRuntimeState attacker, UnitRuntimeState defender)
         {
             List<string> notes = new List<string>();
+            if (PassiveSkillRules.GetPersonalAttackBonus(attacker) > 0)
+            {
+                notes.Add(LocalizationService.Text("skill.deadeye.name", "Deadeye"));
+            }
+
             if (PassiveSkillRules.GetAttackBonus(simulation.Context, attacker) > 0)
             {
-                notes.Add(LocalizationService.Text("skill.command_aura.name", "Command Aura"));
+                notes.Add(attacker.PassiveSkill == PassiveSkillType.BenevolentCommand
+                    ? LocalizationService.Text("skill.benevolent_command.name", "Benevolent Command")
+                    : LocalizationService.Text("skill.command_aura.name", "Command Aura"));
             }
 
             if (PassiveSkillRules.GetDamageBonus(attacker) > 0)
             {
-                notes.Add(LocalizationService.Text("skill.vanguard.name", "Vanguard"));
+                notes.Add(attacker.PassiveSkill == PassiveSkillType.ThunderVanguard
+                    ? LocalizationService.Text("skill.thunder_vanguard.name", "Thunder Vanguard")
+                    : LocalizationService.Text("skill.vanguard.name", "Vanguard"));
             }
 
             if (PassiveSkillRules.GetIgnoredDefense(attacker) > 0)
             {
-                notes.Add(LocalizationService.Text("skill.armor_break.name", "Armor Break"));
+                notes.Add(attacker.PassiveSkill == PassiveSkillType.DragonGuard
+                    ? LocalizationService.Text("skill.dragon_guard.name", "Dragon Guard")
+                    : LocalizationService.Text("skill.armor_break.name", "Armor Break"));
             }
 
             if (StatusEffectRules.GetDefenseModifier(defender) < 0)
@@ -1500,6 +1784,16 @@ namespace PhalanxChronicle.Battle
                 : skillType.ToString();
         }
 
+        private string GetTerrainDisplayName(TerrainType terrainType)
+        {
+            return LocalizationService.Text(TerrainRules.GetNameKey(terrainType), terrainType.ToString());
+        }
+
+        private string FormatExpGainText(int experience)
+        {
+            return LocalizationService.Format("ui.exp.gain", "EXP +{0}", experience);
+        }
+
         private string GetStatusDisplayName(StatusEffectType statusEffectType)
         {
             switch (statusEffectType)
@@ -1510,6 +1804,14 @@ namespace PhalanxChronicle.Battle
                     return LocalizationService.Text("status.shattered_armor.name", "Shattered Armor");
                 case StatusEffectType.Intimidated:
                     return LocalizationService.Text("status.intimidated.name", "Intimidated");
+                case StatusEffectType.Bleeding:
+                    return LocalizationService.Text("status.bleeding.name", "Bleeding");
+                case StatusEffectType.Rooted:
+                    return LocalizationService.Text("status.rooted.name", "Rooted");
+                case StatusEffectType.Guarded:
+                    return LocalizationService.Text("status.guarded.name", "Guarded");
+                case StatusEffectType.Taunted:
+                    return LocalizationService.Text("status.taunted.name", "Taunted");
                 default:
                     return statusEffectType.ToString();
             }
@@ -1579,6 +1881,19 @@ namespace PhalanxChronicle.Battle
             }
         }
 
+        private BattleResultSummary BuildBattleResultSummary()
+        {
+            IReadOnlyList<string> survivingUnitIds = simulation.Context.GetUnits(UnitFaction.Player)
+                .Select(unit => unit.Id)
+                .ToList();
+
+            return new BattleResultSummary(
+                scenarioData != null ? scenarioData.ScenarioId : string.Empty,
+                simulation.Context.WinningSide,
+                simulation.Context.RoundNumber,
+                survivingUnitIds);
+        }
+
         private void ChangeState(Type stateType)
         {
             if (!states.TryGetValue(stateType, out IBattleState nextState))
@@ -1602,34 +1917,142 @@ namespace PhalanxChronicle.Battle
             pendingDialogueResumeState = null;
             currentTurnText = LocalizationService.Text("ui.turn.player", "Turn: Player Phase");
             currentInstructionText = string.Empty;
+            battleRewardsGranted = false;
+            battleResultSummaryText = string.Empty;
 
             battleHUD.ClearForecast();
             battleHUD.HideResult();
             battleHUD.HideDialogue();
+            battleHUD.HideCampaignOverlay();
 
             scenarioData = data;
             simulation = new BattleSimulation(scenarioData.Stage);
             scenarioDirector = new ScenarioDirector(scenarioData);
-            gridManager.BuildGrid(simulation.Context.Width, simulation.Context.Height, simulation.Context.BlockedCells, OnCellClicked);
+            gridManager.BuildGrid(simulation.Context, OnCellClicked);
             CreateUnits();
             ConfigureCamera();
             battleHUD.SetRerollEnabled(simulation.Context.IsRandomMap);
             RefreshAllVisuals();
         }
 
+        private string BuildBattleResultText(string text)
+        {
+            if (simulation == null || scenarioData == null || simulation.Context == null || !simulation.Context.BattleEnded)
+            {
+                return text;
+            }
+
+            GrantBattleRewards();
+            return string.IsNullOrEmpty(battleResultSummaryText)
+                ? text
+                : text + "\n\n" + battleResultSummaryText;
+        }
+
+        private void GrantBattleRewards()
+        {
+            if (battleRewardsGranted || simulation == null || scenarioData == null)
+            {
+                return;
+            }
+
+            int objectiveReward = ExperienceSystem.GetObjectiveReward(scenarioData, simulation.Context.WinningSide == TurnSide.Player);
+            foreach (UnitRuntimeState unit in simulation.Context.GetUnits(UnitFaction.Player, false))
+            {
+                unit.BondState.RegisterBattle();
+                int totalReward = objectiveReward + ExperienceSystem.GetParticipationReward(unit);
+                unit.AddBonusExperience(totalReward);
+            }
+
+            battleRewardsGranted = true;
+            battleResultSummaryText = BuildBattleRewardSummary(objectiveReward);
+        }
+
+        private string BuildBattleRewardSummary(int objectiveReward)
+        {
+            List<string> lines = new List<string>
+            {
+                LocalizationService.Format("ui.result.objective_exp", "Objective reward +{0} EXP", objectiveReward),
+            };
+
+            if (simulation.Context.WinningSide == TurnSide.Player &&
+                scenarioData != null &&
+                scenarioData.RewardBundle != null &&
+                scenarioData.RewardBundle.HasAnyReward)
+            {
+                lines.Add(LocalizationService.Format(
+                    "ui.result.rewards",
+                    "Rewards: Supplies {0}  Renown {1}",
+                    scenarioData.RewardBundle.Supplies,
+                    scenarioData.RewardBundle.Renown));
+            }
+
+            foreach (UnitRuntimeState unit in simulation.Context.GetUnits(UnitFaction.Player, false).OrderBy(unit => unit.Id))
+            {
+                lines.Add(BuildUnitBattleRewardSummary(unit, objectiveReward));
+            }
+
+            return string.Join("\n", lines);
+        }
+
+        private string BuildUnitBattleRewardSummary(UnitRuntimeState unit, int objectiveReward)
+        {
+            int totalGain = unit.BattleExpEarned + objectiveReward + ExperienceSystem.GetParticipationReward(unit);
+            string summary = LocalizationService.Format(
+                "ui.result.unit_summary",
+                "{0}  Lv {1}  EXP +{2}  ({3}/{4})",
+                GetUnitDisplayName(unit.Id),
+                unit.Level,
+                totalGain,
+                unit.CurrentExp,
+                unit.NextLevelExp);
+
+            List<string> unlocks = new List<string>();
+            GrowthProfileDefinition growthProfile = GrowthProfileCatalog.Get(unit.GrowthProfileId);
+            if (unit.BattleStartLevel < growthProfile.AdvancedSkillUnlockLevel && unit.Level >= growthProfile.AdvancedSkillUnlockLevel)
+            {
+                unlocks.Add(LocalizationService.Text("ui.unlock.skill_mastery", "Skill Mastery"));
+            }
+
+            if (unit.BattleStartLevel < growthProfile.TraitSlotUnlockLevel && unit.Level >= growthProfile.TraitSlotUnlockLevel)
+            {
+                unlocks.Add(LocalizationService.Text("ui.unlock.trait_slot", "Trait Slot"));
+            }
+
+            if (unit.BattleStartLevel < growthProfile.PromotionUnlockLevel && unit.Level >= growthProfile.PromotionUnlockLevel)
+            {
+                unlocks.Add(LocalizationService.Text("ui.unlock.promotion", "Promotion Ready"));
+            }
+
+            if (unit.BattleStartLevel < growthProfile.SignaturePassiveUnlockLevel && unit.Level >= growthProfile.SignaturePassiveUnlockLevel)
+            {
+                unlocks.Add(LocalizationService.Text("ui.unlock.signature", "Signature Passive"));
+            }
+
+            return unlocks.Count == 0
+                ? summary
+                : summary + " | " + string.Join(", ", unlocks);
+        }
+
         private bool IsInteractionLocked()
         {
-            return currentState is ScenarioDialogueState;
+            return currentState is ScenarioDialogueState ||
+                   battleHUD != null && (battleHUD.IsCampaignOverlayVisible || battleHUD.IsResultVisible);
         }
 
         private ScenarioEvaluationResult ProcessScenarioCheckpoint(ScenarioCheckpoint checkpoint)
         {
             ScenarioEvaluationResult result = scenarioDirector != null
                 ? scenarioDirector.Evaluate(checkpoint, simulation.Context)
-                : new ScenarioEvaluationResult(Array.Empty<string>(), false, false, false);
+                : new ScenarioEvaluationResult(Array.Empty<string>(), false, false, false, false);
 
             UpdateHudModels();
-            if (result.SpawnedUnitIds.Count > 0)
+            if (result.BattlefieldChanged)
+            {
+                gridManager.BuildGrid(simulation.Context, OnCellClicked);
+                ConfigureCamera();
+                RefreshAllVisuals();
+            }
+            else if (result.SpawnedUnitIds.Count > 0)
             {
                 RefreshAllVisuals();
             }
