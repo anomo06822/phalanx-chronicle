@@ -23,10 +23,10 @@ MonoBehaviour:
   frameColor: {r: 1, g: 1, b: 1, a: 1}
   markerColor: {r: 1, g: 1, b: 1, a: 1}
   portraitBackdropColor: {r: 1, g: 1, b: 1, a: 1}
-  battleScale: 0
-  portraitSprite: {fileID: 0}
-  battleSprite: {fileID: 0}
-  weaponIcon: {fileID: 0}
+  battleScale: 1
+  portraitSprite: {fileID: 21300000, guid: 7e2313a40d3684cb7a1e75ed432d6c1e, type: 3}
+  battleSprite: {fileID: 21300000, guid: 21c9ac177f2764ae9b1f7c400b78a177, type: 3}
+  weaponIcon: {fileID: 21300000, guid: 55b4c8e9f7d814e76b5e78b1c96329bf, type: 3}
   factionMarker: {fileID: 0}
   selectionFrame: {fileID: 0}
   idleAnimationController: {fileID: 0}

@@ -11,10 +11,10 @@ namespace PhalanxChronicle.Battle.Units
     [RequireComponent(typeof(BoxCollider2D))]
     public sealed class Unit : MonoBehaviour
     {
-        private const float HpBarWidth = 0.9f;
-        private const float HpBarBackHeight = 0.11f;
-        private const float HpBarFillHeight = 0.08f;
-        private const float BaseNameCharacterSize = 0.043f;
+        private const float HpBarWidth = 0.72f;
+        private const float HpBarBackHeight = 0.09f;
+        private const float HpBarFillHeight = 0.06f;
+        private const float BaseNameCharacterSize = 0.038f;
         private const float GlobalVisualScale = 0.84f;
 
         private Action<Unit> clickHandler;
@@ -53,8 +53,8 @@ namespace PhalanxChronicle.Battle.Units
             spriteRenderer.sortingOrder = 30;
 
             BoxCollider2D colliderComponent = GetComponent<BoxCollider2D>();
-            colliderComponent.size = new Vector2(0.78f, 1.02f);
-            colliderComponent.offset = new Vector2(0f, 0.02f);
+            colliderComponent.size = new Vector2(0.56f, 0.82f);
+            colliderComponent.offset = new Vector2(0f, -0.02f);
             colliderComponent.isTrigger = false;
             float scaledSize = visualProfile.BattleScale * GlobalVisualScale;
             restingScale = new Vector3(scaledSize, scaledSize, 1f);
@@ -108,7 +108,7 @@ namespace PhalanxChronicle.Battle.Units
             UpdateInfoVisibility();
         }
 
-        public Vector3 GetAnchorPosition(float yOffset = 0.82f)
+        public Vector3 GetAnchorPosition(float yOffset = 0.64f)
         {
             return transform.position + new Vector3(0f, yOffset, 0f);
         }
@@ -176,22 +176,22 @@ namespace PhalanxChronicle.Battle.Units
 
         private void BuildDecorations()
         {
-            shadowRenderer = CreateSpriteChild("Shadow", transform, RuntimeSpriteLibrary.MistBandSprite, new Color(0f, 0f, 0f, 0.22f), new Vector3(0f, -0.46f, 0f), new Vector3(0.42f, 0.1f, 1f), 20);
+            shadowRenderer = CreateSpriteChild("Shadow", transform, RuntimeSpriteLibrary.MistBandSprite, new Color(0f, 0f, 0f, 0.2f), new Vector3(0f, -0.34f, 0f), new Vector3(0.34f, 0.08f, 1f), 20);
             factionRingRenderer = CreateSpriteChild(
                 "FactionMarker",
                 transform,
                 RuntimeSpriteLibrary.GetFactionMarkerSprite(visualProfile),
                 visualProfile.MarkerColor,
-                new Vector3(0f, -0.46f, 0f),
-                new Vector3(0.88f, 0.24f, 1f),
+                new Vector3(0f, -0.33f, 0f),
+                new Vector3(0.72f, 0.18f, 1f),
                 21);
             frameRenderer = CreateSpriteChild(
                 "SelectionFrame",
                 transform,
                 visualProfile.SelectionFrame != null ? visualProfile.SelectionFrame : RuntimeSpriteLibrary.FrameSprite,
                 visualProfile.FrameColor,
-                new Vector3(0f, 0.02f, 0f),
-                new Vector3(1.24f, 1.28f, 1f),
+                new Vector3(0f, -0.01f, 0f),
+                new Vector3(0.94f, 1.02f, 1f),
                 29);
             frameRenderer.enabled = false;
 
@@ -200,8 +200,8 @@ namespace PhalanxChronicle.Battle.Units
                 transform,
                 RuntimeSpriteLibrary.SparkSprite,
                 Color.white,
-                new Vector3(0.36f, 0.56f, 0f),
-                new Vector3(0.16f, 0.16f, 1f),
+                new Vector3(0.28f, 0.44f, 0f),
+                new Vector3(0.13f, 0.13f, 1f),
                 34);
             statusBadgeRenderer.enabled = false;
 
@@ -210,14 +210,14 @@ namespace PhalanxChronicle.Battle.Units
                 transform,
                 RuntimeSpriteLibrary.RingSprite,
                 Color.white,
-                new Vector3(0f, 0.88f, 0f),
-                new Vector3(0.18f, 0.18f, 1f),
+                new Vector3(0f, 0.62f, 0f),
+                new Vector3(0.15f, 0.15f, 1f),
                 35);
             skillReadyRenderer.enabled = false;
 
             nameInfoRoot = new GameObject("NameInfoRoot");
             nameInfoRoot.transform.SetParent(transform, false);
-            nameInfoRoot.transform.localPosition = new Vector3(0f, 0.88f, 0f);
+            nameInfoRoot.transform.localPosition = new Vector3(0f, 0.68f, 0f);
 
             namePlateRenderer = CreateSpriteChild(
                 "NamePlate",
@@ -225,7 +225,7 @@ namespace PhalanxChronicle.Battle.Units
                 RuntimeSpriteLibrary.BannerSprite,
                 BattleUiTheme.GetFactionPlateColor(RuntimeState.Faction, exhausted: false),
                 new Vector3(0f, 0f, 0f),
-                new Vector3(0.78f, 0.18f, 1f),
+                new Vector3(0.64f, 0.15f, 1f),
                 36);
 
             string localizedName = LocalizationService.Text(RuntimeState.DisplayNameKey, RuntimeState.DisplayName);
@@ -242,7 +242,7 @@ namespace PhalanxChronicle.Battle.Units
 
             hpInfoRoot = new GameObject("HpInfoRoot");
             hpInfoRoot.transform.SetParent(transform, false);
-            hpInfoRoot.transform.localPosition = new Vector3(0f, 0.72f, 0f);
+            hpInfoRoot.transform.localPosition = new Vector3(0f, 0.54f, 0f);
 
             CreateSpriteChild(
                 "HpFrame",
@@ -250,7 +250,7 @@ namespace PhalanxChronicle.Battle.Units
                 RuntimeSpriteLibrary.WhiteSprite,
                 new Color(0.03f, 0.03f, 0.04f, 0.88f),
                 Vector3.zero,
-                new Vector3(HpBarWidth + 0.05f, HpBarBackHeight + 0.04f, 1f),
+                new Vector3(HpBarWidth + 0.04f, HpBarBackHeight + 0.03f, 1f),
                 35);
 
             hpBackRenderer = CreateSpriteChild(
@@ -331,9 +331,9 @@ namespace PhalanxChronicle.Battle.Units
             }
 
             transform.localScale = isSelected
-                ? restingScale * 1.04f
+                ? restingScale * 1.035f
                 : isHovered
-                    ? restingScale * 1.015f
+                    ? restingScale * 1.01f
                     : restingScale;
         }
 
@@ -424,20 +424,20 @@ namespace PhalanxChronicle.Battle.Units
 
             if (visibleLength <= 6)
             {
-                return 0.044f;
+                return 0.039f;
             }
 
             if (visibleLength <= 9)
             {
-                return 0.04f;
+                return 0.036f;
             }
 
             if (visibleLength <= 12)
             {
-                return 0.036f;
+                return 0.033f;
             }
 
-            return 0.033f;
+            return 0.03f;
         }
 
         private IEnumerator AnimateBetween(Vector3 start, Vector3 end, float duration)

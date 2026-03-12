@@ -168,6 +168,8 @@ namespace PhalanxChronicle.Presentation
             UnitFrameStyle frameStyle = definition.FrameStyle == UnitFrameStyle.Common && fallback.FrameStyle != UnitFrameStyle.Common
                 ? fallback.FrameStyle
                 : definition.FrameStyle;
+            float requestedBattleScale = definition.BattleScale > 0f ? definition.BattleScale : fallback.BattleScale;
+            float normalizedBattleScale = NormalizeBattleScale(role, frameStyle, requestedBattleScale);
 
             return new UnitVisualProfile(
                 unitId,
@@ -182,7 +184,7 @@ namespace PhalanxChronicle.Presentation
                 useCustomPalette ? definition.FrameColor : fallback.FrameColor,
                 useCustomPalette ? definition.MarkerColor : fallback.MarkerColor,
                 useCustomPalette ? definition.PortraitBackdropColor : fallback.PortraitBackdropColor,
-                definition.BattleScale > 0f ? definition.BattleScale : fallback.BattleScale,
+                normalizedBattleScale,
                 definition.PortraitSprite != null ? definition.PortraitSprite : fallback.PortraitSprite,
                 definition.BattleSprite != null ? definition.BattleSprite : fallback.BattleSprite,
                 definition.WeaponIcon != null ? definition.WeaponIcon : fallback.WeaponIcon,
@@ -331,7 +333,41 @@ namespace PhalanxChronicle.Presentation
                 frameColor,
                 markerColor,
                 portraitBackdropColor,
-                battleScale);
+                NormalizeBattleScale(role, frameStyle, battleScale));
+        }
+
+        private static float NormalizeBattleScale(UnitRole role, UnitFrameStyle frameStyle, float requestedBattleScale)
+        {
+            float baseline = GetBaselineBattleScale(role, frameStyle);
+            float minimum = Mathf.Max(0.72f, baseline - 0.04f);
+            float maximum = Mathf.Min(0.96f, baseline + 0.04f);
+            if (requestedBattleScale <= 0f)
+            {
+                return baseline;
+            }
+
+            return Mathf.Clamp(requestedBattleScale, minimum, maximum);
+        }
+
+        private static float GetBaselineBattleScale(UnitRole role, UnitFrameStyle frameStyle)
+        {
+            if (frameStyle == UnitFrameStyle.Boss)
+            {
+                return 0.92f;
+            }
+
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    return 0.84f;
+                case UnitRole.Guardian:
+                    return 0.88f;
+                case UnitRole.Ranger:
+                case UnitRole.Scout:
+                case UnitRole.Raider:
+                default:
+                    return 0.8f;
+            }
         }
 
         private static Color Hex(string value)

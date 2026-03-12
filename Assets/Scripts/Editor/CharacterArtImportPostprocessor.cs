@@ -54,7 +54,7 @@ namespace PhalanxChronicle.Editor
         {
             importer.textureType = TextureImporterType.Sprite;
             importer.spriteImportMode = SpriteImportMode.Single;
-            importer.spritePixelsPerUnit = 64f;
+            importer.spritePixelsPerUnit = 128f;
             importer.mipmapEnabled = false;
             importer.alphaIsTransparency = true;
             importer.filterMode = FilterMode.Bilinear;

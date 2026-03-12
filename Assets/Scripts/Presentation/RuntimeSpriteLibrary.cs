@@ -900,7 +900,7 @@ namespace PhalanxChronicle.Presentation
 
         private static Sprite CreateUnitSprite(UnitVisualProfile profile)
         {
-            Texture2D texture = CreateTexture(48, 48, FilterMode.Bilinear);
+            Texture2D source = CreateTexture(48, 48, FilterMode.Bilinear);
             uint hash = StableHash(profile.UnitId ?? profile.Archetype.ToString());
             int variant = (int)(hash % 3u);
 
@@ -915,16 +915,22 @@ namespace PhalanxChronicle.Presentation
             Color32 metal = Blend(secondary, new Color32(225, 220, 206, 255), 0.58f);
             Color32 glow = new Color32(accent.r, accent.g, accent.b, 40);
 
-            FillCircle(texture, 24, 16, 11, glow);
-            FillDiamond(texture, 24, 14, 13, new Color32(accent.r, accent.g, accent.b, 22));
-            DrawFieldCloak(texture, profile.Role, cloak, outline);
-            DrawFieldBody(texture, profile.Role, primary, primaryShadow, accent, metal, outline);
-            DrawFieldHead(texture, profile.Role, profile.Archetype, skin, hair, accent, secondary, outline, variant);
-            DrawFieldRoleMarks(texture, profile.Role, accent, metal, outline);
-            DrawFieldSignature(texture, profile.Archetype, accent, metal, secondary, outline);
+            FillCircle(source, 24, 16, 11, glow);
+            FillDiamond(source, 24, 14, 13, new Color32(accent.r, accent.g, accent.b, 22));
+            DrawFieldCloak(source, profile.Role, cloak, outline);
+            DrawFieldBody(source, profile.Role, primary, primaryShadow, accent, metal, outline);
+            DrawFieldHead(source, profile.Role, profile.Archetype, skin, hair, accent, secondary, outline, variant);
+            DrawFieldRoleMarks(source, profile.Role, accent, metal, outline);
+            DrawFieldSignature(source, profile.Archetype, accent, metal, secondary, outline);
+            source.Apply();
 
+            Texture2D texture = CreateTexture(64, 64, FilterMode.Bilinear);
+            FillCircle(texture, 32, 23, 13, new Color32(accent.r, accent.g, accent.b, 24));
+            BlitTexture(source, texture, 8, 8);
+            DrawLine(texture, 11, 47, 25, 57, new Color32(255, 255, 255, 16), 1);
+            DrawLine(texture, 39, 56, 51, 47, new Color32(255, 255, 255, 16), 1);
             texture.Apply();
-            return CreateSprite(texture, 24f);
+            return CreateSprite(texture, 64f);
         }
 
         private static Sprite CreatePortraitSprite(UnitVisualProfile profile)
@@ -1643,6 +1649,10 @@ namespace PhalanxChronicle.Presentation
             {
                 case "guangzong-smoke":
                     return GetGuangzongPaletteColor(channel);
+                case "jiangxia-bridges":
+                    return GetJiangxiaPaletteColor(channel);
+                case "luocheng-gate":
+                    return GetLuochengPaletteColor(channel);
                 case "changban-river":
                     return GetChangbanPaletteColor(channel);
                 case "dingjun-stone":
@@ -1719,6 +1729,76 @@ namespace PhalanxChronicle.Presentation
                     return Hex("A8B2B9");
                 default:
                     return Hex("77807C");
+            }
+        }
+
+        private static Color GetJiangxiaPaletteColor(string channel)
+        {
+            switch (channel)
+            {
+                case "forest":
+                    return Hex("5E756B");
+                case "fort":
+                    return Hex("7E715E");
+                case "hazard":
+                    return Hex("516273");
+                case "blocked":
+                    return Hex("32404E");
+                case "overlay-plain":
+                    return Hex("CFCCBE");
+                case "overlay-forest":
+                    return Hex("94A899");
+                case "overlay-fort":
+                    return Hex("D8C7A4");
+                case "overlay-hazard":
+                    return Hex("9DB7CF");
+                case "overlay-blocked":
+                    return Hex("8DA2B5");
+                case "prop-forest":
+                    return Hex("89A89A");
+                case "prop-fort":
+                    return Hex("B89669");
+                case "prop-hazard":
+                    return Hex("C8DBEB");
+                case "prop-blocked":
+                    return Hex("A7B7C6");
+                default:
+                    return Hex("7B8072");
+            }
+        }
+
+        private static Color GetLuochengPaletteColor(string channel)
+        {
+            switch (channel)
+            {
+                case "forest":
+                    return Hex("69705D");
+                case "fort":
+                    return Hex("857362");
+                case "hazard":
+                    return Hex("684235");
+                case "blocked":
+                    return Hex("3F3D44");
+                case "overlay-plain":
+                    return Hex("CAB79F");
+                case "overlay-forest":
+                    return Hex("97A389");
+                case "overlay-fort":
+                    return Hex("D8C1A1");
+                case "overlay-hazard":
+                    return Hex("D79B67");
+                case "overlay-blocked":
+                    return Hex("A7A4AE");
+                case "prop-forest":
+                    return Hex("8F997E");
+                case "prop-fort":
+                    return Hex("C18B5C");
+                case "prop-hazard":
+                    return Hex("E3B07F");
+                case "prop-blocked":
+                    return Hex("B7B3BB");
+                default:
+                    return Hex("7B6654");
             }
         }
 
@@ -1871,6 +1951,23 @@ namespace PhalanxChronicle.Presentation
 
             texture.SetPixels(pixels);
             return texture;
+        }
+
+        private static void BlitTexture(Texture2D source, Texture2D destination, int offsetX, int offsetY)
+        {
+            for (int x = 0; x < source.width; x++)
+            {
+                for (int y = 0; y < source.height; y++)
+                {
+                    Color pixel = source.GetPixel(x, y);
+                    if (pixel.a <= 0f)
+                    {
+                        continue;
+                    }
+
+                    destination.SetPixel(x + offsetX, y + offsetY, pixel);
+                }
+            }
         }
 
         private static Sprite CreateSprite(Texture2D texture, float pixelsPerUnit)
