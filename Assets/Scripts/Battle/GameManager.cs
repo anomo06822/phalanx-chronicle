@@ -205,12 +205,24 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            BattleScenarioData scenario = BattleScenarioCatalog.CreateScenario(stage.ScenarioId);
+            BattleScenarioData scenario = campaignProgressionService.PrepareScenario(
+                BattleScenarioCatalog.CreateScenario(stage.ScenarioId),
+                campaignSaveData);
+            ItemDefinition rewardItem = ItemCatalog.Get(scenario.RewardBundle.RewardItemId);
+            List<string> detailLines = new List<string>
+            {
+                LocalizationService.Format("campaign.stage.recommended_level", "Recommended Level {0}", scenario.RecommendedLevel),
+                LocalizationService.Format("campaign.stage.variant", "Scenario Variant: {0}", FormatScenarioVariantTag(scenario.ScenarioVariantTag)),
+            };
+
             CampaignInterludeModel model = new CampaignInterludeModel
             {
                 Title = LocalizationService.Text(stage.ChapterTitleKey, stage.ChapterTitleFallback),
-                Body = LocalizationService.Text(stage.InterludeIntroKey, stage.InterludeIntroFallback) + "\n\n" +
-                       LocalizationService.Format("campaign.stage.recommended_level", "Recommended Level {0}", scenario.RecommendedLevel),
+                Body = LocalizationService.Text(stage.InterludeIntroKey, stage.InterludeIntroFallback),
+                DetailLines = detailLines,
+                HighlightLine = rewardItem != null && !campaignSaveData.Progress.IsRewardClaimed(stage.ScenarioId)
+                    ? LocalizationService.Format("campaign.stage.reward_preview", "First-clear Treasure: {0}", LocalizationService.Text(rewardItem.NameKey, rewardItem.NameFallback))
+                    : string.Empty,
                 PrimaryActionLabel = LocalizationService.Text("ui.button.begin_battle", "Begin Battle"),
                 SecondaryActionLabel = LocalizationService.Text("ui.button.back_to_camp", "Back to Camp"),
             };
@@ -256,7 +268,7 @@ namespace PhalanxChronicle.Battle
                     "Supplies {0}  Renown {1}",
                     campaignSaveData.Inventory.Supplies,
                     campaignSaveData.Inventory.Renown),
-                Description = LocalizationService.Text("camp.shop.desc", "Buy stronger weapons and armor for the next push."),
+                Description = LocalizationService.Text("camp.shop.desc", "Buy stronger weapons, armor, and mounts for the next push."),
                 IsEnabled = true,
                 IsEmphasized = campaignProgressionService.GetShopOffers().Any(offer =>
                     campaignSaveData.Inventory.Renown >= offer.RequiredRenown &&
@@ -268,10 +280,10 @@ namespace PhalanxChronicle.Battle
                 Title = LocalizationService.Text("camp.inventory.title", "Warehouse"),
                 Status = LocalizationService.Format(
                     "camp.inventory.summary",
-                    "Special Goods {0}  Stored Gear {1}",
+                    "Treasures {0}  Stored Gear {1}",
                     GetSpecialGoodCount(),
                     GetStoredGearCount()),
-                Description = LocalizationService.Text("camp.inventory.desc", "Review story rewards and every owned piece of equipment."),
+                Description = LocalizationService.Text("camp.inventory.desc", "Review campaign treasures and every owned piece of equipment."),
                 IsEnabled = true,
             });
 
@@ -509,7 +521,7 @@ namespace PhalanxChronicle.Battle
                 .OrderByDescending(entry =>
                 {
                     ItemDefinition definition = ItemCatalog.Get(entry.ItemId);
-                    return definition != null && definition.Category == ItemCategory.SpecialGood ? 1 : 0;
+                    return definition != null && definition.IsTreasure ? 1 : 0;
                 })
                 .ThenBy(entry => entry.ItemId, StringComparer.Ordinal)
                 .Select(entry =>
@@ -657,7 +669,7 @@ namespace PhalanxChronicle.Battle
                 ItemDefinition item = ItemCatalog.Get(resolution.GrantedItemId);
                 parts.Add(LocalizationService.Format(
                     "campaign.reward.item",
-                    "Special Good: {0}",
+                    "Treasure: {0}",
                     item != null ? LocalizationService.Text(item.NameKey, item.NameFallback) : resolution.GrantedItemId));
             }
 
@@ -808,7 +820,9 @@ namespace PhalanxChronicle.Battle
             }
 
             string description = LocalizationService.Text(item.DescriptionKey, item.DescriptionFallback);
-            return statParts.Count == 0 ? description : string.Join("  ", statParts) + " | " + description;
+            string treasureEffect = BuildTreasureEffectSummary(item);
+            string summary = statParts.Count == 0 ? description : string.Join("  ", statParts) + " | " + description;
+            return string.IsNullOrWhiteSpace(treasureEffect) ? summary : summary + " | " + treasureEffect;
         }
 
         private bool CanPromote(CampaignUnitState unit)
@@ -832,7 +846,7 @@ namespace PhalanxChronicle.Battle
             return campaignSaveData.Inventory.Entries.Count(entry =>
             {
                 ItemDefinition definition = ItemCatalog.Get(entry.ItemId);
-                return definition != null && definition.Category == ItemCategory.SpecialGood;
+                return definition != null && definition.IsTreasure;
             });
         }
 
@@ -843,6 +857,51 @@ namespace PhalanxChronicle.Battle
                 ItemDefinition definition = ItemCatalog.Get(entry.ItemId);
                 return definition != null && definition.IsEquipable ? entry.Quantity : 0;
             });
+        }
+
+        private static string BuildTreasureEffectSummary(ItemDefinition item)
+        {
+            if (item == null || !item.IsTreasure)
+            {
+                return string.Empty;
+            }
+
+            switch (item.TreasureEffect)
+            {
+                case TreasureEffectType.SkillDamageBonus:
+                    return LocalizationService.Text("treasure.effect.skill_damage", "Treasure Effect: skill damage +2");
+                case TreasureEffectType.StatusDurationBonus:
+                    return LocalizationService.Text("treasure.effect.status_duration", "Treasure Effect: applied status duration +1");
+                case TreasureEffectType.GuardOnLowHp:
+                    return LocalizationService.Text("treasure.effect.guard_low_hp", "Treasure Effect: gain Guarded at low HP");
+                case TreasureEffectType.IgnoreHazardTick:
+                    return LocalizationService.Text("treasure.effect.ignore_hazard", "Treasure Effect: ignores hazard end-turn damage");
+                case TreasureEffectType.FortHealingBonus:
+                    return LocalizationService.Text("treasure.effect.fort_heal", "Treasure Effect: fort healing +2");
+                case TreasureEffectType.MovePlusOneOnFirstThreeTurns:
+                    return LocalizationService.Text("treasure.effect.first_turn_move", "Treasure Effect: MOVE +1 during the first 3 turns");
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string FormatScenarioVariantTag(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag) || string.Equals(tag, "Normal", StringComparison.Ordinal))
+            {
+                return LocalizationService.Text("campaign.variant.normal", "Normal");
+            }
+
+            const string ReplayPrefix = "Replay ";
+            if (tag.StartsWith(ReplayPrefix, StringComparison.Ordinal))
+            {
+                return LocalizationService.Format(
+                    "campaign.variant.replay",
+                    "Replay {0}",
+                    tag.Substring(ReplayPrefix.Length));
+            }
+
+            return tag;
         }
     }
 }

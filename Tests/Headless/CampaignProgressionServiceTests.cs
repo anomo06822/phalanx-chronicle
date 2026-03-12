@@ -17,7 +17,7 @@ namespace PhalanxChronicle.Headless.Tests
 
             Assert.Equal(CampaignCatalog.LiuBeiLegendCampaignId, save.CampaignId);
             Assert.Equal(4, save.Units.Count);
-            Assert.Equal(2, save.Version);
+            Assert.Equal(3, save.Version);
             Assert.Equal("vermilion-jian", save.GetUnit("player-liu-bei").EquipmentLoadout.WeaponId);
             Assert.Equal("commander-travel-cloak", save.GetUnit("player-liu-bei").EquipmentLoadout.ArmorId);
             Assert.Equal(string.Empty, save.GetUnit("player-liu-bei").EquipmentLoadout.MountId);
@@ -26,6 +26,7 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal(2, save.Inventory.GetQuantity("guardian-scale-vest"));
             Assert.Equal(1, save.Inventory.GetQuantity("featherback-war-bow"));
             Assert.Equal(1, save.Inventory.GetQuantity("ranger-hunt-coat"));
+            Assert.Equal(0, save.Progress.GetClearCount(BattleScenarioCatalog.GuangzongScenarioId));
         }
 
         [Fact]
@@ -38,15 +39,45 @@ namespace PhalanxChronicle.Headless.Tests
             BattleScenarioData firstClearScenario = service.PrepareScenario(baseScenario, save);
             save.Progress.MarkRewardClaimed(BattleScenarioCatalog.BowangpoScenarioId);
             BattleScenarioData replayScenario = service.PrepareScenario(baseScenario, save);
+            ItemDefinition firstClearReward = ItemCatalog.Get(firstClearScenario.RewardBundle.RewardItemId);
 
             Assert.Equal(150, firstClearScenario.RewardBundle.Supplies);
             Assert.Equal(2, firstClearScenario.RewardBundle.Renown);
             Assert.Equal("bowang-fire-token", firstClearScenario.RewardBundle.RewardItemId);
             Assert.Contains("player-zhuge-liang", firstClearScenario.RewardBundle.RecruitUnitIds);
+            Assert.NotNull(firstClearReward);
+            Assert.True(firstClearReward.IsTreasure);
+            Assert.Equal(TreasureEffectType.SkillDamageBonus, firstClearReward.TreasureEffect);
             Assert.Equal(0, replayScenario.RewardBundle.Supplies);
             Assert.Equal(0, replayScenario.RewardBundle.Renown);
             Assert.Equal(string.Empty, replayScenario.RewardBundle.RewardItemId);
             Assert.Empty(replayScenario.RewardBundle.RecruitUnitIds);
+        }
+
+        [Fact]
+        public void PrepareScenario_AppliesReplayTierFromClearCountAndRosterLevels()
+        {
+            CampaignProgressionService service = new CampaignProgressionService();
+            CampaignSaveData save = service.CreateNewSave(CampaignCatalog.CreateLiuBeiLegend());
+            foreach (CampaignUnitState unit in save.Units)
+            {
+                unit.SyncFromBattle(CreateResolvedRuntime(unit, 9), 0, 0, 0);
+            }
+
+            save.Progress.MarkCleared(BattleScenarioCatalog.GuangzongScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.GuangzongScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.GuangzongScenarioId);
+
+            BattleScenarioData prepared = service.PrepareScenario(
+                BattleScenarioCatalog.CreateScenario(BattleScenarioCatalog.GuangzongScenarioId),
+                save);
+            UnitDefinitionData zhangBao = prepared.Stage.UnitSpawns.Single(spawn => spawn.Definition.Id == "enemy-zhang-bao").Definition;
+
+            Assert.Equal(5, prepared.ReplayDifficultyTier);
+            Assert.Equal("Replay V", prepared.ScenarioVariantTag);
+            Assert.Equal(42, zhangBao.MaxHp);
+            Assert.Equal(15, zhangBao.Attack);
+            Assert.Equal(6, zhangBao.Defense);
         }
 
         [Fact]
@@ -84,6 +115,8 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal(120, save.Inventory.Supplies);
             Assert.Equal(1, save.Inventory.Renown);
             Assert.Equal(1, save.Inventory.GetQuantity("yellow-turban-signet"));
+            Assert.True(ItemCatalog.Get("yellow-turban-signet").IsTreasure);
+            Assert.Equal("player-liu-bei", ItemCatalog.Get("yellow-turban-signet").RecommendedOwnerUnitId);
             Assert.True(save.Progress.IsRewardClaimed(BattleScenarioCatalog.GuangzongScenarioId));
             Assert.True(save.GetUnit("player-liu-bei").Level > 1);
             Assert.False(replayResolution.GrantedStageReward);
@@ -147,6 +180,70 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal(1, save.Inventory.GetQuantity("scout-travel-mail"));
             Assert.Equal(1, save.Inventory.GetQuantity("western-lance"));
             Assert.Equal(1, save.Inventory.GetQuantity("raider-scale-vest"));
+        }
+
+        [Fact]
+        public void NormalizeSave_UpdatesLegacyZhaoYunAndMaChaoSkills()
+        {
+            CampaignUnitState legacyZhaoYun = new CampaignUnitState(
+                "player-zhao-yun",
+                "Zhao Yun",
+                "unit.player_zhao_yun",
+                UnitRole.Scout,
+                "role.scout",
+                PassiveSkillType.RapidMarch,
+                "skill.rapid_march.name",
+                "skill.rapid_march.desc",
+                ActiveSkillType.PowerStrike,
+                "skill.power_strike.name",
+                "skill.power_strike.desc",
+                31,
+                11,
+                4,
+                4,
+                1,
+                18,
+                "scout",
+                "scout",
+                AiProfileType.Aggressor,
+                EquipmentLoadout.Empty);
+            CampaignUnitState legacyMaChao = new CampaignUnitState(
+                "player-ma-chao",
+                "Ma Chao",
+                "unit.player_ma_chao",
+                UnitRole.Raider,
+                "role.raider",
+                PassiveSkillType.Vanguard,
+                "skill.vanguard.name",
+                "skill.vanguard.desc",
+                ActiveSkillType.PowerStrike,
+                "skill.power_strike.name",
+                "skill.power_strike.desc",
+                33,
+                12,
+                4,
+                4,
+                1,
+                18,
+                "storm_raider",
+                "storm_raider",
+                AiProfileType.Aggressor,
+                EquipmentLoadout.Empty,
+                level: 10,
+                hasPromoted: true);
+
+            CampaignSaveData save = new CampaignSaveData(
+                "campaign",
+                new CampaignProgress(),
+                new CampaignInventoryState(),
+                new[] { legacyZhaoYun, legacyMaChao });
+
+            CampaignSaveNormalizer.Normalize(save);
+
+            Assert.Equal(ActiveSkillType.DragonPierce, legacyZhaoYun.ActiveSkill);
+            Assert.Equal("skill.dragon_pierce.name", legacyZhaoYun.ActiveSkillNameKey);
+            Assert.Equal(ActiveSkillType.WesternStampede, legacyMaChao.ActiveSkill);
+            Assert.Equal("skill.western_stampede.name", legacyMaChao.ActiveSkillNameKey);
         }
 
         [Fact]
@@ -236,9 +333,9 @@ namespace PhalanxChronicle.Headless.Tests
                 PassiveSkillType.RapidMarch,
                 "skill.rapid_march.name",
                 "skill.rapid_march.desc",
-                ActiveSkillType.PowerStrike,
-                "skill.power_strike.name",
-                "skill.power_strike.desc",
+                ActiveSkillType.DragonPierce,
+                "skill.dragon_pierce.name",
+                "skill.dragon_pierce.desc",
                 31,
                 11,
                 4,
@@ -254,7 +351,7 @@ namespace PhalanxChronicle.Headless.Tests
                 new CampaignProgress(),
                 new CampaignInventoryState(),
                 new[] { rider },
-                2);
+                3);
 
             UnitDefinitionData placeholder = new UnitDefinitionData(
                 "player-zhao-yun",

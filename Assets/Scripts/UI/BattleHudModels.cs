@@ -211,6 +211,10 @@ namespace PhalanxChronicle.UI
 
         public string Body { get; set; } = string.Empty;
 
+        public IReadOnlyList<string> DetailLines { get; set; } = new List<string>();
+
+        public string HighlightLine { get; set; } = string.Empty;
+
         public string PrimaryActionLabel { get; set; } = string.Empty;
 
         public string SecondaryActionLabel { get; set; } = string.Empty;

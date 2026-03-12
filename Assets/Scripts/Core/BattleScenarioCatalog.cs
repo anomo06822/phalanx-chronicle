@@ -537,6 +537,170 @@ namespace PhalanxChronicle.Core
                 new RewardBundle(180, 2, "changban-scout-map", new[] { "player-zhao-yun" }));
         }
 
+        public static BattleScenarioData CreateJiangxiaFerry()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
+            AddCoreSquad(
+                openingSpawns,
+                new GridPosition(1, 5),
+                new GridPosition(2, 6),
+                new GridPosition(2, 4),
+                new GridPosition(1, 7));
+            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(0, 4)));
+            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(1, 3)));
+            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-bridge-captain", "Bridge Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 6, 2, 1, new GridPosition(8, 5), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-bow-chief", "River Bow Chief", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(9, 2), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-outer-warden-a", "Outer Bridge Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 26, 8, 5, 2, 1, new GridPosition(8, 2), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-outer-warden-b", "Outer Bridge Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 26, 8, 5, 2, 1, new GridPosition(8, 8), AiProfileType.Protector));
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Jiangxia Ferry",
+                "stage.jiangxia_ferry",
+                12,
+                10,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(5, 0),
+                    new GridPosition(6, 0),
+                    new GridPosition(5, 1),
+                    new GridPosition(6, 1),
+                    new GridPosition(5, 3),
+                    new GridPosition(6, 3),
+                    new GridPosition(5, 4),
+                    new GridPosition(6, 4),
+                    new GridPosition(5, 6),
+                    new GridPosition(6, 6),
+                    new GridPosition(5, 7),
+                    new GridPosition(6, 7),
+                    new GridPosition(5, 9),
+                    new GridPosition(6, 9),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 2), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 2), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 5), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 8), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 8), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(3, 1), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(3, 8), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(9, 4), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(9, 6), TerrainType.Hazard),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.jiangxia.opening",
+                "Hold the middle bridge until the outer crossings are cut.",
+                "objective.jiangxia.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.jiangxia.final",
+                "Defeat the Jiangxia ferry captain through the center bridge.",
+                "objective.jiangxia.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            BattlefieldMutation bridgeCutMutation = new BattlefieldMutation(
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(6, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(5, 8), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(6, 8), TerrainType.Hazard),
+                },
+                new List<BlockedCellStateChange>
+                {
+                    new BlockedCellStateChange(new GridPosition(5, 2), true),
+                    new BlockedCellStateChange(new GridPosition(6, 2), true),
+                    new BlockedCellStateChange(new GridPosition(5, 8), true),
+                    new BlockedCellStateChange(new GridPosition(6, 8), true),
+                });
+
+            List<ScenarioDirective> bridgeCutDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(JiangxiaBridgesCutFlag),
+                ScenarioDirective.ApplyBattlefieldMutation(bridgeCutMutation),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-jiangxia-ferry-captain", "Jiangxia Ferry Captain", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 34, 11, 5, 3, 1, new GridPosition(11, 5), AiProfileType.Boss),
+                    SpawnEnemy("enemy-jiangxia-river-rider", "River Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 25, 9, 3, 4, 1, new GridPosition(10, 4), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-jiangxia-river-rider-b", "River Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 25, 9, 3, 4, 1, new GridPosition(10, 6), AiProfileType.Aggressor),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.jiangxia.mid.1", "Cut the outer bridges. Force the whole ferry line through the center and let their command stack there."),
+                    Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.jiangxia.mid.2", "The side crossings are gone. We strike straight through the middle before they reset."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.jiangxia.mid.3", "Hold the center bridge and break their captain cleanly."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "jiangxia-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.jiangxia.opening.1", "Jiangxia's ferry line is too wide to force head-on. We keep the center while the outer bridges are cut."),
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.jiangxia.opening.2", "Once the flanks are severed, the defenders must answer on the middle bridge alone."),
+                            Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.jiangxia.opening.3", "Then I will hold the lane until that order lands."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "jiangxia-bridges-cut-kill",
+                    ScenarioCheckpoint.ActionResolved,
+                    bridgeCutDirectives,
+                    requiredDefeatedUnitIds: new List<string> { "enemy-jiangxia-outer-warden-a", "enemy-jiangxia-outer-warden-b" },
+                    exclusivityGroupId: "jiangxia-bridges"),
+                new ScenarioTrigger(
+                    "jiangxia-bridges-cut-round",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    bridgeCutDirectives,
+                    minimumRoundNumber: 3,
+                    exclusivityGroupId: "jiangxia-bridges"),
+                new ScenarioTrigger(
+                    "jiangxia-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "jiangxia-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-jiangxia-ferry-captain" },
+                    requiredFlags: new List<string> { JiangxiaBridgesCutFlag }),
+                new ScenarioTrigger(
+                    "jiangxia-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.jiangxia.victory.1", "The crossing is ours. Jiangxia's line broke the moment the river narrowed to one bridge."),
+                            Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.jiangxia.victory.2", "Then we move before the next bank can harden against us."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+            };
+
+            return new BattleScenarioData(
+                JiangxiaScenarioId,
+                "Jiangxia Ferry",
+                "scenario.jiangxia_ferry",
+                stage,
+                triggers,
+                4,
+                92,
+                32,
+                new RewardBundle(205, 3, "jiangxia-river-reins"));
+        }
+
         public static BattleScenarioData CreateJiamengPass()
         {
             List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
@@ -690,10 +854,304 @@ namespace PhalanxChronicle.Core
                 "scenario.jiameng_pass",
                 stage,
                 triggers,
-                4,
+                5,
                 95,
                 34,
                 new RewardBundle(220, 3, "jiameng-oath-banner", new[] { "player-ma-chao" }));
+        }
+
+        public static BattleScenarioData CreateLuochengSiege()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
+            AddCoreSquad(
+                openingSpawns,
+                new GridPosition(4, 1),
+                new GridPosition(3, 2),
+                new GridPosition(5, 2),
+                new GridPosition(2, 1));
+            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(6, 1)));
+            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(4, 3)));
+            openingSpawns.Add(SpawnPlayerMaChao(new GridPosition(5, 3)));
+            openingSpawns.Add(SpawnEnemy("enemy-luocheng-gate-captain", "Gate Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 32, 10, 6, 2, 1, new GridPosition(5, 4), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-luocheng-wall-bow", "Wall Bow Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 25, 9, 3, 3, 2, new GridPosition(7, 4), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-luocheng-outer-guard", "Outer Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 9, 5, 2, 1, new GridPosition(4, 5), AiProfileType.Protector));
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Luocheng Siege",
+                "stage.luocheng_siege",
+                12,
+                12,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(2, 6),
+                    new GridPosition(3, 6),
+                    new GridPosition(4, 6),
+                    new GridPosition(5, 6),
+                    new GridPosition(6, 6),
+                    new GridPosition(7, 6),
+                    new GridPosition(8, 6),
+                    new GridPosition(9, 6),
+                    new GridPosition(3, 8),
+                    new GridPosition(8, 8),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 6), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 6), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(4, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(7, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 9), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(6, 9), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(2, 4), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(9, 4), TerrainType.Forest),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.luocheng.opening",
+                "Break the outer gate line and breach Luocheng.",
+                "objective.luocheng.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.luocheng.final",
+                "Push through the breach and defeat the Luocheng commandant.",
+                "objective.luocheng.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            BattlefieldMutation gateBreachMutation = new BattlefieldMutation(
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 6), TerrainType.Plain),
+                    new TerrainTileData(new GridPosition(6, 6), TerrainType.Plain),
+                    new TerrainTileData(new GridPosition(5, 8), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(6, 8), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(5, 9), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(6, 9), TerrainType.Hazard),
+                },
+                new List<BlockedCellStateChange>
+                {
+                    new BlockedCellStateChange(new GridPosition(5, 6), false),
+                    new BlockedCellStateChange(new GridPosition(6, 6), false),
+                });
+
+            List<ScenarioDirective> breachDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(LuochengGateBreachedFlag),
+                ScenarioDirective.ApplyBattlefieldMutation(gateBreachMutation),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-luocheng-commandant", "Luocheng Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 35, 11, 5, 3, 1, new GridPosition(6, 10), AiProfileType.Boss),
+                    SpawnEnemy("enemy-luocheng-street-guard-a", "Street Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(4, 9), AiProfileType.Protector),
+                    SpawnEnemy("enemy-luocheng-street-guard-b", "Street Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(8, 9), AiProfileType.Protector),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.luocheng.mid.1", "The gate is open. Drive into the inner street before they can stack a second wall behind it."),
+                    Line("unit.zhang_fei", "Zhang Fei", "dialogue.luocheng.mid.2", "At last. I am done arguing with a wooden gate."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.luocheng.mid.3", "Press through the breach and end the city command."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "luocheng-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.luocheng.opening.1", "Luocheng will not yield to patience. We break the gate, then take the street before they settle."),
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.luocheng.opening.2", "The outer line is short but dense. Once the gate cracks, the city turns into a funnel."),
+                            Line("unit.player_ma_chao", "Ma Chao", "dialogue.luocheng.opening.3", "Then hit hard enough that they never recover the lane."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "luocheng-breach-kill",
+                    ScenarioCheckpoint.ActionResolved,
+                    breachDirectives,
+                    requiredDefeatedUnitIds: new List<string> { "enemy-luocheng-gate-captain", "enemy-luocheng-wall-bow" },
+                    exclusivityGroupId: "luocheng-breach"),
+                new ScenarioTrigger(
+                    "luocheng-breach-round",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    breachDirectives,
+                    minimumRoundNumber: 4,
+                    exclusivityGroupId: "luocheng-breach"),
+                new ScenarioTrigger(
+                    "luocheng-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "luocheng-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-luocheng-commandant" },
+                    requiredFlags: new List<string> { LuochengGateBreachedFlag }),
+            };
+
+            return new BattleScenarioData(
+                LuochengScenarioId,
+                "Luocheng Siege",
+                "scenario.luocheng_siege",
+                stage,
+                triggers,
+                6,
+                108,
+                38,
+                new RewardBundle(235, 4, "luocheng-breach-hammer"));
+        }
+
+        public static BattleScenarioData CreateYangpingPass()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>
+            {
+                SpawnPlayerLiuBei(new GridPosition(1, 5)),
+                SpawnPlayerGuanYu(new GridPosition(2, 6)),
+                SpawnPlayerZhangFei(new GridPosition(2, 4)),
+                SpawnPlayerHuangZhong(new GridPosition(1, 7)),
+                SpawnPlayerZhugeLiang(new GridPosition(0, 5)),
+                SpawnPlayerZhaoYun(new GridPosition(1, 3)),
+                SpawnPlayerMaChao(new GridPosition(1, 8)),
+                SpawnEnemy("enemy-yangping-left-sentry", "Left Sentry", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 31, 10, 6, 2, 1, new GridPosition(8, 3), AiProfileType.Protector),
+                SpawnEnemy("enemy-yangping-right-sentry", "Right Sentry", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 31, 10, 6, 2, 1, new GridPosition(8, 8), AiProfileType.Protector),
+                SpawnEnemy("enemy-yangping-bow-chief", "Pass Bow Chief", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 26, 9, 3, 3, 2, new GridPosition(9, 5), AiProfileType.Support),
+            };
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Yangping Pass",
+                "stage.yangping_pass",
+                12,
+                12,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(4, 2),
+                    new GridPosition(4, 3),
+                    new GridPosition(4, 8),
+                    new GridPosition(4, 9),
+                    new GridPosition(5, 4),
+                    new GridPosition(5, 7),
+                    new GridPosition(6, 4),
+                    new GridPosition(6, 7),
+                    new GridPosition(7, 2),
+                    new GridPosition(7, 3),
+                    new GridPosition(7, 8),
+                    new GridPosition(7, 9),
+                    new GridPosition(9, 1),
+                    new GridPosition(9, 2),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 2), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 2), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(5, 9), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(6, 9), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(9, 8), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(10, 8), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(3, 6), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(8, 6), TerrainType.Forest),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.yangping.opening",
+                "Break the pass sentries before the mountain closes around the center road.",
+                "objective.yangping.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.yangping.final",
+                "Use the opened flank and defeat the Yangping commandant.",
+                "objective.yangping.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            BattlefieldMutation rockslideMutation = new BattlefieldMutation(
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 5), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(6, 5), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(9, 8), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(9, 9), TerrainType.Fort),
+                },
+                new List<BlockedCellStateChange>
+                {
+                    new BlockedCellStateChange(new GridPosition(5, 5), true),
+                    new BlockedCellStateChange(new GridPosition(6, 5), true),
+                    new BlockedCellStateChange(new GridPosition(9, 8), false),
+                    new BlockedCellStateChange(new GridPosition(9, 9), false),
+                });
+
+            List<ScenarioDirective> rockslideDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(YangpingRockslideFlag),
+                ScenarioDirective.ApplyBattlefieldMutation(rockslideMutation),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-yangping-commandant", "Yangping Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 36, 12, 5, 3, 1, new GridPosition(11, 9), AiProfileType.Boss),
+                    SpawnEnemy("enemy-yangping-flank-rider", "Flank Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 10, 3, 4, 1, new GridPosition(10, 9), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-yangping-flank-rider-b", "Flank Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 10, 3, 4, 1, new GridPosition(10, 8), AiProfileType.Aggressor),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.yangping.mid.1", "Rockfall on the center road. Good. Their left lane is sealed, but the right flank is suddenly open."),
+                    Line("unit.player_ma_chao", "Ma Chao", "dialogue.yangping.mid.2", "Then give me the flank and I will break the pass commander from the side."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.yangping.mid.3", "Shift right. Take the new lane before they understand what the mountain has given us."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "yangping-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.yangping.opening.1", "Yangping Pass has two teeth but only one throat. We crack the sentries before the mountain decides the route for us."),
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.yangping.opening.2", "Watch the slopes. One collapse could close a road and open another."),
+                            Line("unit.player_ma_chao", "Ma Chao", "dialogue.yangping.opening.3", "Then we ride fast enough to take whichever lane survives."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "yangping-rockslide-kill",
+                    ScenarioCheckpoint.ActionResolved,
+                    rockslideDirectives,
+                    requiredDefeatedUnitIds: new List<string> { "enemy-yangping-left-sentry", "enemy-yangping-right-sentry" },
+                    exclusivityGroupId: "yangping-rockslide"),
+                new ScenarioTrigger(
+                    "yangping-rockslide-round",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    rockslideDirectives,
+                    minimumRoundNumber: 3,
+                    exclusivityGroupId: "yangping-rockslide"),
+                new ScenarioTrigger(
+                    "yangping-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "yangping-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-yangping-commandant" },
+                    requiredFlags: new List<string> { YangpingRockslideFlag }),
+            };
+
+            return new BattleScenarioData(
+                YangpingScenarioId,
+                "Yangping Pass",
+                "scenario.yangping_pass",
+                stage,
+                triggers,
+                7,
+                114,
+                40,
+                new RewardBundle(245, 4, "yangping-stone-route"));
         }
 
         public static BattleScenarioData CreateHanshui()
@@ -854,7 +1312,7 @@ namespace PhalanxChronicle.Core
                 "scenario.hanshui",
                 stage,
                 triggers,
-                5,
+                8,
                 104,
                 36,
                 new RewardBundle(230, 3, "hanshui-command-seal"));
@@ -1005,7 +1463,7 @@ namespace PhalanxChronicle.Core
                 "scenario.dingjun_mountain",
                 stage,
                 triggers,
-                6,
+                9,
                 118,
                 40,
                 new RewardBundle(260, 4, "dingjun-war-banner"));

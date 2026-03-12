@@ -38,7 +38,7 @@ namespace PhalanxChronicle.Battle
 
                 saveData = ToModel(dto);
                 bool normalized = progressionService.NormalizeSave(saveData);
-                if (normalized)
+                if (normalized || dto.version < 3)
                 {
                     Save(saveData);
                 }
@@ -109,7 +109,10 @@ namespace PhalanxChronicle.Battle
                     : null,
                 dto.progress != null ? dto.progress.claimedRewardScenarioIds : Array.Empty<string>(),
                 dto.progress != null && dto.progress.scenarioClearCounts != null
-                    ? dto.progress.scenarioClearCounts.ToDictionary(entry => entry.scenarioId, entry => entry.clearCount)
+                    ? dto.progress.scenarioClearCounts
+                        .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.scenarioId))
+                        .GroupBy(entry => entry.scenarioId)
+                        .ToDictionary(group => group.Key, group => group.Max(entry => entry.clearCount))
                     : null);
 
             CampaignInventoryState inventory = new CampaignInventoryState(

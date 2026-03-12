@@ -400,12 +400,6 @@ namespace PhalanxChronicle.Core
                     defeatedCount++;
                     defeatedUnitIds.Add(affectedUnit.Id);
                 }
-                else if (enemyUnit.ActiveSkill == ActiveSkillType.WesternStampede &&
-                         !affectedUnit.HasStatus(StatusEffectType.Intimidated))
-                {
-                    totalDamage += 0;
-                    defeatedCount += 0;
-                }
             }
 
             float reward = 6f +

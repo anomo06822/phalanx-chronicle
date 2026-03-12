@@ -1144,7 +1144,13 @@ namespace PhalanxChronicle.Battle
 
             return new BattleOverviewModel
             {
-                StageLabel = LocalizationService.Format("ui.stage", "Stage: {0}", LocalizationService.Text(context.StageNameKey, context.StageName)),
+                StageLabel = LocalizationService.Format(
+                    "ui.stage",
+                    "Stage: {0}",
+                    LocalizationService.Text(context.StageNameKey, context.StageName) +
+                    (scenarioData != null && !string.IsNullOrWhiteSpace(scenarioData.ScenarioVariantTag)
+                        ? " [" + FormatScenarioVariantTag(scenarioData.ScenarioVariantTag) + "]"
+                        : string.Empty)),
                 SeedLabel = context.IsRandomMap
                     ? LocalizationService.Format("ui.seed.value", "Seed: {0}", context.MapSeed)
                     : LocalizationService.Text("ui.seed.fixed", "Seed: Fixed"),
@@ -1231,7 +1237,7 @@ namespace PhalanxChronicle.Battle
                 NextLevelExp = selected.NextLevelExp,
                 Attack = selected.Attack + PassiveSkillRules.GetPersonalAttackBonus(selected) + PassiveSkillRules.GetAttackBonus(simulation.Context, selected) + SupportRules.GetAttackBonus(simulation.Context, selected, selected.Position) + StatusEffectRules.GetAttackModifier(selected),
                 Defense = selected.Defense + PassiveSkillRules.GetDefenseBonus(selected) + SupportRules.GetDefenseBonus(simulation.Context, selected) + TerrainRules.GetDefenseBonus(terrainType) + StatusEffectRules.GetDefenseModifier(selected),
-                MoveRange = PassiveSkillRules.GetMoveRange(selected),
+                MoveRange = GetCurrentMoveRange(selected),
                 AttackRange = PassiveSkillRules.GetAttackRange(selected),
                 WeaponTypeLabel = LocalizationService.Text(loadoutProfile.WeaponTypeKey, loadoutProfile.WeaponTypeFallback),
                 WeaponName = weapon != null ? LocalizationService.Text(weapon.NameKey, weapon.NameFallback) : LocalizationService.Text(loadoutProfile.WeaponNameKey, loadoutProfile.WeaponNameFallback),
@@ -2000,6 +2006,25 @@ namespace PhalanxChronicle.Battle
             return LocalizationService.Text("ui.mastery.tag", "Lv10 Mastery");
         }
 
+        private static string FormatScenarioVariantTag(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag) || string.Equals(tag, "Normal", StringComparison.Ordinal))
+            {
+                return LocalizationService.Text("campaign.variant.normal", "Normal");
+            }
+
+            const string ReplayPrefix = "Replay ";
+            if (tag.StartsWith(ReplayPrefix, StringComparison.Ordinal))
+            {
+                return LocalizationService.Format(
+                    "campaign.variant.replay",
+                    "Replay {0}",
+                    tag.Substring(ReplayPrefix.Length));
+            }
+
+            return tag;
+        }
+
         private string BuildSkillImpactDescriptor(ActiveSkillType skillType)
         {
             switch (skillType)
@@ -2156,7 +2181,7 @@ namespace PhalanxChronicle.Battle
             }
 
             ItemDefinition mount = ItemCatalog.Get(unit.EquipmentLoadout.MountId);
-            int moveRange = PassiveSkillRules.GetMoveRange(unit);
+            int moveRange = GetCurrentMoveRange(unit);
             return mount != null && mount.MoveBonus > 0
                 ? LocalizationService.Format(
                     "ui.position.compact_move_mount",
@@ -2190,16 +2215,20 @@ namespace PhalanxChronicle.Battle
                 parts.Add(LocalizationService.Format("ui.terrain.effect.defense_bonus", "Defense +{0}", defenseBonus));
             }
 
-            int healing = TerrainRules.GetEndTurnHealing(terrainType);
+            int healing = TerrainRules.GetEndTurnHealing(terrainType) + EquipmentEffectRules.GetFortHealingBonus(unit);
             if (healing > 0)
             {
                 parts.Add(LocalizationService.Format("ui.terrain.effect.heal", "End turn heal {0}", healing));
             }
 
-            int damage = TerrainRules.GetEndTurnDamage(terrainType);
+            int damage = EquipmentEffectRules.IgnoresHazardTick(unit) ? 0 : TerrainRules.GetEndTurnDamage(terrainType);
             if (damage > 0)
             {
                 parts.Add(LocalizationService.Format("ui.terrain.effect.damage", "End turn damage {0}", damage));
+            }
+            else if (terrainType == TerrainType.Hazard && EquipmentEffectRules.IgnoresHazardTick(unit))
+            {
+                parts.Add(LocalizationService.Text("ui.terrain.effect.ignore_hazard", "Hazard damage ignored"));
             }
 
             return parts.Count == 0
@@ -2213,6 +2242,13 @@ namespace PhalanxChronicle.Battle
             return unit != null
                 ? LocalizationService.Text(unit.DisplayNameKey, unit.DisplayName)
                 : unitId;
+        }
+
+        private int GetCurrentMoveRange(UnitRuntimeState unit)
+        {
+            return unit == null
+                ? 0
+                : PassiveSkillRules.GetMoveRange(unit) + EquipmentEffectRules.GetMoveBonus(simulation.Context, unit);
         }
 
         private string GetSkillDisplayName(string unitId, ActiveSkillType skillType)

@@ -445,6 +445,62 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.NotNull(result);
         }
 
+        [Fact]
+        public void Treasure_JiangxiaRiverReins_IgnoresHazardEndTurnDamage()
+        {
+            UnitDefinitionData rider = new UnitDefinitionData(
+                "player-rider",
+                "Rider",
+                "unit.player_rider",
+                UnitFaction.Player,
+                UnitRole.Commander,
+                "role.commander",
+                PassiveSkillType.None,
+                "skill.none.name",
+                "skill.none.desc",
+                ActiveSkillType.None,
+                "active.none.name",
+                "active.none.desc",
+                30,
+                10,
+                5,
+                3,
+                1,
+                20,
+                "commander",
+                "commander",
+                AiProfileType.Default,
+                new EquipmentLoadout(string.Empty, string.Empty, "jiangxia-river-reins"),
+                1,
+                0,
+                null,
+                true);
+            UnitDefinitionData enemy = CreateDefinition("enemy-1", "Bandit", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "River Reins Hazard",
+                "stage.river_reins_hazard",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(rider, new GridPosition(1, 1)),
+                    new UnitSpawnData(enemy, new GridPosition(6, 6)),
+                },
+                new List<GridPosition>(),
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(1, 1), TerrainType.Hazard),
+                });
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            simulation.Wait("player-rider");
+            simulation.EndCurrentTurn();
+
+            Assert.Equal(30, simulation.Context.GetUnit("player-rider").CurrentHp);
+        }
+
         private static BattleSimulation CreateSimulation(
             int enemyHpOverride = 20,
             int enemyDefenseOverride = 3,
@@ -807,6 +863,70 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void ActiveSkill_DragonPierce_GuardsCasterAndLowestAdjacentAlly()
+        {
+            UnitDefinitionData zhaoYun = CreateDefinition("player-zhao-yun", "Zhao Yun", UnitFaction.Player, UnitRole.Scout, PassiveSkillType.RapidMarch, ActiveSkillType.DragonPierce, attack: 10);
+            UnitDefinitionData ally = CreateDefinition("player-ally", "Ally", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30);
+            UnitDefinitionData enemy = CreateDefinition("enemy-1", "Bandit", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 3);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Dragon Pierce Stage",
+                "stage.dragon_pierce_stage",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(zhaoYun, new GridPosition(1, 1)),
+                    new UnitSpawnData(ally, new GridPosition(1, 2)),
+                    new UnitSpawnData(enemy, new GridPosition(2, 1)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.Context.GetUnit("player-ally").ApplyDamage(12);
+
+            SkillResult result = simulation.TryUseSkill("player-zhao-yun", "enemy-1");
+
+            Assert.NotNull(result);
+            Assert.Equal(3, result.Effects.Count);
+            Assert.Equal("enemy-1", result.Effects[0].UnitId);
+            Assert.True(result.Effects[0].Amount >= 10);
+            Assert.True(simulation.Context.GetUnit("player-zhao-yun").HasStatus(StatusEffectType.Guarded));
+            Assert.True(simulation.Context.GetUnit("player-ally").HasStatus(StatusEffectType.Guarded));
+        }
+
+        [Fact]
+        public void ActiveSkill_WesternStampede_HitsLineAndAppliesIntimidated()
+        {
+            UnitDefinitionData maChao = CreateDefinition("player-ma-chao", "Ma Chao", UnitFaction.Player, UnitRole.Raider, PassiveSkillType.Vanguard, ActiveSkillType.WesternStampede, attack: 10);
+            UnitDefinitionData enemyOne = CreateDefinition("enemy-1", "Bandit A", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 2);
+            UnitDefinitionData enemyTwo = CreateDefinition("enemy-2", "Bandit B", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 2);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Western Stampede Stage",
+                "stage.western_stampede_stage",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(maChao, new GridPosition(1, 1)),
+                    new UnitSpawnData(enemyOne, new GridPosition(2, 1)),
+                    new UnitSpawnData(enemyTwo, new GridPosition(3, 1)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            SkillResult result = simulation.TryUseSkill("player-ma-chao", "enemy-1");
+
+            Assert.NotNull(result);
+            Assert.Equal(2, result.Effects.Count);
+            Assert.True(simulation.Context.GetUnit("enemy-1").HasStatus(StatusEffectType.Intimidated));
+            Assert.True(simulation.Context.GetUnit("enemy-2").HasStatus(StatusEffectType.Intimidated));
+            Assert.True(result.Effects.All(effect => effect.Amount >= 9));
+        }
+
+        [Fact]
         public void ActiveSkill_WarCry_AppliesIntimidatedUntilTargetTurnEnds()
         {
             UnitDefinitionData intimidator = CreateDefinition("player-intimidator", "Intimidator", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.WarCry);
@@ -1147,6 +1267,30 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void Jiangxia_BridgeCutMutatesBlockedCellsAndSpawnsBoss()
+        {
+            BattleScenarioData scenario = BattleScenarioCatalog.CreateJiangxiaFerry();
+            BattleSimulation simulation = new BattleSimulation(scenario.Stage);
+            ScenarioDirector director = new ScenarioDirector(scenario);
+
+            director.Evaluate(ScenarioCheckpoint.BattleStart, simulation.Context);
+            DefeatUnit(simulation.Context, "enemy-jiangxia-outer-warden-a");
+            DefeatUnit(simulation.Context, "enemy-jiangxia-outer-warden-b");
+
+            ScenarioEvaluationResult result = director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+            ScenarioEvaluationResult secondResult = director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+
+            Assert.True(result.BattlefieldChanged);
+            Assert.False(secondResult.BattlefieldChanged);
+            Assert.True(director.HasFlag(BattleScenarioCatalog.JiangxiaBridgesCutFlag));
+            Assert.Equal("objective.jiangxia.final", director.CurrentObjective.PrimaryObjectiveKey);
+            Assert.Equal(TerrainType.Hazard, simulation.Context.GetTerrainAt(new GridPosition(5, 2)));
+            Assert.True(simulation.Context.GetCell(new GridPosition(5, 2)).IsBlocked);
+            Assert.True(simulation.Context.GetCell(new GridPosition(6, 8)).IsBlocked);
+            Assert.NotNull(simulation.Context.GetUnit("enemy-jiangxia-ferry-captain"));
+        }
+
+        [Fact]
         public void Jiameng_BossPhaseStartsOnlyAfterGateLineBreaks()
         {
             BattleScenarioData scenario = BattleScenarioCatalog.CreateJiamengPass();
@@ -1166,6 +1310,54 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.True(director.HasFlag(BattleScenarioCatalog.JiamengBossArrivedFlag));
             Assert.NotNull(simulation.Context.GetUnit("enemy-jiameng-commandant"));
             Assert.Equal("objective.jiameng.final", director.CurrentObjective.PrimaryObjectiveKey);
+        }
+
+        [Fact]
+        public void Luocheng_BreachOpensGateAndIgnitesInnerStreet()
+        {
+            BattleScenarioData scenario = BattleScenarioCatalog.CreateLuochengSiege();
+            BattleSimulation simulation = new BattleSimulation(scenario.Stage);
+            ScenarioDirector director = new ScenarioDirector(scenario);
+
+            director.Evaluate(ScenarioCheckpoint.BattleStart, simulation.Context);
+            DefeatUnit(simulation.Context, "enemy-luocheng-gate-captain");
+            DefeatUnit(simulation.Context, "enemy-luocheng-wall-bow");
+
+            ScenarioEvaluationResult result = director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+            ScenarioEvaluationResult secondResult = director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+
+            Assert.True(result.BattlefieldChanged);
+            Assert.False(secondResult.BattlefieldChanged);
+            Assert.True(director.HasFlag(BattleScenarioCatalog.LuochengGateBreachedFlag));
+            Assert.Equal("objective.luocheng.final", director.CurrentObjective.PrimaryObjectiveKey);
+            Assert.False(simulation.Context.GetCell(new GridPosition(5, 6)).IsBlocked);
+            Assert.Equal(TerrainType.Plain, simulation.Context.GetTerrainAt(new GridPosition(5, 6)));
+            Assert.Equal(TerrainType.Hazard, simulation.Context.GetTerrainAt(new GridPosition(5, 8)));
+            Assert.NotNull(simulation.Context.GetUnit("enemy-luocheng-commandant"));
+        }
+
+        [Fact]
+        public void Yangping_RockslideSealsCenterAndOpensRightFlank()
+        {
+            BattleScenarioData scenario = BattleScenarioCatalog.CreateYangpingPass();
+            BattleSimulation simulation = new BattleSimulation(scenario.Stage);
+            ScenarioDirector director = new ScenarioDirector(scenario);
+
+            director.Evaluate(ScenarioCheckpoint.BattleStart, simulation.Context);
+            DefeatUnit(simulation.Context, "enemy-yangping-left-sentry");
+            DefeatUnit(simulation.Context, "enemy-yangping-right-sentry");
+
+            ScenarioEvaluationResult result = director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+            ScenarioEvaluationResult secondResult = director.Evaluate(ScenarioCheckpoint.ActionResolved, simulation.Context);
+
+            Assert.True(result.BattlefieldChanged);
+            Assert.False(secondResult.BattlefieldChanged);
+            Assert.True(director.HasFlag(BattleScenarioCatalog.YangpingRockslideFlag));
+            Assert.Equal("objective.yangping.final", director.CurrentObjective.PrimaryObjectiveKey);
+            Assert.True(simulation.Context.GetCell(new GridPosition(5, 5)).IsBlocked);
+            Assert.False(simulation.Context.GetCell(new GridPosition(9, 8)).IsBlocked);
+            Assert.Equal(TerrainType.Fort, simulation.Context.GetTerrainAt(new GridPosition(9, 8)));
+            Assert.NotNull(simulation.Context.GetUnit("enemy-yangping-commandant"));
         }
 
         [Fact]
@@ -1196,7 +1388,10 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal((10, 10), (BattleScenarioCatalog.CreateGuangzong().Stage.Width, BattleScenarioCatalog.CreateGuangzong().Stage.Height));
             Assert.Equal((12, 10), (BattleScenarioCatalog.CreateBowangpo().Stage.Width, BattleScenarioCatalog.CreateBowangpo().Stage.Height));
             Assert.Equal((12, 10), (BattleScenarioCatalog.CreateChangbanRearguard().Stage.Width, BattleScenarioCatalog.CreateChangbanRearguard().Stage.Height));
+            Assert.Equal((12, 10), (BattleScenarioCatalog.CreateJiangxiaFerry().Stage.Width, BattleScenarioCatalog.CreateJiangxiaFerry().Stage.Height));
             Assert.Equal((10, 14), (BattleScenarioCatalog.CreateJiamengPass().Stage.Width, BattleScenarioCatalog.CreateJiamengPass().Stage.Height));
+            Assert.Equal((12, 12), (BattleScenarioCatalog.CreateLuochengSiege().Stage.Width, BattleScenarioCatalog.CreateLuochengSiege().Stage.Height));
+            Assert.Equal((12, 12), (BattleScenarioCatalog.CreateYangpingPass().Stage.Width, BattleScenarioCatalog.CreateYangpingPass().Stage.Height));
             Assert.Equal((14, 10), (BattleScenarioCatalog.CreateHanshui().Stage.Width, BattleScenarioCatalog.CreateHanshui().Stage.Height));
             Assert.Equal((12, 12), (BattleScenarioCatalog.CreateDingjunMountain().Stage.Width, BattleScenarioCatalog.CreateDingjunMountain().Stage.Height));
         }

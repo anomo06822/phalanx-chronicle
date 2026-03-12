@@ -21,5 +21,6 @@
 
   <ItemGroup>
     <Compile Include="..\..\Assets\Scripts\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Assets\Scripts\Localization\*.cs" Link="Localization\%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
