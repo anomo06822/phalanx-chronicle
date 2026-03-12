@@ -33,31 +33,30 @@ namespace PhalanxChronicle.Battle.Grid
             baseColor = alternate
                 ? Color.Lerp(terrainBaseTint, Color.white, 0.08f)
                 : Color.Lerp(terrainBaseTint, Color.black, 0.08f);
-            frameBaseColor = blocked
-                ? BattleUiTheme.GridFrameBlocked
-                : BattleUiTheme.GridFrameWalkable;
+            frameBaseColor = BattleUiTheme.GetGridFrameColor(terrainType, blocked);
 
             baseRenderer = GetComponent<SpriteRenderer>();
             baseRenderer.sprite = RuntimeSpriteLibrary.GetTerrainBaseSprite(terrainType, blocked);
             baseRenderer.color = baseColor;
             baseRenderer.sortingOrder = 10;
 
-            terrainRenderer = CreateOverlay("TerrainOverlay", RuntimeSpriteLibrary.GetTerrainOverlaySprite(terrainType, blocked), Vector3.zero, Vector3.one, 11);
+            moveHighlightRenderer = CreateOverlay("MoveHighlight", RuntimeSpriteLibrary.GetGridOverlaySprite(GridOverlayKind.Move), Vector3.zero, new Vector3(0.98f, 0.98f, 1f), 11);
+            attackHighlightRenderer = CreateOverlay("AttackHighlight", RuntimeSpriteLibrary.GetGridOverlaySprite(GridOverlayKind.Attack), Vector3.zero, Vector3.one, 11);
+            skillHighlightRenderer = CreateOverlay("SkillHighlight", RuntimeSpriteLibrary.GetGridOverlaySprite(GridOverlayKind.Skill), Vector3.zero, Vector3.one, 11);
+
+            terrainRenderer = CreateOverlay("TerrainOverlay", RuntimeSpriteLibrary.GetTerrainOverlaySprite(terrainType, blocked), Vector3.zero, Vector3.one, 12);
             terrainRenderer.color = terrainOverlayTint;
             terrainRenderer.enabled = terrainRenderer.sprite != null;
 
-            propRenderer = CreateOverlay("TerrainProp", RuntimeSpriteLibrary.GetTerrainPropSprite(terrainType, blocked), new Vector3(0f, 0.02f, 0f), new Vector3(0.96f, 0.96f, 1f), 12);
+            propRenderer = CreateOverlay("TerrainProp", RuntimeSpriteLibrary.GetTerrainPropSprite(terrainType, blocked), new Vector3(0f, 0.02f, 0f), new Vector3(0.96f, 0.96f, 1f), 13);
             propRenderer.color = terrainPropTint;
             propRenderer.enabled = propRenderer.sprite != null;
 
-            frameRenderer = CreateOverlay("GridFrame", RuntimeSpriteLibrary.FrameSprite, Vector3.zero, new Vector3(1.03f, 1.03f, 1f), 13);
+            frameRenderer = CreateOverlay("GridFrame", RuntimeSpriteLibrary.FrameSprite, Vector3.zero, new Vector3(1.03f, 1.03f, 1f), 14);
             frameRenderer.color = frameBaseColor;
             frameRenderer.enabled = true;
 
-            moveHighlightRenderer = CreateOverlay("MoveHighlight", RuntimeSpriteLibrary.GetGridOverlaySprite(GridOverlayKind.Move), Vector3.zero, new Vector3(0.98f, 0.98f, 1f), 14);
-            attackHighlightRenderer = CreateOverlay("AttackHighlight", RuntimeSpriteLibrary.GetGridOverlaySprite(GridOverlayKind.Attack), Vector3.zero, new Vector3(1f, 1f, 1f), 15);
-            skillHighlightRenderer = CreateOverlay("SkillHighlight", RuntimeSpriteLibrary.GetGridOverlaySprite(GridOverlayKind.Skill), Vector3.zero, new Vector3(1f, 1f, 1f), 15);
-            selectedHighlightRenderer = CreateOverlay("SelectedHighlight", RuntimeSpriteLibrary.GetGridOverlaySprite(GridOverlayKind.Selected), Vector3.zero, new Vector3(1.04f, 1.04f, 1f), 16);
+            selectedHighlightRenderer = CreateOverlay("SelectedHighlight", RuntimeSpriteLibrary.GetGridOverlaySprite(GridOverlayKind.Selected), Vector3.zero, new Vector3(1.04f, 1.04f, 1f), 15);
             ClearHighlights();
 
             BoxCollider2D colliderComponent = GetComponent<BoxCollider2D>();
@@ -77,28 +76,28 @@ namespace PhalanxChronicle.Battle.Grid
 
         public void SetMoveHighlight(Color color)
         {
-            ApplyHighlightTint(BattleUiTheme.MoveTileTint, 0.5f, BattleUiTheme.MoveFrameHighlight);
+            ApplyHighlightTint(BattleUiTheme.MoveTileTint, 0.38f, BattleUiTheme.MoveFrameHighlight);
             moveHighlightRenderer.color = color;
             moveHighlightRenderer.enabled = true;
         }
 
         public void SetAttackHighlight(Color color)
         {
-            ApplyHighlightTint(BattleUiTheme.AttackTileTint, 0.46f, BattleUiTheme.AttackFrameHighlight);
+            ApplyHighlightTint(BattleUiTheme.AttackTileTint, 0.34f, BattleUiTheme.AttackFrameHighlight);
             attackHighlightRenderer.color = color;
             attackHighlightRenderer.enabled = true;
         }
 
         public void SetSkillHighlight(Color color)
         {
-            ApplyHighlightTint(BattleUiTheme.SkillTileTint, 0.46f, BattleUiTheme.SkillFrameHighlight);
+            ApplyHighlightTint(BattleUiTheme.SkillTileTint, 0.34f, BattleUiTheme.SkillFrameHighlight);
             skillHighlightRenderer.color = color;
             skillHighlightRenderer.enabled = true;
         }
 
         public void SetSelectedHighlight(Color color)
         {
-            ApplyHighlightTint(BattleUiTheme.SelectedTileTint, 0.62f, BattleUiTheme.SelectedFrameHighlight);
+            ApplyHighlightTint(BattleUiTheme.SelectedTileTint, 0.5f, BattleUiTheme.SelectedFrameHighlight);
             selectedHighlightRenderer.color = color;
             selectedHighlightRenderer.enabled = true;
         }

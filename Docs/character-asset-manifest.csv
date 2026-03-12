@@ -1,0 +1,51 @@
+unit_id,display_name,faction,role,delivery_tier,portrait_asset_key,battle_asset_key,weapon_icon_key,visual_family,notes
+player-liu-bei,Liu Bei,Player,Commander,P0-Unique,player-liu-bei__portrait,player-liu-bei__battle,vermilion-jian__icon,hero-liu-bei,Core hero unique
+player-guan-yu,Guan Yu,Player,Guardian,P0-Unique,player-guan-yu__portrait,player-guan-yu__battle,iron-crescent-glaive__icon,hero-guan-yu,Core hero unique
+player-zhang-fei,Zhang Fei,Player,Guardian,P0-Unique,player-zhang-fei__portrait,player-zhang-fei__battle,iron-crescent-glaive__icon,hero-zhang-fei,Core hero unique
+player-huang-zhong,Huang Zhong,Player,Ranger,P0-Unique,player-huang-zhong__portrait,player-huang-zhong__battle,featherback-war-bow__icon,hero-huang-zhong,Core hero unique
+player-zhuge-liang,Zhuge Liang,Player,Commander,P0-Unique,player-zhuge-liang__portrait,player-zhuge-liang__battle,wind-feather-fan__icon,hero-zhuge-liang,Core hero unique
+player-zhao-yun,Zhao Yun,Player,Scout,P0-Unique,player-zhao-yun__portrait,player-zhao-yun__battle,white-dragon-spear__icon,hero-zhao-yun,Core hero unique
+player-ma-chao,Ma Chao,Player,Raider,P0-Unique,player-ma-chao__portrait,player-ma-chao__battle,western-lance__icon,hero-ma-chao,Core hero unique
+enemy-zhang-bao,Zhang Bao,Enemy,Commander,P0-Unique,enemy-zhang-bao__portrait,enemy-zhang-bao__battle,yellow-turban-command-seal__icon,boss-yellow-turban,Unique boss
+enemy-zhang-liang,Zhang Liang,Enemy,Commander,P0-Unique,enemy-zhang-liang__portrait,enemy-zhang-liang__battle,yellow-turban-command-blade__icon,boss-yellow-turban,Unique boss
+enemy-pursuit_commander,Pursuit Commander,Enemy,Commander,P0-Unique,enemy-pursuit_commander__portrait,enemy-pursuit_commander__battle,wei-command-blade__icon,boss-wei-pursuit,Unique boss
+enemy-xiahou-dun,Xiahou Dun,Enemy,Commander,P0-Unique,enemy-xiahou-dun__portrait,enemy-xiahou-dun__battle,commander-lance__icon,boss-xiahou-dun,Unique boss
+enemy-xiahou-yuan,Xiahou Yuan,Enemy,Commander,P0-Unique,enemy-xiahou-yuan__portrait,enemy-xiahou-yuan__battle,command-war-bow__icon,boss-xiahou-yuan,Unique boss
+enemy-yellow_turban_raider,Yellow Turban Raider,Enemy,Raider,P1-Shared,archetype-yellow-turban-raider__portrait,archetype-yellow-turban-raider__battle,raider-sabre__icon,archetype-yellow-turban-raider,Shared base with palette variance
+enemy-yellow_turban_hunter,Yellow Turban Hunter,Enemy,Raider,P1-Shared,archetype-yellow-turban-raider__portrait,archetype-yellow-turban-raider__battle,raider-spear__icon,archetype-yellow-turban-raider,Use hunter palette variant
+enemy-fervent_spearman,Fervent Spearman,Enemy,Raider,P1-Shared,archetype-yellow-turban-raider__portrait,archetype-yellow-turban-raider__battle,raider-spear__icon,archetype-yellow-turban-raider,Use spear-heavy variant
+enemy-yellow_turban_archer,Yellow Turban Archer,Enemy,Ranger,P1-Shared,archetype-yellow-turban-ranger__portrait,archetype-yellow-turban-ranger__battle,recurve-bow__icon,archetype-yellow-turban-ranger,Shared archer family
+enemy-armored_zealot,Armored Zealot,Enemy,Guardian,P1-Shared,archetype-yellow-turban-guardian__portrait,archetype-yellow-turban-guardian__battle,heavy-sabre__icon,archetype-yellow-turban-guardian,Shared heavy infantry family
+enemy-bowang-vanguard,Wei Vanguard,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,guardian-spear__icon,archetype-wei-guardian,Shared Wei guardian family
+enemy-bowang-shield,Wei Shieldwall,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,guardian-shield-spear__icon,archetype-wei-guardian,Shield-first variant
+enemy-bowang-escort,Wei Escort,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,guardian-spear__icon,archetype-wei-guardian,Escort palette variant
+enemy-tiger_guard,Tiger Guard,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,tiger-guard-polearm__icon,archetype-wei-guardian,Elite guardian palette variant
+enemy-tiger_guard_captain,Tiger Guard Captain,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,tiger-guard-polearm__icon,archetype-wei-guardian,Elite captain variant
+enemy-jiameng-gatewarden,Gate Warden,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,gate-halberd__icon,archetype-wei-guardian,Fortress guard recolor
+enemy-jiameng-sentry,Stonewall Sentry,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,gate-halberd__icon,archetype-wei-guardian,Stone fort variant
+enemy-jiameng-guard-a,Gate Guard,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,gate-halberd__icon,archetype-wei-guardian,Shared guard asset
+enemy-jiameng-guard-b,Gate Guard,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,gate-halberd__icon,archetype-wei-guardian,Shared guard asset
+enemy-hanshui-shield-captain,Shield Captain,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,river-shield-spear__icon,archetype-wei-guardian,River army guardian variant
+enemy-hanshui-guard,River Guard,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,river-shield-spear__icon,archetype-wei-guardian,River guard recolor
+enemy-wei_vanguard_captain,Wei Vanguard Captain,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,guardian-spear__icon,archetype-wei-guardian,Standard guardian captain
+enemy-wei_shieldman,Wei Shieldman,Enemy,Guardian,P1-Shared,archetype-wei-guardian__portrait,archetype-wei-guardian__battle,guardian-shield-spear__icon,archetype-wei-guardian,Standard shield infantry
+enemy-bowang-archer,Wei Archer,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,wei-war-bow__icon,archetype-wei-ranger,Shared Wei archer family
+enemy-bowang-hunter,Hidden Bow,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,wei-war-bow__icon,archetype-wei-ranger,Hidden hunter recolor
+enemy-wei_bow_captain,Wei Bow Captain,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,wei-war-bow__icon,archetype-wei-ranger,Captain variant
+enemy-pursuit_bowman,Pursuit Bowman,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,pursuit-bow__icon,archetype-wei-ranger,Pursuit palette variant
+enemy-jiameng-bow-captain,Bow Captain,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,fort-bow__icon,archetype-wei-ranger,Pass defense variant
+enemy-hanshui-bow-captain,Bow Captain,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,river-bow__icon,archetype-wei-ranger,River army variant
+enemy-hanshui-deadeye,Wei Deadeye,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,river-bow__icon,archetype-wei-ranger,Elite archer recolor
+enemy-wei_archer_captain,Wei Archer Captain,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,wei-war-bow__icon,archetype-wei-ranger,Standard captain variant
+enemy-wei_deadeye,Wei Deadeye,Enemy,Ranger,P1-Shared,archetype-wei-ranger__portrait,archetype-wei-ranger__battle,wei-war-bow__icon,archetype-wei-ranger,Elite archer recolor
+enemy-bowang-rider,Wei Rider,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,raider-lance__icon,archetype-wei-raider,Shared Wei raider family
+enemy-bowang-rearguard,Wei Rearguard,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,raider-lance__icon,archetype-wei-raider,Rear guard variant
+enemy-cavalry_scout,Cavalry Scout,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,light-lance__icon,archetype-wei-raider,Light cavalry variant
+enemy-tiger_leopard_rider_a,Tiger Leopard Rider,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,tiger-leopard-lance__icon,archetype-wei-raider,Elite rider asset shared with B
+enemy-tiger_leopard_rider_b,Tiger Leopard Rider,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,tiger-leopard-lance__icon,archetype-wei-raider,Elite rider asset shared with A
+enemy-jiameng-lancer,Pass Lancer,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,fort-lance__icon,archetype-wei-raider,Pass lancer recolor
+enemy-hanshui-river-rider,River Rider,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,river-lance__icon,archetype-wei-raider,River rider recolor
+enemy-hanshui-raider,Hanshui Raider,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,river-lance__icon,archetype-wei-raider,River assault variant
+enemy-wei_skirmisher,Wei Skirmisher,Enemy,Raider,P1-Shared,archetype-wei-raider__portrait,archetype-wei-raider__battle,light-lance__icon,archetype-wei-raider,Standard raider
+enemy-jiameng-commandant,Jiameng Commandant,Enemy,Commander,P1-Shared,archetype-wei-commandant__portrait,archetype-wei-commandant__battle,command-blade__icon,archetype-wei-commandant,Shared non-boss commander family
+enemy-hanshui-commander,Hanshui Commander,Enemy,Commander,P1-Shared,archetype-wei-commandant__portrait,archetype-wei-commandant__battle,command-blade__icon,archetype-wei-commandant,Shared non-boss commander family

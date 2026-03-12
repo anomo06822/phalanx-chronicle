@@ -31,6 +31,7 @@ namespace PhalanxChronicle.Data
         [SerializeField] private string weaponId = string.Empty;
         [FormerlySerializedAs("accessoryId")]
         [SerializeField] private string armorId = string.Empty;
+        [SerializeField] private string mountId = string.Empty;
         [SerializeField] private int startingLevel = 1;
         [SerializeField] private int startingExp;
 
@@ -62,7 +63,7 @@ namespace PhalanxChronicle.Data
                 classId,
                 growthProfileId,
                 aiProfile,
-                new EquipmentLoadout(weaponId, armorId),
+                new EquipmentLoadout(weaponId, armorId, mountId),
                 startingLevel,
                 startingExp,
                 new BondState());
@@ -92,6 +93,7 @@ namespace PhalanxChronicle.Data
             AiProfileType aiProfile = AiProfileType.Default,
             string weaponId = "",
             string armorId = "",
+            string mountId = "",
             int startingLevel = 1,
             int startingExp = 0)
         {
@@ -119,6 +121,7 @@ namespace PhalanxChronicle.Data
             definition.aiProfile = aiProfile;
             definition.weaponId = weaponId;
             definition.armorId = armorId;
+            definition.mountId = mountId;
             definition.startingLevel = startingLevel;
             definition.startingExp = startingExp;
             return definition;

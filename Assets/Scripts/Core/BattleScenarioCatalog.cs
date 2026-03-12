@@ -8,14 +8,20 @@ namespace PhalanxChronicle.Core
         public const string GuangzongScenarioId = "scenario.guangzong";
         public const string BowangpoScenarioId = "scenario.bowangpo";
         public const string ChangbanScenarioId = "scenario.changban_rearguard";
+        public const string JiangxiaScenarioId = "scenario.jiangxia_ferry";
         public const string JiamengPassScenarioId = "scenario.jiameng_pass";
+        public const string LuochengScenarioId = "scenario.luocheng_siege";
+        public const string YangpingScenarioId = "scenario.yangping_pass";
         public const string HanshuiScenarioId = "scenario.hanshui";
         public const string DingjunScenarioId = "scenario.dingjun_mountain";
 
         public const string GuangzongReinforcementsArrivedFlag = "flag.guangzong.reinforcements_arrived";
         public const string BowangpoFireTrapSprungFlag = "flag.bowangpo.fire_trap_sprung";
         public const string ChangbanFlankersArrivedFlag = "flag.changban.flankers_arrived";
+        public const string JiangxiaBridgesCutFlag = "flag.jiangxia.bridges_cut";
         public const string JiamengBossArrivedFlag = "flag.jiameng.boss_arrived";
+        public const string LuochengGateBreachedFlag = "flag.luocheng.gate_breached";
+        public const string YangpingRockslideFlag = "flag.yangping.rockslide";
         public const string HanshuiCounterattackFlag = "flag.hanshui.counterattack";
         public const string DingjunBossArrivedFlag = "flag.dingjun.boss_arrived";
 
@@ -27,8 +33,14 @@ namespace PhalanxChronicle.Core
                     return CreateBowangpo();
                 case ChangbanScenarioId:
                     return CreateChangbanRearguard();
+                case JiangxiaScenarioId:
+                    return CreateJiangxiaFerry();
                 case JiamengPassScenarioId:
                     return CreateJiamengPass();
+                case LuochengScenarioId:
+                    return CreateLuochengSiege();
+                case YangpingScenarioId:
+                    return CreateYangpingPass();
                 case HanshuiScenarioId:
                     return CreateHanshui();
                 case DingjunScenarioId:
@@ -1034,17 +1046,17 @@ namespace PhalanxChronicle.Core
 
         private static UnitSpawnData SpawnPlayerZhugeLiang(GridPosition position)
         {
-            return SpawnPlayer("player-zhuge-liang", "Zhuge Liang", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.RoyalAid, 26, 8, 3, 3, 1, position, 26, AiProfileType.Support);
+            return SpawnPlayer("player-zhuge-liang", "Zhuge Liang", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.FireStratagem, 26, 8, 3, 3, 1, position, 26, AiProfileType.Support);
         }
 
         private static UnitSpawnData SpawnPlayerZhaoYun(GridPosition position)
         {
-            return SpawnPlayer("player-zhao-yun", "Zhao Yun", UnitRole.Scout, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 31, 11, 4, 4, 1, position, 18, AiProfileType.Aggressor);
+            return SpawnPlayer("player-zhao-yun", "Zhao Yun", UnitRole.Scout, PassiveSkillType.RapidMarch, ActiveSkillType.DragonPierce, 31, 11, 4, 4, 1, position, 18, AiProfileType.Aggressor);
         }
 
         private static UnitSpawnData SpawnPlayerMaChao(GridPosition position)
         {
-            return SpawnPlayer("player-ma-chao", "Ma Chao", UnitRole.Raider, PassiveSkillType.Vanguard, ActiveSkillType.PowerStrike, 33, 12, 4, 4, 1, position, 18, AiProfileType.Aggressor);
+            return SpawnPlayer("player-ma-chao", "Ma Chao", UnitRole.Raider, PassiveSkillType.Vanguard, ActiveSkillType.WesternStampede, 33, 12, 4, 4, 1, position, 18, AiProfileType.Aggressor);
         }
 
         private static UnitSpawnData SpawnPlayer(

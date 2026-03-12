@@ -9,6 +9,12 @@ namespace PhalanxChronicle.Core
             foreach (UnitRuntimeState unit in context.GetUnits(faction))
             {
                 unit.ResetTurn();
+                if (unit.IsAlive &&
+                    EquipmentEffectRules.ShouldGainGuardAtLowHp(unit) &&
+                    unit.CurrentHp * 2 <= unit.MaxHp)
+                {
+                    unit.AddOrRefreshStatus(StatusEffectType.Guarded, 1);
+                }
             }
         }
 
@@ -29,7 +35,7 @@ namespace PhalanxChronicle.Core
                 if (unit.IsAlive)
                 {
                     int terrainDamage = TerrainRules.GetEndTurnDamage(terrainType);
-                    if (terrainDamage > 0)
+                    if (terrainDamage > 0 && !EquipmentEffectRules.IgnoresHazardTick(unit))
                     {
                         unit.ApplyDamage(terrainDamage);
                     }
@@ -37,7 +43,7 @@ namespace PhalanxChronicle.Core
 
                 if (unit.IsAlive)
                 {
-                    int terrainHealing = TerrainRules.GetEndTurnHealing(terrainType);
+                    int terrainHealing = TerrainRules.GetEndTurnHealing(terrainType) + EquipmentEffectRules.GetFortHealingBonus(unit);
                     if (terrainHealing > 0)
                     {
                         unit.ApplyHealing(terrainHealing);

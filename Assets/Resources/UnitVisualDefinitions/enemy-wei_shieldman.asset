@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 331d1f8274c448e89e1506738393884b, type: 3}
+  m_Name: enemy-wei_shieldman
+  m_EditorClassIdentifier: 
+  unitId: enemy-wei_shieldman
+  heroProfile: 0
+  archetype: 0
+  frameStyle: 0
+  useCustomPalette: 0
+  primaryColor: {r: 1, g: 1, b: 1, a: 1}
+  secondaryColor: {r: 1, g: 1, b: 1, a: 1}
+  accentColor: {r: 1, g: 1, b: 1, a: 1}
+  frameColor: {r: 1, g: 1, b: 1, a: 1}
+  markerColor: {r: 1, g: 1, b: 1, a: 1}
+  portraitBackdropColor: {r: 1, g: 1, b: 1, a: 1}
+  battleScale: 0
+  portraitSprite: {fileID: 0}
+  battleSprite: {fileID: 0}
+  weaponIcon: {fileID: 0}
+  factionMarker: {fileID: 0}
+  selectionFrame: {fileID: 0}
+  idleAnimationController: {fileID: 0}

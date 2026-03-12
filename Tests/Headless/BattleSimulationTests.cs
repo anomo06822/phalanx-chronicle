@@ -919,15 +919,15 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
-        public void ActiveSkill_Cooldown_BlocksReuseUntilLaterTurn()
+        public void ActiveSkill_ManaOnlyUsage_AllowsReuseOnLaterTurnsWithoutCooldown()
         {
             UnitDefinitionData striker = CreateDefinition("player-striker", "Striker", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.PowerStrike, attack: 10);
             UnitDefinitionData ally = CreateDefinition("player-ally", "Ally", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.None);
             UnitDefinitionData enemy = CreateDefinition("enemy-1", "Bandit", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 3);
 
             StageDefinitionData stage = new StageDefinitionData(
-                "Cooldown Stage",
-                "stage.cooldown_stage",
+                "Mana Stage",
+                "stage.mana_stage",
                 10,
                 10,
                 new List<UnitSpawnData>
@@ -942,23 +942,54 @@ namespace PhalanxChronicle.Headless.Tests
 
             SkillResult firstCast = simulation.TryUseSkill("player-striker", "enemy-1");
             Assert.NotNull(firstCast);
-            Assert.Equal(2, simulation.Context.GetUnit("player-striker").CurrentSkillCooldown);
+            Assert.Equal(0, simulation.Context.GetUnit("player-striker").CurrentSkillCooldown);
+            Assert.Null(simulation.TryUseSkill("player-striker", "enemy-1"));
 
-            simulation.Wait("player-ally");
-            simulation.EndCurrentTurn();
-            simulation.EndCurrentTurn();
-
-            SkillResult blockedCast = simulation.TryUseSkill("player-striker", "enemy-1");
-            Assert.Null(blockedCast);
-            Assert.Equal(1, simulation.Context.GetUnit("player-striker").CurrentSkillCooldown);
-
-            simulation.Wait("player-striker");
             simulation.Wait("player-ally");
             simulation.EndCurrentTurn();
             simulation.EndCurrentTurn();
 
             SkillResult secondCast = simulation.TryUseSkill("player-striker", "enemy-1");
             Assert.NotNull(secondCast);
+            Assert.Equal(0, simulation.Context.GetUnit("player-striker").CurrentSkillCooldown);
+        }
+
+        [Fact]
+        public void EnemyAi_CanUseSkillsAcrossMultipleTurnsWithoutCooldownLock()
+        {
+            UnitDefinitionData player = CreateDefinition("player-1", "Hero", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, maxHp: 40, defense: 4);
+            UnitDefinitionData enemy = CreateDefinition("enemy-strategist", "Strategist", UnitFaction.Enemy, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.FireStratagem, attack: 10, maxMana: 20);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Enemy Mana Stage",
+                "stage.enemy_mana_stage",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(player, new GridPosition(2, 2)),
+                    new UnitSpawnData(enemy, new GridPosition(0, 2)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            simulation.EndCurrentTurn();
+            UnitActionResult firstEnemyAction = simulation.ResolveEnemyAction("enemy-strategist");
+
+            Assert.NotNull(firstEnemyAction);
+            Assert.NotNull(firstEnemyAction.SkillResult);
+            Assert.Equal(0, simulation.Context.GetUnit("enemy-strategist").CurrentSkillCooldown);
+
+            simulation.Wait("player-1");
+            simulation.EndCurrentTurn();
+            simulation.EndCurrentTurn();
+
+            UnitActionResult secondEnemyAction = simulation.ResolveEnemyAction("enemy-strategist");
+
+            Assert.NotNull(secondEnemyAction);
+            Assert.NotNull(secondEnemyAction.SkillResult);
+            Assert.Equal(0, simulation.Context.GetUnit("enemy-strategist").CurrentSkillCooldown);
         }
 
         [Fact]
@@ -1218,6 +1249,408 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.True(shortestPath >= 4);
         }
 
+        [Fact]
+        public void ActiveSkill_FireStratagem_HitsAdjacentEnemies_AndHighlightsArea()
+        {
+            UnitDefinitionData strategist = CreateDefinition(
+                "player-zhuge",
+                "Zhuge Liang",
+                UnitFaction.Player,
+                UnitRole.Commander,
+                PassiveSkillType.CommandAura,
+                ActiveSkillType.FireStratagem,
+                attack: 10,
+                maxMana: 24,
+                progressionResolved: true);
+            UnitDefinitionData primary = CreateDefinition("enemy-primary", "Primary", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 2, progressionResolved: true);
+            UnitDefinitionData adjacent = CreateDefinition("enemy-adjacent", "Adjacent", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 2, progressionResolved: true);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Fire Stratagem",
+                "stage.fire_stratagem",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(strategist, new GridPosition(1, 1)),
+                    new UnitSpawnData(primary, new GridPosition(4, 1)),
+                    new UnitSpawnData(adjacent, new GridPosition(4, 2)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            IReadOnlyList<GridPosition> affectedPositions = simulation.GetSkillAffectedPositions("player-zhuge", "enemy-primary");
+            SkillResult result = simulation.TryUseSkill("player-zhuge", "enemy-primary");
+
+            Assert.Contains(new GridPosition(4, 1), affectedPositions);
+            Assert.Contains(new GridPosition(4, 2), affectedPositions);
+            Assert.Contains(new GridPosition(5, 1), affectedPositions);
+            Assert.NotNull(result);
+            Assert.Equal(2, result.Effects.Count);
+
+            SkillEffectResult primaryEffect = result.Effects.Single(effect => effect.UnitId == "enemy-primary");
+            SkillEffectResult adjacentEffect = result.Effects.Single(effect => effect.UnitId == "enemy-adjacent");
+
+            Assert.Equal(StatusEffectType.Intimidated, primaryEffect.AppliedStatus);
+            Assert.Empty(adjacentEffect.AppliedStatuses);
+            Assert.True(simulation.Context.GetUnit("enemy-primary").HasStatus(StatusEffectType.Intimidated));
+            Assert.False(simulation.Context.GetUnit("enemy-adjacent").HasStatus(StatusEffectType.Intimidated));
+        }
+
+        [Fact]
+        public void SkillMastery_FireStratagem_ImprovesDamageAndSpreadsIntimidated()
+        {
+            BattleSimulation veteranSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Fire Stratagem Veteran",
+                    "stage.fire_stratagem_veteran",
+                    8,
+                    8,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(CreateDefinition("player-zhuge", "Zhuge Liang", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.FireStratagem, attack: 10, startingLevel: 10, maxMana: 24, progressionResolved: true), new GridPosition(1, 1)),
+                        new UnitSpawnData(CreateDefinition("enemy-primary", "Primary", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 2, progressionResolved: true), new GridPosition(4, 1)),
+                        new UnitSpawnData(CreateDefinition("enemy-adjacent", "Adjacent", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 2, progressionResolved: true), new GridPosition(4, 2)),
+                    },
+                    new List<GridPosition>()));
+            BattleSimulation apprenticeSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Fire Stratagem Apprentice",
+                    "stage.fire_stratagem_apprentice",
+                    8,
+                    8,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(CreateDefinition("player-zhuge", "Zhuge Liang", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.FireStratagem, attack: 10, startingLevel: 9, maxMana: 24, progressionResolved: true), new GridPosition(1, 1)),
+                        new UnitSpawnData(CreateDefinition("enemy-primary", "Primary", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 2, progressionResolved: true), new GridPosition(4, 1)),
+                        new UnitSpawnData(CreateDefinition("enemy-adjacent", "Adjacent", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 2, progressionResolved: true), new GridPosition(4, 2)),
+                    },
+                    new List<GridPosition>()));
+
+            SkillResult veteranResult = veteranSimulation.TryUseSkill("player-zhuge", "enemy-primary");
+            SkillResult apprenticeResult = apprenticeSimulation.TryUseSkill("player-zhuge", "enemy-primary");
+
+            Assert.NotNull(veteranResult);
+            Assert.NotNull(apprenticeResult);
+
+            SkillEffectResult veteranPrimary = veteranResult.Effects.Single(effect => effect.UnitId == "enemy-primary");
+            SkillEffectResult apprenticePrimary = apprenticeResult.Effects.Single(effect => effect.UnitId == "enemy-primary");
+            SkillEffectResult veteranAdjacent = veteranResult.Effects.Single(effect => effect.UnitId == "enemy-adjacent");
+            SkillEffectResult apprenticeAdjacent = apprenticeResult.Effects.Single(effect => effect.UnitId == "enemy-adjacent");
+
+            Assert.Equal(apprenticePrimary.Amount + 2, veteranPrimary.Amount);
+            Assert.Empty(apprenticeAdjacent.AppliedStatuses);
+            Assert.Contains(veteranAdjacent.AppliedStatuses, status => status.Type == StatusEffectType.Intimidated && status.WasApplied);
+        }
+
+        [Fact]
+        public void ActiveSkill_EightTrigramInferno_AppliesDualStatuses_WithMasteryDuration()
+        {
+            UnitDefinitionData strategist = CreateDefinition(
+                "player-zhuge",
+                "Zhuge Liang",
+                UnitFaction.Player,
+                UnitRole.Commander,
+                PassiveSkillType.BenevolentCommand,
+                ActiveSkillType.EightTrigramInferno,
+                attack: 11,
+                maxMana: 24,
+                startingLevel: 10,
+                classId: "sleeping_dragon",
+                growthProfileId: "sleeping_dragon",
+                progressionResolved: true);
+            UnitDefinitionData primary = CreateDefinition("enemy-primary", "Primary", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 28, defense: 2, progressionResolved: true);
+            UnitDefinitionData adjacent = CreateDefinition("enemy-adjacent", "Adjacent", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 28, defense: 2, progressionResolved: true);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Eight Trigram Inferno",
+                "stage.eight_trigram_inferno",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(strategist, new GridPosition(1, 1)),
+                    new UnitSpawnData(primary, new GridPosition(4, 1)),
+                    new UnitSpawnData(adjacent, new GridPosition(4, 2)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            SkillResult result = simulation.TryUseSkill("player-zhuge", "enemy-primary");
+
+            Assert.NotNull(result);
+            Assert.Equal(2, result.Effects.Count);
+            Assert.All(result.Effects, effect =>
+            {
+                Assert.Contains(effect.AppliedStatuses, status => status.Type == StatusEffectType.Intimidated && status.WasApplied);
+                Assert.Contains(effect.AppliedStatuses, status => status.Type == StatusEffectType.ShatteredArmor && status.WasApplied);
+            });
+            Assert.Equal(2, simulation.Context.GetUnit("enemy-primary").StatusEffects.Single(status => status.Type == StatusEffectType.ShatteredArmor).RemainingOwnTurnEnds);
+            Assert.Equal(2, simulation.Context.GetUnit("enemy-adjacent").StatusEffects.Single(status => status.Type == StatusEffectType.ShatteredArmor).RemainingOwnTurnEnds);
+        }
+
+        [Fact]
+        public void SkillMastery_RoyalAid_HealsMore_AndReportsBothSupportStatuses()
+        {
+            BattleSimulation veteranSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Royal Aid Veteran",
+                    "stage.royal_aid_veteran",
+                    8,
+                    8,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(CreateDefinition("player-healer", "Healer", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.RoyalAid, startingLevel: 10, progressionResolved: true), new GridPosition(1, 1)),
+                        new UnitSpawnData(CreateDefinition("player-ally", "Ally", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30, progressionResolved: true), new GridPosition(2, 1)),
+                    },
+                    new List<GridPosition>()));
+            BattleSimulation apprenticeSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Royal Aid Apprentice",
+                    "stage.royal_aid_apprentice",
+                    8,
+                    8,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(CreateDefinition("player-healer", "Healer", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.RoyalAid, startingLevel: 9, progressionResolved: true), new GridPosition(1, 1)),
+                        new UnitSpawnData(CreateDefinition("player-ally", "Ally", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30, progressionResolved: true), new GridPosition(2, 1)),
+                    },
+                    new List<GridPosition>()));
+
+            veteranSimulation.Context.GetUnit("player-ally").ApplyDamage(15);
+            apprenticeSimulation.Context.GetUnit("player-ally").ApplyDamage(15);
+
+            SkillResult veteranResult = veteranSimulation.TryUseSkill("player-healer", "player-ally");
+            SkillResult apprenticeResult = apprenticeSimulation.TryUseSkill("player-healer", "player-ally");
+
+            Assert.NotNull(veteranResult);
+            Assert.NotNull(apprenticeResult);
+            Assert.Equal(apprenticeResult.Effects[0].Amount + 2, veteranResult.Effects[0].Amount);
+            Assert.Contains(veteranResult.Effects[0].AppliedStatuses, status => status.Type == StatusEffectType.Inspired && status.WasApplied);
+            Assert.Contains(veteranResult.Effects[0].AppliedStatuses, status => status.Type == StatusEffectType.Guarded && status.WasApplied);
+        }
+
+        [Fact]
+        public void SkillMastery_GuardOrder_PrimaryGetsInspired_WhileAdjacentKeepsGuarded()
+        {
+            UnitDefinitionData commander = CreateDefinition("player-commander", "Commander", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.GuardOrder, startingLevel: 10, progressionResolved: true);
+            UnitDefinitionData primary = CreateDefinition("player-primary", "Primary", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30, progressionResolved: true);
+            UnitDefinitionData adjacent = CreateDefinition("player-adjacent", "Adjacent", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30, progressionResolved: true);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Guard Order Mastery",
+                "stage.guard_order_mastery",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(commander, new GridPosition(1, 1)),
+                    new UnitSpawnData(primary, new GridPosition(3, 1)),
+                    new UnitSpawnData(adjacent, new GridPosition(3, 2)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.Context.GetUnit("player-primary").ApplyDamage(10);
+
+            SkillResult result = simulation.TryUseSkill("player-commander", "player-primary");
+
+            Assert.NotNull(result);
+            SkillEffectResult primaryEffect = result.Effects.Single(effect => effect.UnitId == "player-primary");
+            SkillEffectResult adjacentEffect = result.Effects.Single(effect => effect.UnitId == "player-adjacent");
+
+            Assert.Equal(6, primaryEffect.Amount);
+            Assert.Contains(primaryEffect.AppliedStatuses, status => status.Type == StatusEffectType.Guarded && status.WasApplied);
+            Assert.Contains(primaryEffect.AppliedStatuses, status => status.Type == StatusEffectType.Inspired && status.WasApplied);
+            Assert.Equal(0, adjacentEffect.Amount);
+            Assert.Contains(adjacentEffect.AppliedStatuses, status => status.Type == StatusEffectType.Guarded && status.WasApplied);
+            Assert.DoesNotContain(adjacentEffect.AppliedStatuses, status => status.Type == StatusEffectType.Inspired);
+        }
+
+        [Fact]
+        public void SkillMastery_PowerStrike_UpgradesDamage_AndAppliesMultipleStatuses()
+        {
+            BattleSimulation veteranSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Power Strike Veteran",
+                    "stage.power_strike_veteran",
+                    8,
+                    8,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(CreateDefinition("player-striker", "Striker", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.PowerStrike, attack: 10, startingLevel: 10, progressionResolved: true), new GridPosition(1, 1)),
+                        new UnitSpawnData(CreateDefinition("enemy-target", "Target", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30, defense: 3, progressionResolved: true), new GridPosition(2, 1)),
+                    },
+                    new List<GridPosition>()));
+            BattleSimulation apprenticeSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Power Strike Apprentice",
+                    "stage.power_strike_apprentice",
+                    8,
+                    8,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(CreateDefinition("player-striker", "Striker", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.PowerStrike, attack: 10, startingLevel: 9, progressionResolved: true), new GridPosition(1, 1)),
+                        new UnitSpawnData(CreateDefinition("enemy-target", "Target", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 30, defense: 3, progressionResolved: true), new GridPosition(2, 1)),
+                    },
+                    new List<GridPosition>()));
+
+            SkillResult veteranResult = veteranSimulation.TryUseSkill("player-striker", "enemy-target");
+            SkillResult apprenticeResult = apprenticeSimulation.TryUseSkill("player-striker", "enemy-target");
+
+            Assert.NotNull(veteranResult);
+            Assert.NotNull(apprenticeResult);
+            Assert.Equal(apprenticeResult.Effects[0].Amount + 2, veteranResult.Effects[0].Amount);
+            Assert.Contains(veteranResult.Effects[0].AppliedStatuses, status => status.Type == StatusEffectType.ShatteredArmor && status.WasApplied);
+            Assert.Contains(veteranResult.Effects[0].AppliedStatuses, status => status.Type == StatusEffectType.Bleeding && status.WasApplied);
+            Assert.Equal(2, veteranSimulation.Context.GetUnit("enemy-target").StatusEffects.Single(status => status.Type == StatusEffectType.ShatteredArmor).RemainingOwnTurnEnds);
+        }
+
+        [Fact]
+        public void SkillMastery_GreenDragonSlash_AppliesShatteredArmorToAllSurvivors()
+        {
+            UnitDefinitionData striker = CreateDefinition(
+                "player-striker",
+                "Striker",
+                UnitFaction.Player,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.GreenDragonSlash,
+                attack: 10,
+                startingLevel: 10,
+                progressionResolved: true);
+            UnitDefinitionData enemyOne = CreateDefinition("enemy-1", "Bandit A", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 1, progressionResolved: true);
+            UnitDefinitionData enemyTwo = CreateDefinition("enemy-2", "Bandit B", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 1, progressionResolved: true);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Green Dragon Mastery",
+                "stage.green_dragon_mastery",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(striker, new GridPosition(1, 1)),
+                    new UnitSpawnData(enemyOne, new GridPosition(2, 1)),
+                    new UnitSpawnData(enemyTwo, new GridPosition(3, 1)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            SkillResult result = simulation.TryUseSkill("player-striker", "enemy-1");
+
+            Assert.NotNull(result);
+            Assert.All(result.Effects, effect => Assert.Contains(effect.AppliedStatuses, status => status.Type == StatusEffectType.ShatteredArmor && status.WasApplied));
+            Assert.True(simulation.Context.GetUnit("enemy-1").HasStatus(StatusEffectType.ShatteredArmor));
+            Assert.True(simulation.Context.GetUnit("enemy-2").HasStatus(StatusEffectType.ShatteredArmor));
+        }
+
+        [Fact]
+        public void SkillMastery_PinningShot_AndWarCry_UpgradeControlDuration()
+        {
+            BattleSimulation pinningSimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "Pinning Mastery",
+                    "stage.pinning_mastery",
+                    8,
+                    8,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(CreateDefinition("player-archer", "Archer", UnitFaction.Player, UnitRole.Ranger, PassiveSkillType.None, ActiveSkillType.PinningShot, attack: 10, attackRange: 2, startingLevel: 10, progressionResolved: true), new GridPosition(1, 1)),
+                        new UnitSpawnData(CreateDefinition("enemy-target", "Target", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 24, defense: 3, progressionResolved: true), new GridPosition(4, 1)),
+                    },
+                    new List<GridPosition>()));
+            BattleSimulation warCrySimulation = new BattleSimulation(
+                new StageDefinitionData(
+                    "War Cry Mastery",
+                    "stage.war_cry_mastery",
+                    8,
+                    8,
+                    new List<UnitSpawnData>
+                    {
+                        new UnitSpawnData(CreateDefinition("player-intimidator", "Intimidator", UnitFaction.Player, UnitRole.Guardian, PassiveSkillType.None, ActiveSkillType.WarCry, startingLevel: 10, progressionResolved: true), new GridPosition(2, 2)),
+                        new UnitSpawnData(CreateDefinition("enemy-target", "Target", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, progressionResolved: true), new GridPosition(3, 2)),
+                    },
+                    new List<GridPosition>()));
+
+            SkillResult pinningResult = pinningSimulation.TryUseSkill("player-archer", "enemy-target");
+            SkillResult warCryResult = warCrySimulation.TryUseSkill("player-intimidator", "enemy-target");
+
+            Assert.NotNull(pinningResult);
+            Assert.NotNull(warCryResult);
+            Assert.Equal(2, pinningSimulation.Context.GetUnit("enemy-target").StatusEffects.Single(status => status.Type == StatusEffectType.Rooted).RemainingOwnTurnEnds);
+            Assert.Equal(2, warCrySimulation.Context.GetUnit("enemy-target").StatusEffects.Single(status => status.Type == StatusEffectType.Intimidated).RemainingOwnTurnEnds);
+        }
+
+        [Fact]
+        public void EnemyAi_UsesFireStratagemTargetThatHitsMoreUnits()
+        {
+            UnitDefinitionData isolatedTarget = CreateDefinition(
+                "player-isolated",
+                "Isolated",
+                UnitFaction.Player,
+                UnitRole.Ranger,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 12,
+                defense: 0,
+                progressionResolved: true);
+            UnitDefinitionData clusteredTarget = CreateDefinition(
+                "player-clustered-a",
+                "Cluster A",
+                UnitFaction.Player,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 12,
+                defense: 0,
+                progressionResolved: true);
+            UnitDefinitionData clusteredNeighbor = CreateDefinition(
+                "player-clustered-b",
+                "Cluster B",
+                UnitFaction.Player,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 12,
+                defense: 0,
+                progressionResolved: true);
+            UnitDefinitionData enemy = CreateDefinition(
+                "enemy-strategist",
+                "Enemy Strategist",
+                UnitFaction.Enemy,
+                UnitRole.Commander,
+                PassiveSkillType.CommandAura,
+                ActiveSkillType.FireStratagem,
+                attack: 10,
+                attackRange: 1,
+                progressionResolved: true);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Fire Stratagem Value",
+                "stage.fire_stratagem_value",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(isolatedTarget, new GridPosition(2, 1)),
+                    new UnitSpawnData(clusteredTarget, new GridPosition(2, 3)),
+                    new UnitSpawnData(clusteredNeighbor, new GridPosition(2, 4)),
+                    new UnitSpawnData(enemy, new GridPosition(0, 2)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.EndCurrentTurn();
+
+            AiDecision decision = simulation.BuildEnemyDecision("enemy-strategist");
+
+            Assert.Equal(AiActionType.Skill, decision.ActionType);
+            Assert.Contains(decision.TargetUnitId, new[] { "player-clustered-a", "player-clustered-b" });
+        }
+
         private static UnitDefinitionData CreateDefinition(
             string id,
             string displayName,
@@ -1229,7 +1662,12 @@ namespace PhalanxChronicle.Headless.Tests
             int attack = 10,
             int defense = 5,
             int moveRange = 3,
-            int attackRange = 1)
+            int attackRange = 1,
+            int maxMana = 20,
+            int startingLevel = 1,
+            string classId = null,
+            string growthProfileId = null,
+            bool progressionResolved = false)
         {
             return new UnitDefinitionData(
                 id,
@@ -1248,7 +1686,16 @@ namespace PhalanxChronicle.Headless.Tests
                 attack,
                 defense,
                 moveRange,
-                attackRange);
+                attackRange,
+                maxMana,
+                classId,
+                growthProfileId,
+                AiProfileType.Default,
+                null,
+                startingLevel,
+                0,
+                null,
+                progressionResolved);
         }
 
         private static IReadOnlyList<UnitDefinitionData> CreateRandomStageUnits()

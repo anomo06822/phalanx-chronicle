@@ -214,6 +214,21 @@ namespace PhalanxChronicle.Presentation
                 return CreateProfile(unitId, faction, role, true, UnitVisualArchetype.HuangZhong, UnitFrameStyle.Hero, Hex("7A6533"), Hex("304D3F"), Hex("D8BF72"), Hex("C8A55A"), Hex("7F8E70"), Hex("2B2B25"), 0.97f);
             }
 
+            if (normalizedId == "player-zhuge-liang")
+            {
+                return CreateProfile(unitId, faction, role, true, UnitVisualArchetype.LiuBei, UnitFrameStyle.Hero, Hex("5A6E62"), Hex("DEE2D3"), Hex("BFCB88"), Hex("C0A768"), Hex("89A68C"), Hex("243028"), 0.96f);
+            }
+
+            if (normalizedId == "player-zhao-yun")
+            {
+                return CreateProfile(unitId, faction, role, true, UnitVisualArchetype.WeiRaider, UnitFrameStyle.Hero, Hex("E4E2D7"), Hex("4D6478"), Hex("CDBB77"), Hex("C3A166"), Hex("8DB6C8"), Hex("24282D"), 0.99f);
+            }
+
+            if (normalizedId == "player-ma-chao")
+            {
+                return CreateProfile(unitId, faction, role, true, UnitVisualArchetype.WeiRaider, UnitFrameStyle.Hero, Hex("D8D7CF"), Hex("365266"), Hex("D8BC76"), Hex("C79C5A"), Hex("76A6C0"), Hex("21252A"), 1.01f);
+            }
+
             if (normalizedId.Contains("yellow_turban") || normalizedId.Contains("zhang-bao") || normalizedId.Contains("zhang-liang"))
             {
                 bool boss = normalizedId.Contains("zhang-bao") || normalizedId.Contains("zhang-liang");

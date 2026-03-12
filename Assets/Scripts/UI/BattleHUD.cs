@@ -37,12 +37,15 @@ namespace PhalanxChronicle.UI
         private Image selectedPortraitBacking;
         private Image selectedHpFill;
         private Image selectedManaFill;
+        private GameObject selectedTerrainInfoRoot;
         private Image selectedWeaponIconImage;
         private Image selectedWeaponIconBacking;
         private Image selectedWeaponAccentImage;
         private Text selectedNameLabel;
         private Text selectedRoleLabel;
         private Text selectedPositionLabel;
+        private Text selectedTerrainNameLabel;
+        private Text selectedTerrainEffectLabel;
         private Text selectedHpLabel;
         private Text selectedManaLabel;
         private Text selectedWeaponTypeLabel;
@@ -220,10 +223,16 @@ namespace PhalanxChronicle.UI
                 selectedWeaponIconImage.enabled = false;
                 selectedWeaponIconBacking.color = new Color(0.17f, 0.16f, 0.15f, 1f);
                 selectedWeaponAccentImage.color = BattleUiTheme.TextMuted;
+                if (selectedTerrainInfoRoot != null)
+                {
+                    selectedTerrainInfoRoot.SetActive(false);
+                }
                 selectedHpFill.fillAmount = 0f;
                 selectedNameLabel.text = LocalizationService.Text("ui.selected.card_none_title", "No Unit Selected");
                 selectedRoleLabel.text = string.Empty;
                 selectedPositionLabel.text = LocalizationService.Text("ui.selected.card_none_body", "Choose a player unit to inspect battlefield details.");
+                selectedTerrainNameLabel.text = string.Empty;
+                selectedTerrainEffectLabel.text = string.Empty;
                 selectedHpLabel.text = string.Empty;
                 selectedManaLabel.text = string.Empty;
                 selectedManaFill.fillAmount = 0f;
@@ -271,6 +280,13 @@ namespace PhalanxChronicle.UI
             selectedNameLabel.text = selected.DisplayName;
             selectedRoleLabel.text = selected.RoleLabel;
             selectedPositionLabel.text = selected.PositionLabel;
+            if (selectedTerrainInfoRoot != null)
+            {
+                selectedTerrainInfoRoot.SetActive(true);
+            }
+
+            selectedTerrainNameLabel.text = selected.TerrainName;
+            selectedTerrainEffectLabel.text = selected.TerrainEffectSummary;
             selectedHpLabel.text = LocalizationService.Format("ui.label.hp_value", "HP {0}/{1}", selected.CurrentHp, selected.MaxHp);
             selectedManaLabel.text = LocalizationService.Format("ui.label.mana_value", "Mana {0}/{1}", selected.CurrentMana, selected.MaxMana);
             selectedWeaponTypeLabel.text = selected.WeaponTypeLabel;
@@ -480,7 +496,7 @@ namespace PhalanxChronicle.UI
 
             CreateSectionHeader(parent, LocalizationService.Text("ui.panel.selected", "Character Dossier"));
 
-            GameObject identityPanel = CreateInsetPanel("IdentityPanel", parent, 156f);
+            GameObject identityPanel = CreateInsetPanel("IdentityPanel", parent, 200f);
             HorizontalLayoutGroup identityLayout = identityPanel.AddComponent<HorizontalLayoutGroup>();
             identityLayout.spacing = 16f;
             identityLayout.padding = new RectOffset(16, 16, 16, 16);
@@ -525,7 +541,31 @@ namespace PhalanxChronicle.UI
             selectedRoleLabel = CreateText(identityTextRoot.transform, string.Empty, 16, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
             EnableBestFit(selectedRoleLabel, 12, 16, true);
             selectedPositionLabel = CreateText(identityTextRoot.transform, string.Empty, 14, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextMuted);
-            selectedPositionLabel.GetComponent<LayoutElement>().preferredHeight = 34f;
+            selectedPositionLabel.GetComponent<LayoutElement>().preferredHeight = 32f;
+
+            selectedTerrainInfoRoot = CreateInsetPanel("TerrainInfoPanel", identityTextRoot.transform, 44f, new Color(0.16f, 0.14f, 0.11f, 0.92f));
+            Transform terrainInfoRoot = CreateInsetContentRoot(selectedTerrainInfoRoot.transform, 10f);
+            HorizontalLayoutGroup terrainLayout = terrainInfoRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
+            terrainLayout.spacing = 10f;
+            terrainLayout.childAlignment = TextAnchor.MiddleLeft;
+            terrainLayout.childControlHeight = true;
+            terrainLayout.childControlWidth = true;
+            terrainLayout.childForceExpandHeight = false;
+            terrainLayout.childForceExpandWidth = false;
+
+            selectedTerrainNameLabel = CreateText(terrainInfoRoot, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            LayoutElement terrainNameLayout = selectedTerrainNameLabel.GetComponent<LayoutElement>();
+            terrainNameLayout.preferredWidth = 78f;
+            terrainNameLayout.preferredHeight = 24f;
+            EnableBestFit(selectedTerrainNameLabel, 11, 12, true);
+
+            selectedTerrainEffectLabel = CreateText(terrainInfoRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            LayoutElement terrainEffectLayout = selectedTerrainEffectLabel.GetComponent<LayoutElement>();
+            terrainEffectLayout.flexibleWidth = 1f;
+            terrainEffectLayout.preferredHeight = 28f;
+            EnableBestFit(selectedTerrainEffectLabel, 11, 12, false);
+            selectedTerrainInfoRoot.SetActive(false);
+
             selectedActionLabel = CreateText(identityTextRoot.transform, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.96f, 0.92f, 0.82f, 1f));
 
             selectedDetailSectionsRoot = new GameObject("SelectedDetails", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
@@ -557,7 +597,7 @@ namespace PhalanxChronicle.UI
             CreateUiBar(manaPanel.transform, new Vector2(14f, 14f), new Vector2(-14f, 30f), out selectedManaFill);
 
             CreateSectionHeader(selectedDetailSectionsRoot.transform, LocalizationService.Text("ui.label.weapon", "Armory"));
-            GameObject weaponPanel = CreateInsetPanel("WeaponPanel", selectedDetailSectionsRoot.transform, 104f, new Color(0.16f, 0.14f, 0.11f, 0.94f));
+            GameObject weaponPanel = CreateInsetPanel("WeaponPanel", selectedDetailSectionsRoot.transform, 120f, new Color(0.16f, 0.14f, 0.11f, 0.94f));
             Transform weaponRoot = CreateInsetContentRoot(weaponPanel.transform, 12f);
             GameObject weaponAccent = new GameObject("WeaponAccent", typeof(RectTransform), typeof(Image));
             weaponAccent.transform.SetParent(weaponRoot, false);
@@ -621,9 +661,9 @@ namespace PhalanxChronicle.UI
             selectedWeaponNameLabel = CreateText(weaponTextRoot.transform, string.Empty, 18, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
             EnableBestFit(selectedWeaponNameLabel, 12, 18, true);
             selectedWeaponDescriptionLabel = CreateText(weaponTextRoot.transform, string.Empty, 13, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            selectedWeaponDescriptionLabel.GetComponent<LayoutElement>().preferredHeight = 48f;
+            selectedWeaponDescriptionLabel.GetComponent<LayoutElement>().preferredHeight = 78f;
 
-            GameObject statusPanel = CreateInsetPanel("SelectedStatusPanel", selectedDetailSectionsRoot.transform, 126f);
+            GameObject statusPanel = CreateInsetPanel("SelectedStatusPanel", selectedDetailSectionsRoot.transform, 132f);
             Transform statusRoot = CreateInsetContentRoot(statusPanel.transform, 14f);
             VerticalLayoutGroup statusLayout = statusRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             statusLayout.spacing = 4f;
@@ -652,7 +692,7 @@ namespace PhalanxChronicle.UI
             selectedPassiveDescriptionLabel.GetComponent<LayoutElement>().preferredHeight = 34f;
 
             CreateSectionHeader(selectedDetailSectionsRoot.transform, LocalizationService.Text("ui.label.active", "Active"));
-            GameObject activePanel = CreateInsetPanel("ActivePanel", selectedDetailSectionsRoot.transform, 88f);
+            GameObject activePanel = CreateInsetPanel("ActivePanel", selectedDetailSectionsRoot.transform, 108f);
             Transform activeRoot = CreateInsetContentRoot(activePanel.transform, 14f);
             VerticalLayoutGroup activeLayout = activeRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             activeLayout.spacing = 4f;
@@ -662,20 +702,20 @@ namespace PhalanxChronicle.UI
             selectedActiveNameLabel = CreateText(activeRoot, string.Empty, 17, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
             EnableBestFit(selectedActiveNameLabel, 13, 17, true);
             selectedActiveDescriptionLabel = CreateText(activeRoot, string.Empty, 15, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            selectedActiveDescriptionLabel.GetComponent<LayoutElement>().preferredHeight = 36f;
+            selectedActiveDescriptionLabel.GetComponent<LayoutElement>().preferredHeight = 56f;
         }
 
         private void BuildOverviewPanel(Transform parent, Action onEndTurn, Action onReroll)
         {
             VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 4f;
+            layout.spacing = 6f;
             layout.padding = new RectOffset(18, 18, 18, 18);
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
 
             CreateSectionHeader(parent, LocalizationService.Text("ui.panel.overview", "War Overview"));
-            GameObject summaryPanel = CreateInsetPanel("OverviewSummaryPanel", parent, 118f);
+            GameObject summaryPanel = CreateInsetPanel("OverviewSummaryPanel", parent, 112f);
             Transform summaryRoot = CreateInsetContentRoot(summaryPanel.transform, 10f);
             VerticalLayoutGroup summaryLayout = summaryRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             summaryLayout.spacing = 2f;
@@ -702,7 +742,7 @@ namespace PhalanxChronicle.UI
             skillReadyLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
 
             CreateSectionHeader(parent, LocalizationService.Text("ui.objective.header", "Objective"));
-            GameObject objectivePanel = CreateInsetPanel("ObjectivePanel", parent, 72f, BattleUiTheme.PanelCommand);
+            GameObject objectivePanel = CreateInsetPanel("ObjectivePanel", parent, 76f, BattleUiTheme.PanelCommand);
             Transform objectiveRoot = CreateInsetContentRoot(objectivePanel.transform, 12f);
             VerticalLayoutGroup objectiveLayout = objectiveRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             objectiveLayout.spacing = 4f;
@@ -720,7 +760,7 @@ namespace PhalanxChronicle.UI
             buttonLayout.spacing = 8f;
             buttonLayout.childForceExpandHeight = true;
             buttonLayout.childForceExpandWidth = true;
-            buttonRow.AddComponent<LayoutElement>().preferredHeight = 40f;
+            buttonRow.AddComponent<LayoutElement>().preferredHeight = 42f;
 
             endTurnButton = CreateActionButton(buttonRow.transform, LocalizationService.Text("ui.button.end_turn", "End Turn"));
             endTurnButton.onClick.AddListener(() => onEndTurn?.Invoke());
@@ -729,14 +769,14 @@ namespace PhalanxChronicle.UI
             rerollButtonObject = rerollButton.gameObject;
 
             CreateSectionHeader(parent, LocalizationService.Text("ui.panel.allies", "Allied Ledger"));
-            GameObject alliesPanel = CreateInsetPanel("AlliedRosterPanel", parent, 108f);
+            GameObject alliesPanel = CreateInsetPanel("AlliedRosterPanel", parent, 148f);
             alliedRosterRoot = CreateRosterRoot(CreateScrollContentRoot(alliesPanel.transform, 6f));
             CreateSectionHeader(parent, LocalizationService.Text("ui.panel.enemies", "Enemy Ledger"));
-            GameObject enemiesPanel = CreateInsetPanel("EnemyRosterPanel", parent, 154f);
+            GameObject enemiesPanel = CreateInsetPanel("EnemyRosterPanel", parent, 228f);
             enemyRosterRoot = CreateRosterRoot(CreateScrollContentRoot(enemiesPanel.transform, 6f));
 
             CreateSectionHeader(parent, LocalizationService.Text("ui.panel.feed", "War Feed"));
-            GameObject feedPanel = CreateInsetPanel("FeedPanel", parent, 92f);
+            GameObject feedPanel = CreateInsetPanel("FeedPanel", parent, 78f);
             Transform feedRoot = CreateScrollContentRoot(feedPanel.transform, 8f);
             VerticalLayoutGroup feedLayout = feedRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             feedLayout.spacing = 4f;
@@ -746,12 +786,12 @@ namespace PhalanxChronicle.UI
             for (int index = 0; index < FeedLimit; index++)
             {
                 Text feedLabel = CreateText(feedRoot, string.Empty, 12, index == 0 ? FontStyle.Bold : FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-                feedLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
+                feedLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
                 feedLabels.Add(feedLabel);
             }
 
             instructionLabel = CreateText(feedRoot, string.Empty, 14, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.95f, 0.91f, 0.79f, 1f));
-            instructionLabel.GetComponent<LayoutElement>().preferredHeight = 28f;
+            instructionLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
             RefreshFeed();
         }
 
@@ -815,32 +855,32 @@ namespace PhalanxChronicle.UI
                 new Vector2(0.5f, 0.5f),
                 new Vector2(0.5f, 0.5f),
                 Vector2.zero,
-                new Vector2(960f, 640f),
+                new Vector2(1040f, 700f),
                 BattleUiTheme.PanelBackdrop);
 
             VerticalLayoutGroup layout = campaignBox.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 12f;
-            layout.padding = new RectOffset(20, 20, 20, 20);
+            layout.spacing = 14f;
+            layout.padding = new RectOffset(24, 24, 24, 24);
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
 
-            campaignTitleLabel = CreateText(campaignBox.transform, string.Empty, 28, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            campaignTitleLabel.GetComponent<LayoutElement>().preferredHeight = 38f;
-            campaignBodyLabel = CreateText(campaignBox.transform, string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            campaignBodyLabel.GetComponent<LayoutElement>().preferredHeight = 64f;
+            campaignTitleLabel = CreateText(campaignBox.transform, string.Empty, 32, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            campaignTitleLabel.GetComponent<LayoutElement>().preferredHeight = 44f;
+            campaignBodyLabel = CreateText(campaignBox.transform, string.Empty, 18, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            campaignBodyLabel.GetComponent<LayoutElement>().preferredHeight = 104f;
 
-            GameObject contentPanel = CreateInsetPanel("CampaignContentPanel", campaignBox.transform, 420f, new Color(0.12f, 0.11f, 0.1f, 0.95f));
+            GameObject contentPanel = CreateInsetPanel("CampaignContentPanel", campaignBox.transform, 470f, new Color(0.12f, 0.11f, 0.1f, 0.95f));
             campaignContentRoot = CreateScrollContentRoot(contentPanel.transform, 10f);
             VerticalLayoutGroup contentLayout = campaignContentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            contentLayout.spacing = 10f;
+            contentLayout.spacing = 12f;
             contentLayout.childControlHeight = true;
             contentLayout.childControlWidth = true;
             contentLayout.childForceExpandHeight = false;
 
             GameObject buttonRow = new GameObject("CampaignButtons", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             buttonRow.transform.SetParent(campaignBox.transform, false);
-            buttonRow.GetComponent<LayoutElement>().preferredHeight = 44f;
+            buttonRow.GetComponent<LayoutElement>().preferredHeight = 50f;
             HorizontalLayoutGroup buttonLayout = buttonRow.GetComponent<HorizontalLayoutGroup>();
             buttonLayout.spacing = 10f;
             buttonLayout.childForceExpandHeight = true;
@@ -917,9 +957,13 @@ namespace PhalanxChronicle.UI
             GameObject root = CreateInsetPanel(
                 "CampaignOptionEntry",
                 parent,
-                112f,
+                model.IsPromotionOption ? 148f : 124f,
                 model.IsEnabled
-                    ? (model.IsEmphasized ? new Color(0.15f, 0.17f, 0.12f, 0.95f) : new Color(0.16f, 0.14f, 0.11f, 0.95f))
+                    ? (model.IsPromotionOption
+                        ? new Color(0.15f, 0.19f, 0.12f, 0.97f)
+                        : model.IsEmphasized
+                            ? new Color(0.15f, 0.17f, 0.12f, 0.95f)
+                            : new Color(0.16f, 0.14f, 0.11f, 0.95f))
                     : new Color(0.12f, 0.11f, 0.11f, 0.88f));
             Button button = root.AddComponent<Button>();
             ColorBlock colors = button.colors;
@@ -930,33 +974,50 @@ namespace PhalanxChronicle.UI
             button.interactable = model.IsEnabled && campaignOptionSelectionHandler != null;
             button.onClick.AddListener(() => campaignOptionSelectionHandler?.Invoke(model.OptionId));
 
-            Transform contentRoot = CreateInsetContentRoot(root.transform, 14f);
+            if (model.IsPromotionOption)
+            {
+                GameObject accent = new GameObject("PromotionAccent", typeof(RectTransform), typeof(Image));
+                accent.transform.SetParent(root.transform, false);
+                RectTransform accentRect = accent.GetComponent<RectTransform>();
+                accentRect.anchorMin = new Vector2(0f, 0f);
+                accentRect.anchorMax = new Vector2(0f, 1f);
+                accentRect.sizeDelta = new Vector2(8f, 0f);
+                accentRect.anchoredPosition = Vector2.zero;
+                Image accentImage = accent.GetComponent<Image>();
+                accentImage.color = new Color(0.95f, 0.78f, 0.28f, 0.98f);
+            }
+
+            Transform contentRoot = CreateInsetContentRoot(root.transform, model.IsPromotionOption ? 18f : 14f);
             VerticalLayoutGroup layout = contentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 4f;
+            layout.spacing = model.IsPromotionOption ? 6f : 4f;
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
 
-            Text titleLabel = CreateText(contentRoot, model.Title, 18, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            titleLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
+            Text titleLabel = CreateText(contentRoot, model.Title, model.IsPromotionOption ? 22 : 19, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            titleLabel.GetComponent<LayoutElement>().preferredHeight = model.IsPromotionOption ? 30f : 26f;
             Text statusLabel = CreateText(
                 contentRoot,
                 model.Status,
-                13,
+                model.IsPromotionOption ? 16 : 14,
                 FontStyle.Bold,
                 TextAnchor.MiddleLeft,
                 model.IsEnabled
-                    ? (model.IsEmphasized ? new Color(0.99f, 0.84f, 0.34f, 1f) : new Color(0.72f, 0.92f, 0.78f, 1f))
+                    ? (model.IsPromotionOption
+                        ? new Color(0.99f, 0.84f, 0.34f, 1f)
+                        : model.IsEmphasized
+                            ? new Color(0.99f, 0.84f, 0.34f, 1f)
+                            : new Color(0.72f, 0.92f, 0.78f, 1f))
                     : BattleUiTheme.TextMuted);
-            statusLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+            statusLabel.GetComponent<LayoutElement>().preferredHeight = model.IsPromotionOption ? 22f : 18f;
             Text descriptionLabel = CreateText(
                 contentRoot,
                 model.Description,
-                14,
+                model.IsPromotionOption ? 16 : 15,
                 FontStyle.Normal,
                 TextAnchor.UpperLeft,
-                model.IsEnabled ? BattleUiTheme.TextSecondary : new Color(0.62f, 0.59f, 0.54f, 1f));
-            descriptionLabel.GetComponent<LayoutElement>().preferredHeight = 48f;
+                model.IsEnabled ? BattleUiTheme.TextPrimary : new Color(0.62f, 0.59f, 0.54f, 1f));
+            descriptionLabel.GetComponent<LayoutElement>().preferredHeight = model.IsPromotionOption ? 74f : 56f;
         }
 
         private void ConfigureCampaignButtons(string primaryLabel, string secondaryLabel)
@@ -1003,8 +1064,10 @@ namespace PhalanxChronicle.UI
         {
             view.UnitId = model.UnitId;
             view.NameLabel.text = model.DisplayName;
-            view.MetaLabel.text = model.RoleShortLabel + "  " + model.PositionLabel;
-            view.StateLabel.text = model.StatusLabel + "  " + model.SkillLabel;
+            view.RoleLabel.text = model.RoleShortLabel;
+            view.PositionLabel.text = model.PositionLabel;
+            view.StateLabel.text = model.StatusLabel;
+            view.SkillLabel.text = model.SkillLabel;
             view.HpLabel.text = model.IsAlive
                 ? LocalizationService.Format("ui.label.hp_value", "HP {0}/{1}", model.CurrentHp, model.MaxHp)
                 : LocalizationService.Text("ui.roster.defeated", "Defeated");
@@ -1017,9 +1080,33 @@ namespace PhalanxChronicle.UI
                         : new Color(0.88f, 0.35f, 0.28f, 1f))
                 : new Color(0.42f, 0.42f, 0.45f, 1f);
 
+            view.RoleLabel.color = model.Faction == UnitFaction.Player
+                ? new Color(0.95f, 0.88f, 0.62f, 1f)
+                : new Color(0.99f, 0.78f, 0.58f, 1f);
+            view.PositionLabel.color = model.IsAlive
+                ? new Color(0.82f, 0.84f, 0.88f, 1f)
+                : BattleUiTheme.TextMuted;
+            view.StateLabel.color = !model.IsAlive
+                ? BattleUiTheme.TextMuted
+                : model.HasActed
+                    ? new Color(0.86f, 0.82f, 0.72f, 1f)
+                    : new Color(0.76f, 0.94f, 0.8f, 1f);
+            view.SkillLabel.color = !model.IsAlive
+                ? BattleUiTheme.TextMuted
+                : model.CanUseSkill
+                    ? new Color(0.81f, 0.9f, 1f, 1f)
+                    : new Color(0.72f, 0.74f, 0.8f, 1f);
+            view.Accent.color = model.IsSelected
+                ? new Color(0.98f, 0.86f, 0.4f, 0.98f)
+                : model.IsThreateningSelection
+                    ? new Color(0.95f, 0.52f, 0.38f, 0.95f)
+                    : model.Faction == UnitFaction.Player
+                        ? new Color(0.43f, 0.69f, 0.98f, 0.95f)
+                        : new Color(0.95f, 0.44f, 0.35f, 0.95f);
+
             Color baseColor = model.Faction == UnitFaction.Player
-                ? new Color(0.11f, 0.17f, 0.27f, model.IsAlive ? 0.95f : 0.68f)
-                : new Color(0.27f, 0.11f, 0.1f, model.IsAlive ? 0.95f : 0.68f);
+                ? new Color(0.1f, 0.16f, 0.25f, model.IsAlive ? 0.95f : 0.68f)
+                : new Color(0.24f, 0.1f, 0.1f, model.IsAlive ? 0.95f : 0.68f);
             if (model.HasActed && model.IsAlive)
             {
                 baseColor *= new Color(0.82f, 0.82f, 0.82f, 1f);
@@ -1091,7 +1178,7 @@ namespace PhalanxChronicle.UI
         {
             parent.gameObject.name = "RosterContent";
             VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 6f;
+            layout.spacing = 8f;
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
@@ -1106,16 +1193,16 @@ namespace PhalanxChronicle.UI
                 new Vector2(0f, 0.5f),
                 new Vector2(1f, 0.5f),
                 Vector2.zero,
-                new Vector2(0f, 46f),
+                new Vector2(0f, 70f),
                 new Color(0.11f, 0.17f, 0.27f, 0.95f));
             RectTransform rootRect = rootObject.GetComponent<RectTransform>();
             rootRect.pivot = new Vector2(0.5f, 0.5f);
-            rootObject.AddComponent<LayoutElement>().preferredHeight = 46f;
+            rootObject.AddComponent<LayoutElement>().preferredHeight = 70f;
 
             Image background = rootObject.GetComponent<Image>();
             background.sprite = RuntimeSpriteLibrary.WhiteSprite;
             Outline outline = rootObject.AddComponent<Outline>();
-            outline.effectDistance = new Vector2(1f, -1f);
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
             outline.effectColor = new Color(0.38f, 0.31f, 0.24f, 0.75f);
 
             Button button = rootObject.AddComponent<Button>();
@@ -1124,16 +1211,26 @@ namespace PhalanxChronicle.UI
             colors.pressedColor = new Color(1f, 1f, 1f, 0.1f);
             button.colors = colors;
 
+            GameObject accentObject = new GameObject("Accent", typeof(RectTransform), typeof(Image));
+            accentObject.transform.SetParent(rootObject.transform, false);
+            RectTransform accentRect = accentObject.GetComponent<RectTransform>();
+            accentRect.anchorMin = new Vector2(0f, 0f);
+            accentRect.anchorMax = new Vector2(0f, 1f);
+            accentRect.sizeDelta = new Vector2(6f, 0f);
+            accentRect.anchoredPosition = Vector2.zero;
+            Image accent = accentObject.GetComponent<Image>();
+            accent.sprite = RuntimeSpriteLibrary.WhiteSprite;
+
             GameObject contentRoot = new GameObject("Content", typeof(RectTransform), typeof(HorizontalLayoutGroup));
             contentRoot.transform.SetParent(rootObject.transform, false);
             RectTransform contentRect = contentRoot.GetComponent<RectTransform>();
             contentRect.anchorMin = Vector2.zero;
             contentRect.anchorMax = Vector2.one;
-            contentRect.offsetMin = new Vector2(8f, 5f);
-            contentRect.offsetMax = new Vector2(-8f, -5f);
+            contentRect.offsetMin = new Vector2(14f, 7f);
+            contentRect.offsetMax = new Vector2(-12f, -7f);
 
             HorizontalLayoutGroup contentLayout = contentRoot.GetComponent<HorizontalLayoutGroup>();
-            contentLayout.spacing = 8f;
+            contentLayout.spacing = 10f;
             contentLayout.childControlHeight = true;
             contentLayout.childControlWidth = true;
             contentLayout.childForceExpandHeight = false;
@@ -1145,44 +1242,76 @@ namespace PhalanxChronicle.UI
             LayoutElement textLayoutElement = textColumn.GetComponent<LayoutElement>();
             textLayoutElement.flexibleWidth = 1f;
             VerticalLayoutGroup textLayout = textColumn.GetComponent<VerticalLayoutGroup>();
-            textLayout.spacing = 1f;
+            textLayout.spacing = 2f;
             textLayout.childControlHeight = true;
             textLayout.childControlWidth = true;
             textLayout.childForceExpandHeight = false;
 
-            Text nameLabel = CreateText(textColumn.transform, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            EnableBestFit(nameLabel, 11, 14, true);
-            nameLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
-            Text metaLabel = CreateText(textColumn.transform, string.Empty, 11, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
-            EnableBestFit(metaLabel, 9, 11, true);
-            metaLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
-            Text stateLabel = CreateText(textColumn.transform, string.Empty, 10, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.95f, 0.88f, 0.72f, 1f));
-            EnableBestFit(stateLabel, 8, 10, true);
-            stateLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
+            GameObject topRow = new GameObject("TopRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            topRow.transform.SetParent(textColumn.transform, false);
+            topRow.GetComponent<LayoutElement>().preferredHeight = 18f;
+            HorizontalLayoutGroup topLayout = topRow.GetComponent<HorizontalLayoutGroup>();
+            topLayout.spacing = 6f;
+            topLayout.childControlHeight = true;
+            topLayout.childControlWidth = true;
+            topLayout.childForceExpandHeight = false;
+            topLayout.childForceExpandWidth = false;
+
+            Text nameLabel = CreateText(topRow.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            EnableBestFit(nameLabel, 12, 15, true);
+            nameLabel.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            nameLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+            Text roleLabel = CreateText(topRow.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextGold);
+            EnableBestFit(roleLabel, 10, 12, true);
+            roleLabel.GetComponent<LayoutElement>().preferredWidth = 42f;
+            roleLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+
+            Text positionLabel = CreateText(textColumn.transform, string.Empty, 11, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
+            EnableBestFit(positionLabel, 10, 11, true);
+            positionLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
+
+            GameObject tagRow = new GameObject("TagRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            tagRow.transform.SetParent(textColumn.transform, false);
+            tagRow.GetComponent<LayoutElement>().preferredHeight = 16f;
+            HorizontalLayoutGroup tagLayout = tagRow.GetComponent<HorizontalLayoutGroup>();
+            tagLayout.spacing = 8f;
+            tagLayout.childControlHeight = true;
+            tagLayout.childControlWidth = true;
+            tagLayout.childForceExpandHeight = false;
+            tagLayout.childForceExpandWidth = false;
+
+            Text stateLabel = CreateText(tagRow.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.95f, 0.88f, 0.72f, 1f));
+            EnableBestFit(stateLabel, 10, 11, true);
+            stateLabel.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            stateLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            Text skillLabel = CreateText(tagRow.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleRight, new Color(0.8f, 0.87f, 0.99f, 1f));
+            EnableBestFit(skillLabel, 10, 11, true);
+            skillLabel.GetComponent<LayoutElement>().preferredWidth = 108f;
+            skillLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
 
             GameObject hpColumn = new GameObject("HpColumn", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
             hpColumn.transform.SetParent(contentRoot.transform, false);
             LayoutElement hpLayoutElement = hpColumn.GetComponent<LayoutElement>();
-            hpLayoutElement.preferredWidth = 96f;
+            hpLayoutElement.preferredWidth = 118f;
             VerticalLayoutGroup hpLayout = hpColumn.GetComponent<VerticalLayoutGroup>();
-            hpLayout.spacing = 4f;
+            hpLayout.spacing = 5f;
             hpLayout.childControlHeight = true;
             hpLayout.childControlWidth = true;
             hpLayout.childForceExpandHeight = false;
             hpLayout.childAlignment = TextAnchor.UpperRight;
 
-            Text hpLabel = CreateText(hpColumn.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextPrimary);
-            EnableBestFit(hpLabel, 9, 11, true);
-            hpLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            Text hpLabel = CreateText(hpColumn.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextPrimary);
+            EnableBestFit(hpLabel, 10, 12, true);
+            hpLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
 
             GameObject hpBarRoot = new GameObject("HpBar", typeof(RectTransform), typeof(LayoutElement));
             hpBarRoot.transform.SetParent(hpColumn.transform, false);
-            hpBarRoot.GetComponent<LayoutElement>().preferredHeight = 10f;
+            hpBarRoot.GetComponent<LayoutElement>().preferredHeight = 14f;
 
             Image hpFill;
             CreateStretchUiBar(hpBarRoot.transform, out hpFill);
 
-            return new RosterEntryView(rootObject, button, background, outline, nameLabel, metaLabel, stateLabel, hpLabel, hpFill);
+            return new RosterEntryView(rootObject, button, background, outline, accent, nameLabel, roleLabel, positionLabel, stateLabel, skillLabel, hpLabel, hpFill);
         }
 
         private static Transform CreateScrollContentRoot(Transform parent, float padding)
@@ -1534,9 +1663,12 @@ namespace PhalanxChronicle.UI
                 Button button,
                 Image background,
                 Outline outline,
+                Image accent,
                 Text nameLabel,
-                Text metaLabel,
+                Text roleLabel,
+                Text positionLabel,
                 Text stateLabel,
+                Text skillLabel,
                 Text hpLabel,
                 Image hpFill)
             {
@@ -1544,9 +1676,12 @@ namespace PhalanxChronicle.UI
                 Button = button;
                 Background = background;
                 Outline = outline;
+                Accent = accent;
                 NameLabel = nameLabel;
-                MetaLabel = metaLabel;
+                RoleLabel = roleLabel;
+                PositionLabel = positionLabel;
                 StateLabel = stateLabel;
+                SkillLabel = skillLabel;
                 HpLabel = hpLabel;
                 HpFill = hpFill;
             }
@@ -1559,11 +1694,17 @@ namespace PhalanxChronicle.UI
 
             public Outline Outline { get; }
 
+            public Image Accent { get; }
+
             public Text NameLabel { get; }
 
-            public Text MetaLabel { get; }
+            public Text RoleLabel { get; }
+
+            public Text PositionLabel { get; }
 
             public Text StateLabel { get; }
+
+            public Text SkillLabel { get; }
 
             public Text HpLabel { get; }
 

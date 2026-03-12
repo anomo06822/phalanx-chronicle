@@ -14,5 +14,9 @@ namespace PhalanxChronicle.Core
         SkyVolley = 9,
         GuardOrder = 10,
         PinningShot = 11,
+        FireStratagem = 12,
+        EightTrigramInferno = 13,
+        DragonPierce = 14,
+        WesternStampede = 15,
     }
 }

@@ -45,6 +45,13 @@ dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj
 - `09_GitHub_初始_Issue_清單.md`
 - `10_GitHub_Project_建立說明.md`
 
+## 視覺製作文件
+- `Docs/character-visual-production-guide.md`
+- `Docs/character-asset-manifest.csv`
+- `Docs/templates/character-visual-brief-template.md`
+- Unity 選單：`Phalanx Chronicle/Visuals/Prepare Character Art Pipeline`
+- 角色美術生成器：`python3 scripts/generate_character_art.py`
+
 ## GitHub 協作
 - 已補上 `.gitignore`，可避免 Unity 產生檔進版控
 - 已補上 `.github/ISSUE_TEMPLATE/` 與 `PULL_REQUEST_TEMPLATE.md`

@@ -116,6 +116,16 @@ namespace PhalanxChronicle.Core
                             focusUnit,
                             ActiveSkillRules.GetPowerStrikeBonus())
                         : 0;
+                case ActiveSkillType.DragonPierce:
+                    return primaryTarget.Id == focusUnit.Id
+                        ? BattlePreviewCalculator.EstimateAttackDamage(
+                            context,
+                            caster,
+                            origin,
+                            focusUnit,
+                            ActiveSkillRules.GetDragonPierceBonus(caster),
+                            ActiveSkillRules.GetDragonPierceIgnoredDefense(caster))
+                        : 0;
                 case ActiveSkillType.PinningShot:
                     return primaryTarget.Id == focusUnit.Id
                         ? BattlePreviewCalculator.EstimateAttackDamage(
@@ -123,22 +133,23 @@ namespace PhalanxChronicle.Core
                             caster,
                             origin,
                             focusUnit,
-                            ActiveSkillRules.GetPinningShotBonus())
+                            ActiveSkillRules.GetPinningShotBonus(caster))
                         : 0;
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.SkyVolley:
+                case ActiveSkillType.FireStratagem:
+                case ActiveSkillType.EightTrigramInferno:
                     return BattlePreviewCalculator.GetVolleyTargets(context, primaryTarget).Any(unit => unit.Id == focusUnit.Id)
                         ? BattlePreviewCalculator.EstimateAttackDamage(
                             context,
                             caster,
                             origin,
                             focusUnit,
-                            caster.ActiveSkill == ActiveSkillType.SkyVolley
-                                ? ActiveSkillRules.GetSkyVolleyBonus()
-                                : ActiveSkillRules.GetVolleyBonus())
+                            GetAreaSkillBonus(caster))
                         : 0;
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
+                case ActiveSkillType.WesternStampede:
                     return BattlePreviewCalculator.GetGreenDragonSlashTargets(context, origin, primaryTarget).Any(unit => unit.Id == focusUnit.Id)
                         ? BattlePreviewCalculator.EstimateAttackDamage(
                             context,
@@ -146,11 +157,28 @@ namespace PhalanxChronicle.Core
                             origin,
                             focusUnit,
                             caster.ActiveSkill == ActiveSkillType.AzureDragonSlash
-                                ? ActiveSkillRules.GetAzureDragonSlashBonus()
-                                : ActiveSkillRules.GetGreenDragonSlashBonus())
+                                ? ActiveSkillRules.GetAzureDragonSlashBonus(caster)
+                                : caster.ActiveSkill == ActiveSkillType.WesternStampede
+                                    ? ActiveSkillRules.GetWesternStampedeBonus(caster)
+                                    : ActiveSkillRules.GetGreenDragonSlashBonus(caster))
                         : 0;
                 default:
                     return 0;
+            }
+        }
+
+        private static int GetAreaSkillBonus(UnitRuntimeState caster)
+        {
+            switch (caster.ActiveSkill)
+            {
+                case ActiveSkillType.SkyVolley:
+                    return ActiveSkillRules.GetSkyVolleyBonus(caster);
+                case ActiveSkillType.FireStratagem:
+                    return ActiveSkillRules.GetFireStratagemBonus(caster);
+                case ActiveSkillType.EightTrigramInferno:
+                    return ActiveSkillRules.GetEightTrigramInfernoBonus(caster);
+                default:
+                    return ActiveSkillRules.GetVolleyBonus(caster);
             }
         }
     }

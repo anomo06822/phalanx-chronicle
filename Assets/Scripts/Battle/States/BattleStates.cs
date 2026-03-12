@@ -251,7 +251,7 @@ namespace PhalanxChronicle.Battle.States
 
         public override void Enter()
         {
-            BattleManager.SetLog(LocalizationService.Text("ui.log.select_target", "Select an enemy target."));
+            BattleManager.SetLog(LocalizationService.Text("ui.log.select_target_cancel", "Select an enemy target, or click the acting unit to cancel."));
             BattleManager.ShowAttackRangeForSelection();
         }
 
@@ -262,6 +262,12 @@ namespace PhalanxChronicle.Battle.States
 
         public override void OnUnitClicked(Unit unitView)
         {
+            if (unitView != null && BattleManager.IsSelectedUnit(unitView.UnitId))
+            {
+                BattleManager.ChangeState<UnitActionMenuState>();
+                return;
+            }
+
             if (!BattleManager.TryAttackSelection(unitView.UnitId))
             {
                 if (BattleManager.TrySwitchSelectionTo(unitView))
@@ -291,7 +297,7 @@ namespace PhalanxChronicle.Battle.States
 
         public override void Enter()
         {
-            BattleManager.SetLog(LocalizationService.Text("ui.log.select_skill_target", "Select a skill target."));
+            BattleManager.SetLog(LocalizationService.Text("ui.log.select_skill_target_cancel", "Select a skill target, or click the acting unit to cancel."));
             BattleManager.ShowSkillRangeForSelection();
         }
 
@@ -302,6 +308,12 @@ namespace PhalanxChronicle.Battle.States
 
         public override void OnUnitClicked(Unit unitView)
         {
+            if (unitView != null && BattleManager.IsSelectedUnit(unitView.UnitId))
+            {
+                BattleManager.ChangeState<UnitActionMenuState>();
+                return;
+            }
+
             if (!BattleManager.TryUseSkillSelection(unitView.UnitId))
             {
                 if (BattleManager.TrySwitchSelectionTo(unitView))

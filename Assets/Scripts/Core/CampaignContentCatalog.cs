@@ -8,7 +8,19 @@ namespace PhalanxChronicle.Core
     {
         Weapon = 0,
         Armor = 1,
-        SpecialGood = 2,
+        Mount = 2,
+        SpecialGood = 3,
+    }
+
+    public enum TreasureEffectType
+    {
+        None = 0,
+        SkillDamageBonus = 1,
+        StatusDurationBonus = 2,
+        GuardOnLowHp = 3,
+        IgnoreHazardTick = 4,
+        FortHealingBonus = 5,
+        MovePlusOneOnFirstThreeTurns = 6,
     }
 
     [Serializable]
@@ -24,7 +36,11 @@ namespace PhalanxChronicle.Core
             int attackBonus = 0,
             int defenseBonus = 0,
             int hpBonus = 0,
-            IReadOnlyList<UnitRole> allowedRoles = null)
+            int moveBonus = 0,
+            IReadOnlyList<UnitRole> allowedRoles = null,
+            bool isTreasure = false,
+            TreasureEffectType treasureEffect = TreasureEffectType.None,
+            string recommendedOwnerUnitId = "")
         {
             ItemId = itemId ?? string.Empty;
             Category = category;
@@ -35,7 +51,11 @@ namespace PhalanxChronicle.Core
             AttackBonus = attackBonus;
             DefenseBonus = defenseBonus;
             HpBonus = hpBonus;
+            MoveBonus = moveBonus;
             AllowedRoles = allowedRoles ?? Array.Empty<UnitRole>();
+            IsTreasure = isTreasure;
+            TreasureEffect = treasureEffect;
+            RecommendedOwnerUnitId = recommendedOwnerUnitId ?? string.Empty;
         }
 
         public string ItemId { get; }
@@ -56,9 +76,20 @@ namespace PhalanxChronicle.Core
 
         public int HpBonus { get; }
 
+        public int MoveBonus { get; }
+
         public IReadOnlyList<UnitRole> AllowedRoles { get; }
 
-        public bool IsEquipable => Category == ItemCategory.Weapon || Category == ItemCategory.Armor;
+        public bool IsTreasure { get; }
+
+        public TreasureEffectType TreasureEffect { get; }
+
+        public string RecommendedOwnerUnitId { get; }
+
+        public bool IsEquipable =>
+            Category == ItemCategory.Weapon ||
+            Category == ItemCategory.Armor ||
+            Category == ItemCategory.Mount;
 
         public bool CanEquip(UnitRole role)
         {
@@ -180,12 +211,17 @@ namespace PhalanxChronicle.Core
                 ["scout-war-cloak"] = new ItemDefinition("scout-war-cloak", ItemCategory.Armor, "item.scout_war_cloak.name", "Scout War Cloak", "item.scout_war_cloak.desc", "A reinforced cloak that keeps elite scouts fast without leaving them exposed.", defenseBonus: 1, hpBonus: 2, allowedRoles: ScoutOnly),
                 ["storm-lance"] = new ItemDefinition("storm-lance", ItemCategory.Weapon, "item.storm_lance.name", "Storm Lance", "item.storm_lance.desc", "A charge lance heavy enough to smash a hole in a pinned formation.", attackBonus: 2, allowedRoles: RaiderOnly),
                 ["raider-war-harness"] = new ItemDefinition("raider-war-harness", ItemCategory.Armor, "item.raider_war_harness.name", "Raider War Harness", "item.raider_war_harness.desc", "Extra plates strapped for impact without sacrificing the momentum of a raid.", defenseBonus: 1, hpBonus: 3, allowedRoles: RaiderOnly),
-                ["yellow-turban-signet"] = new ItemDefinition("yellow-turban-signet", ItemCategory.SpecialGood, "item.yellow_turban_signet.name", "Yellow Turban Signet", "item.yellow_turban_signet.desc", "Proof of Guangzong's fall and a mark of growing reputation."),
-                ["changban-scout-map"] = new ItemDefinition("changban-scout-map", ItemCategory.SpecialGood, "item.changban_scout_map.name", "Changban Scout Map", "item.changban_scout_map.desc", "A field map annotated during the Changban withdrawal."),
-                ["bowang-fire-token"] = new ItemDefinition("bowang-fire-token", ItemCategory.SpecialGood, "item.bowang_fire_token.name", "Bowang Fire Token", "item.bowang_fire_token.desc", "A command token tied to the ambush that burned across Bowangpo."),
-                ["jiameng-oath-banner"] = new ItemDefinition("jiameng-oath-banner", ItemCategory.SpecialGood, "item.jiameng_oath_banner.name", "Jiameng Oath Banner", "item.jiameng_oath_banner.desc", "A banner taken when the gate stand-off finally broke in Liu Bei's favor."),
-                ["hanshui-command-seal"] = new ItemDefinition("hanshui-command-seal", ItemCategory.SpecialGood, "item.hanshui_command_seal.name", "Hanshui Command Seal", "item.hanshui_command_seal.desc", "A riverfront seal showing the Han camp line held and counterstruck."),
-                ["dingjun-war-banner"] = new ItemDefinition("dingjun-war-banner", ItemCategory.SpecialGood, "item.dingjun_war_banner.name", "Dingjun War Banner", "item.dingjun_war_banner.desc", "A captured banner from the Dingjun advance, kept as a campaign trophy."),
+                ["field-horse"] = new ItemDefinition("field-horse", ItemCategory.Mount, "item.field_horse.name", "Field Horse", "item.field_horse.desc", "A dependable campaign horse that adds a little more reach to every move.", moveBonus: 1),
+                ["swift-warhorse"] = new ItemDefinition("swift-warhorse", ItemCategory.Mount, "item.swift_warhorse.name", "Swift Warhorse", "item.swift_warhorse.desc", "A faster warhorse bred for aggressive repositioning and sudden breakthroughs.", moveBonus: 2),
+                ["yellow-turban-signet"] = new ItemDefinition("yellow-turban-signet", ItemCategory.Armor, "item.yellow_turban_signet.name", "Yellow Turban Signet", "item.yellow_turban_signet.desc", "A bronze signet seized at Guangzong. It hardens the command line when the battle turns desperate.", defenseBonus: 1, hpBonus: 2, allowedRoles: CommanderOnly, isTreasure: true, treasureEffect: TreasureEffectType.GuardOnLowHp, recommendedOwnerUnitId: "player-liu-bei"),
+                ["bowang-fire-token"] = new ItemDefinition("bowang-fire-token", ItemCategory.Weapon, "item.bowang_fire_token.name", "Bowang Fire Token", "item.bowang_fire_token.desc", "A signal token from the Bowangpo ambush. It sharpens the force behind tactical battle arts.", attackBonus: 1, allowedRoles: CommanderOnly, isTreasure: true, treasureEffect: TreasureEffectType.SkillDamageBonus, recommendedOwnerUnitId: "player-zhuge-liang"),
+                ["changban-scout-map"] = new ItemDefinition("changban-scout-map", ItemCategory.Mount, "item.changban_scout_map.name", "Changban Scout Map", "item.changban_scout_map.desc", "An escape map marked at full gallop through Changban. The rider reads the ground before anyone else.", moveBonus: 1, allowedRoles: ScoutOnly, isTreasure: true, treasureEffect: TreasureEffectType.MovePlusOneOnFirstThreeTurns, recommendedOwnerUnitId: "player-zhao-yun"),
+                ["jiangxia-river-reins"] = new ItemDefinition("jiangxia-river-reins", ItemCategory.Mount, "item.jiangxia_river_reins.name", "Jiangxia River Reins", "item.jiangxia_river_reins.desc", "River-worn reins taken from the Jiangxia crossing. The mount keeps pace even through fire and broken banks.", moveBonus: 1, isTreasure: true, treasureEffect: TreasureEffectType.IgnoreHazardTick, recommendedOwnerUnitId: "player-liu-bei"),
+                ["jiameng-oath-banner"] = new ItemDefinition("jiameng-oath-banner", ItemCategory.Armor, "item.jiameng_oath_banner.name", "Jiameng Oath Banner", "item.jiameng_oath_banner.desc", "A battle banner from the pass. Its oath-lashed silk lets pressure effects linger on routed foes.", defenseBonus: 1, hpBonus: 2, allowedRoles: RaiderOnly, isTreasure: true, treasureEffect: TreasureEffectType.StatusDurationBonus, recommendedOwnerUnitId: "player-ma-chao"),
+                ["luocheng-breach-hammer"] = new ItemDefinition("luocheng-breach-hammer", ItemCategory.Weapon, "item.luocheng_breach_hammer.name", "Luocheng Breach Hammer", "item.luocheng_breach_hammer.desc", "A city-breaker's head refitted for field command. It turns every crushing strike into a deeper crack in the line.", attackBonus: 2, allowedRoles: GuardianOnly, isTreasure: true, treasureEffect: TreasureEffectType.SkillDamageBonus, recommendedOwnerUnitId: "player-zhang-fei"),
+                ["yangping-stone-route"] = new ItemDefinition("yangping-stone-route", ItemCategory.Mount, "item.yangping_stone_route.name", "Yangping Stone Route", "item.yangping_stone_route.desc", "A hidden mountain route mapped through falling stone. The rider finds a flank before the pass fully closes.", moveBonus: 1, allowedRoles: RaiderOnly, isTreasure: true, treasureEffect: TreasureEffectType.MovePlusOneOnFirstThreeTurns, recommendedOwnerUnitId: "player-ma-chao"),
+                ["hanshui-command-seal"] = new ItemDefinition("hanshui-command-seal", ItemCategory.Armor, "item.hanshui_command_seal.name", "Hanshui Command Seal", "item.hanshui_command_seal.desc", "A riverbank seal carried from the Hanshui counterstroke. Fortified ground answers more readily to its bearer.", defenseBonus: 1, hpBonus: 2, allowedRoles: RangerOnly, isTreasure: true, treasureEffect: TreasureEffectType.FortHealingBonus, recommendedOwnerUnitId: "player-huang-zhong"),
+                ["dingjun-war-banner"] = new ItemDefinition("dingjun-war-banner", ItemCategory.Weapon, "item.dingjun_war_banner.name", "Dingjun War Banner", "item.dingjun_war_banner.desc", "A captured banner from Dingjun Mountain. Its weight turns a finishing art into a decisive kill stroke.", attackBonus: 2, allowedRoles: GuardianOnly, isTreasure: true, treasureEffect: TreasureEffectType.SkillDamageBonus, recommendedOwnerUnitId: "player-guan-yu"),
             };
 
         public static IReadOnlyList<ItemDefinition> All => Items.Values.OrderBy(item => item.ItemId, StringComparer.Ordinal).ToList();
@@ -216,6 +252,8 @@ namespace PhalanxChronicle.Core
                 ["scout-war-cloak"] = new ShopOfferDefinition("scout-war-cloak", 55, 1),
                 ["storm-lance"] = new ShopOfferDefinition("storm-lance", 85, 2),
                 ["raider-war-harness"] = new ShopOfferDefinition("raider-war-harness", 60, 1),
+                ["field-horse"] = new ShopOfferDefinition("field-horse", 40, 0),
+                ["swift-warhorse"] = new ShopOfferDefinition("swift-warhorse", 80, 1),
             };
 
         public static IReadOnlyList<ShopOfferDefinition> All => Offers.Values.OrderBy(offer => offer.ItemId, StringComparer.Ordinal).ToList();
@@ -258,17 +296,17 @@ namespace PhalanxChronicle.Core
                 },
                 ["player-zhuge-liang"] = new[]
                 {
-                    new PromotionDefinition("sleeping_dragon", "player-zhuge-liang", "sleeping_dragon", "sleeping_dragon", PassiveSkillType.BenevolentCommand, "skill.benevolent_command.name", "skill.benevolent_command.desc", ActiveSkillType.ImperialAid, "skill.imperial_aid.name", "skill.imperial_aid.desc", 2, 1, 1, 4),
+                    new PromotionDefinition("sleeping_dragon", "player-zhuge-liang", "sleeping_dragon", "sleeping_dragon", PassiveSkillType.BenevolentCommand, "skill.benevolent_command.name", "skill.benevolent_command.desc", ActiveSkillType.EightTrigramInferno, "skill.eight_trigram_inferno.name", "skill.eight_trigram_inferno.desc", 2, 1, 1, 4),
                     new PromotionDefinition("tactician_general", "player-zhuge-liang", "tactician_general", "tactician_general", PassiveSkillType.CommandAura, "skill.command_aura.name", "skill.command_aura.desc", ActiveSkillType.GuardOrder, "skill.guard_order.name", "skill.guard_order.desc", 3, 1, 1, 3),
                 },
                 ["player-zhao-yun"] = new[]
                 {
-                    new PromotionDefinition("white_horse_general", "player-zhao-yun", "white_horse_general", "white_horse_general", PassiveSkillType.GaleStride, "skill.gale_stride.name", "skill.gale_stride.desc", ActiveSkillType.PowerStrike, "skill.power_strike.name", "skill.power_strike.desc", 4, 2, 1, 1),
+                    new PromotionDefinition("white_horse_general", "player-zhao-yun", "white_horse_general", "white_horse_general", PassiveSkillType.GaleStride, "skill.gale_stride.name", "skill.gale_stride.desc", ActiveSkillType.DragonPierce, "skill.dragon_pierce.name", "skill.dragon_pierce.desc", 4, 2, 1, 1),
                     new PromotionDefinition("dragon_lancer", "player-zhao-yun", "dragon_lancer", "dragon_lancer", PassiveSkillType.ArmorBreak, "skill.armor_break.name", "skill.armor_break.desc", ActiveSkillType.GreenDragonSlash, "skill.green_dragon_slash.name", "skill.green_dragon_slash.desc", 5, 2, 1, 0),
                 },
                 ["player-ma-chao"] = new[]
                 {
-                    new PromotionDefinition("storm_raider", "player-ma-chao", "storm_raider", "storm_raider", PassiveSkillType.ThunderVanguard, "skill.thunder_vanguard.name", "skill.thunder_vanguard.desc", ActiveSkillType.PowerStrike, "skill.power_strike.name", "skill.power_strike.desc", 5, 2, 1, 0),
+                    new PromotionDefinition("storm_raider", "player-ma-chao", "storm_raider", "storm_raider", PassiveSkillType.ThunderVanguard, "skill.thunder_vanguard.name", "skill.thunder_vanguard.desc", ActiveSkillType.WesternStampede, "skill.western_stampede.name", "skill.western_stampede.desc", 5, 2, 1, 0),
                     new PromotionDefinition("western_lancer", "player-ma-chao", "western_lancer", "western_lancer", PassiveSkillType.GaleStride, "skill.gale_stride.name", "skill.gale_stride.desc", ActiveSkillType.WarCry, "skill.war_cry.name", "skill.war_cry.desc", 4, 2, 1, 1),
                 },
             };

@@ -29,12 +29,20 @@ namespace PhalanxChronicle.Battle
             try
             {
                 CampaignSaveFileDto dto = JsonUtility.FromJson<CampaignSaveFileDto>(File.ReadAllText(savePath));
-                if (dto == null || dto.version != 1 || (!string.IsNullOrWhiteSpace(expectedCampaignId) && dto.campaignId != expectedCampaignId))
+                if (dto == null ||
+                    (dto.version != 1 && dto.version != 2 && dto.version != 3) ||
+                    (!string.IsNullOrWhiteSpace(expectedCampaignId) && dto.campaignId != expectedCampaignId))
                 {
                     return false;
                 }
 
                 saveData = ToModel(dto);
+                bool normalized = progressionService.NormalizeSave(saveData);
+                if (normalized)
+                {
+                    Save(saveData);
+                }
+
                 return saveData != null;
             }
             catch (Exception exception)
@@ -99,7 +107,10 @@ namespace PhalanxChronicle.Battle
                         dto.progress.lastBattleResult.roundCount,
                         dto.progress.lastBattleResult.survivingUnitIds ?? new List<string>())
                     : null,
-                dto.progress != null ? dto.progress.claimedRewardScenarioIds : Array.Empty<string>());
+                dto.progress != null ? dto.progress.claimedRewardScenarioIds : Array.Empty<string>(),
+                dto.progress != null && dto.progress.scenarioClearCounts != null
+                    ? dto.progress.scenarioClearCounts.ToDictionary(entry => entry.scenarioId, entry => entry.clearCount)
+                    : null);
 
             CampaignInventoryState inventory = new CampaignInventoryState(
                 dto.inventory != null ? dto.inventory.supplies : 0,
@@ -130,7 +141,7 @@ namespace PhalanxChronicle.Battle
                     unit.classId,
                     unit.growthProfileId,
                     (AiProfileType)unit.aiProfile,
-                    new EquipmentLoadout(unit.weaponId, unit.armorId),
+                    new EquipmentLoadout(unit.weaponId, unit.armorId, unit.mountId),
                     unit.level,
                     unit.currentExp,
                     new BondState(unit.supportLevel, unit.sharedBattles),
@@ -138,7 +149,7 @@ namespace PhalanxChronicle.Battle
                 .ToList()
                 : new List<CampaignUnitState>();
 
-            return new CampaignSaveData(dto.campaignId, progress, inventory, units, dto.version);
+            return new CampaignSaveData(dto.campaignId, progress, inventory, units, dto.version < 3 ? 3 : dto.version);
         }
 
         private static CampaignSaveFileDto ToDto(CampaignSaveData saveData)
@@ -152,6 +163,14 @@ namespace PhalanxChronicle.Battle
                     unlockedStageIndex = saveData.Progress.UnlockedStageIndex,
                     clearedScenarioIds = saveData.Progress.ClearedScenarioIds.ToList(),
                     claimedRewardScenarioIds = saveData.Progress.ClaimedRewardScenarioIds.ToList(),
+                    scenarioClearCounts = saveData.Progress.ScenarioClearCounts
+                        .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                        .Select(entry => new ScenarioClearCountDto
+                        {
+                            scenarioId = entry.Key,
+                            clearCount = entry.Value,
+                        })
+                        .ToList(),
                     lastBattleResult = saveData.Progress.LastBattleResult == null
                         ? null
                         : new BattleResultSummaryDto
@@ -195,6 +214,7 @@ namespace PhalanxChronicle.Battle
                         aiProfile = (int)unit.AiProfile,
                         weaponId = unit.EquipmentLoadout.WeaponId,
                         armorId = unit.EquipmentLoadout.ArmorId,
+                        mountId = unit.EquipmentLoadout.MountId,
                         level = unit.Level,
                         currentExp = unit.CurrentExp,
                         supportLevel = unit.BondState.SupportLevel,
@@ -221,7 +241,15 @@ namespace PhalanxChronicle.Battle
             public int unlockedStageIndex;
             public List<string> clearedScenarioIds;
             public List<string> claimedRewardScenarioIds;
+            public List<ScenarioClearCountDto> scenarioClearCounts;
             public BattleResultSummaryDto lastBattleResult;
+        }
+
+        [Serializable]
+        private sealed class ScenarioClearCountDto
+        {
+            public string scenarioId;
+            public int clearCount;
         }
 
         [Serializable]
@@ -273,6 +301,7 @@ namespace PhalanxChronicle.Battle
             public int aiProfile;
             public string weaponId;
             public string armorId;
+            public string mountId;
             public int level;
             public int currentExp;
             public int supportLevel;

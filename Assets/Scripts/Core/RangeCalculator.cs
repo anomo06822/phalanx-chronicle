@@ -12,7 +12,7 @@ namespace PhalanxChronicle.Core
                 return new List<GridPosition> { unit.Position };
             }
 
-            int moveRange = PassiveSkillRules.GetMoveRange(unit);
+            int moveRange = PassiveSkillRules.GetMoveRange(unit) + EquipmentEffectRules.GetMoveBonus(context, unit);
             Dictionary<GridPosition, int> distances = new Dictionary<GridPosition, int>();
             Queue<GridPosition> frontier = new Queue<GridPosition>();
             frontier.Enqueue(unit.Position);

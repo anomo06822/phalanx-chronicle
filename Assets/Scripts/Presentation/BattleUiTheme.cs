@@ -51,6 +51,9 @@ namespace PhalanxChronicle.Presentation
         public static readonly Color SelectedTileTint = new Color(0.92f, 0.82f, 0.53f, 1f);
         public static readonly Color GridFrameWalkable = new Color(0.11f, 0.09f, 0.07f, 0.36f);
         public static readonly Color GridFrameBlocked = new Color(0.06f, 0.06f, 0.07f, 0.76f);
+        public static readonly Color GridFrameForest = new Color(0.16f, 0.24f, 0.15f, 0.66f);
+        public static readonly Color GridFrameFort = new Color(0.4f, 0.35f, 0.28f, 0.7f);
+        public static readonly Color GridFrameHazard = new Color(0.44f, 0.21f, 0.14f, 0.74f);
         public static readonly Color MoveFrameHighlight = new Color(0.43f, 0.74f, 0.85f, 0.94f);
         public static readonly Color AttackFrameHighlight = new Color(0.87f, 0.47f, 0.36f, 0.96f);
         public static readonly Color SkillFrameHighlight = new Color(0.48f, 0.78f, 0.56f, 0.94f);
@@ -84,6 +87,26 @@ namespace PhalanxChronicle.Presentation
             }
 
             return alternate ? GridWalkableLight : GridWalkableDark;
+        }
+
+        public static Color GetGridFrameColor(TerrainType terrainType, bool blocked)
+        {
+            if (blocked)
+            {
+                return GridFrameBlocked;
+            }
+
+            switch (terrainType)
+            {
+                case TerrainType.Forest:
+                    return GridFrameForest;
+                case TerrainType.Fort:
+                    return GridFrameFort;
+                case TerrainType.Hazard:
+                    return GridFrameHazard;
+                default:
+                    return GridFrameWalkable;
+            }
         }
 
     }

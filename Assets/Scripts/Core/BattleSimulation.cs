@@ -86,6 +86,15 @@ namespace PhalanxChronicle.Core
                 : new List<UnitRuntimeState>();
         }
 
+        public IReadOnlyList<GridPosition> GetSkillAffectedPositions(string casterUnitId, string primaryTargetId)
+        {
+            UnitRuntimeState caster = Context.GetUnit(casterUnitId);
+            UnitRuntimeState primaryTarget = Context.GetUnit(primaryTargetId);
+            return CanControlUnit(caster) && primaryTarget != null
+                ? skillSystem.GetSkillAffectedPositions(Context, caster, primaryTarget)
+                : new List<GridPosition>();
+        }
+
         public bool TryMoveUnit(string unitId, GridPosition destination)
         {
             UnitRuntimeState unit = Context.GetUnit(unitId);

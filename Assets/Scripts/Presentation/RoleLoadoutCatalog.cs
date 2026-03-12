@@ -109,6 +109,8 @@ namespace PhalanxChronicle.Presentation
                     return new Color(0.99f, 0.84f, 0.43f, 1f);
                 case ActiveSkillType.PowerStrike:
                     return new Color(1f, 0.54f, 0.3f, 1f);
+                case ActiveSkillType.DragonPierce:
+                    return new Color(0.5f, 0.92f, 0.78f, 1f);
                 case ActiveSkillType.Volley:
                     return new Color(0.39f, 0.84f, 0.78f, 1f);
                 case ActiveSkillType.GreenDragonSlash:
@@ -127,6 +129,12 @@ namespace PhalanxChronicle.Presentation
                     return new Color(0.42f, 0.86f, 0.94f, 1f);
                 case ActiveSkillType.PinningShot:
                     return new Color(0.5f, 0.88f, 1f, 1f);
+                case ActiveSkillType.WesternStampede:
+                    return new Color(1f, 0.62f, 0.34f, 1f);
+                case ActiveSkillType.FireStratagem:
+                    return new Color(1f, 0.54f, 0.28f, 1f);
+                case ActiveSkillType.EightTrigramInferno:
+                    return new Color(1f, 0.42f, 0.24f, 1f);
                 default:
                     return BattleUiTheme.AccentGold;
             }

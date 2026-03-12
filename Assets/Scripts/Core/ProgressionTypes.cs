@@ -6,17 +6,20 @@ namespace PhalanxChronicle.Core
     [Serializable]
     public sealed class EquipmentLoadout
     {
-        public EquipmentLoadout(string weaponId, string armorId)
+        public EquipmentLoadout(string weaponId, string armorId, string mountId = "")
         {
             WeaponId = weaponId ?? string.Empty;
             ArmorId = armorId ?? string.Empty;
+            MountId = mountId ?? string.Empty;
         }
 
-        public static EquipmentLoadout Empty { get; } = new EquipmentLoadout(string.Empty, string.Empty);
+        public static EquipmentLoadout Empty { get; } = new EquipmentLoadout(string.Empty, string.Empty, string.Empty);
 
         public string WeaponId { get; }
 
         public string ArmorId { get; }
+
+        public string MountId { get; }
     }
 
     [Serializable]

@@ -17,9 +17,10 @@ namespace PhalanxChronicle.Headless.Tests
 
             Assert.Equal(CampaignCatalog.LiuBeiLegendCampaignId, save.CampaignId);
             Assert.Equal(4, save.Units.Count);
-            Assert.Equal(1, save.Version);
+            Assert.Equal(2, save.Version);
             Assert.Equal("vermilion-jian", save.GetUnit("player-liu-bei").EquipmentLoadout.WeaponId);
             Assert.Equal("commander-travel-cloak", save.GetUnit("player-liu-bei").EquipmentLoadout.ArmorId);
+            Assert.Equal(string.Empty, save.GetUnit("player-liu-bei").EquipmentLoadout.MountId);
             Assert.Equal(1, save.Inventory.GetQuantity("vermilion-jian"));
             Assert.Equal(2, save.Inventory.GetQuantity("iron-crescent-glaive"));
             Assert.Equal(2, save.Inventory.GetQuantity("guardian-scale-vest"));
@@ -120,8 +121,74 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Contains("player-zhuge-liang", firstResolution.RecruitedUnitIds);
             Assert.Empty(secondResolution.RecruitedUnitIds);
             Assert.NotNull(save.GetUnit("player-zhuge-liang"));
+            Assert.Equal(ActiveSkillType.FireStratagem, save.GetUnit("player-zhuge-liang").ActiveSkill);
             Assert.Equal(1, save.Inventory.GetQuantity("wind-feather-fan"));
             Assert.Equal(1, save.Inventory.GetQuantity("strategist-robe"));
+        }
+
+        [Fact]
+        public void NormalizeSave_BackfillsMissingRewardRecruitsFromLegacyProgress()
+        {
+            CampaignProgressionService service = new CampaignProgressionService();
+            CampaignSaveData save = service.CreateNewSave(CampaignCatalog.CreateLiuBeiLegend());
+            save.Progress.MarkCleared(BattleScenarioCatalog.ChangbanScenarioId);
+            save.Progress.MarkRewardClaimed(BattleScenarioCatalog.ChangbanScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.JiamengPassScenarioId);
+            save.Progress.MarkRewardClaimed(BattleScenarioCatalog.JiamengPassScenarioId);
+
+            bool normalized = service.NormalizeSave(save);
+            bool normalizedAgain = service.NormalizeSave(save);
+
+            Assert.True(normalized);
+            Assert.False(normalizedAgain);
+            Assert.NotNull(save.GetUnit("player-zhao-yun"));
+            Assert.NotNull(save.GetUnit("player-ma-chao"));
+            Assert.Equal(1, save.Inventory.GetQuantity("white-dragon-spear"));
+            Assert.Equal(1, save.Inventory.GetQuantity("scout-travel-mail"));
+            Assert.Equal(1, save.Inventory.GetQuantity("western-lance"));
+            Assert.Equal(1, save.Inventory.GetQuantity("raider-scale-vest"));
+        }
+
+        [Fact]
+        public void PrepareScenario_PreservesAbsentRecruitProgressAcrossSkippedBattle()
+        {
+            CampaignProgressionService service = new CampaignProgressionService();
+            CampaignSaveData save = service.CreateNewSave(CampaignCatalog.CreateLiuBeiLegend());
+            save.Progress.MarkCleared(BattleScenarioCatalog.ChangbanScenarioId);
+            save.Progress.MarkRewardClaimed(BattleScenarioCatalog.ChangbanScenarioId);
+            service.NormalizeSave(save);
+
+            CampaignUnitState zhaoYun = save.GetUnit("player-zhao-yun");
+            zhaoYun.SyncFromBattle(CreateResolvedRuntime(zhaoYun, 8), 0, 0, 0);
+            save.Inventory.AddItem("field-horse");
+            Assert.True(service.TryEquipMount(save, zhaoYun.UnitId, "field-horse"));
+
+            BattleScenarioData replayScenario = service.PrepareScenario(
+                BattleScenarioCatalog.CreateScenario(BattleScenarioCatalog.BowangpoScenarioId),
+                save);
+            BattleSimulation replaySimulation = new BattleSimulation(replayScenario.Stage);
+            BattleResultSummary replaySummary = new BattleResultSummary(
+                BattleScenarioCatalog.BowangpoScenarioId,
+                TurnSide.Player,
+                4,
+                replaySimulation.Context.GetUnits(UnitFaction.Player, false).Select(unit => unit.Id).ToList());
+
+            service.FinalizeBattle(
+                save,
+                replayScenario,
+                replaySummary,
+                replaySimulation.Context.GetUnits(UnitFaction.Player, false));
+
+            BattleScenarioData jiamengScenario = service.PrepareScenario(
+                BattleScenarioCatalog.CreateScenario(BattleScenarioCatalog.JiamengPassScenarioId),
+                save);
+            UnitDefinitionData zhaoYunDefinition = jiamengScenario.Stage.UnitSpawns
+                .Single(spawn => spawn.Definition.Id == "player-zhao-yun")
+                .Definition;
+
+            Assert.Equal(8, zhaoYunDefinition.StartingLevel);
+            Assert.Equal("field-horse", zhaoYunDefinition.EquipmentLoadout.MountId);
+            Assert.Equal(5, zhaoYunDefinition.MoveRange);
         }
 
         [Fact]
@@ -141,8 +208,11 @@ namespace PhalanxChronicle.Headless.Tests
 
             save.Inventory.AddItem("tempered-jian");
             save.Inventory.AddItem("commander-lamellar");
+            save.Inventory.AddItem("field-horse");
             Assert.True(service.TryEquipWeapon(save, "player-liu-bei", "tempered-jian"));
             Assert.True(service.TryEquipArmor(save, "player-liu-bei", "commander-lamellar"));
+            Assert.True(service.TryEquipMount(save, "player-liu-bei", "field-horse"));
+            Assert.False(service.TryEquipMount(save, "player-guan-yu", "field-horse"));
 
             BattleScenarioData scenario = service.PrepareScenario(CreateSingleDuelScenario(), save);
             UnitDefinitionData liuBei = scenario.Stage.UnitSpawns.Single(spawn => spawn.Definition.Id == "player-liu-bei").Definition;
@@ -150,6 +220,80 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal(10, liuBei.Attack);
             Assert.Equal(6, liuBei.Defense);
             Assert.Equal(32, liuBei.MaxHp);
+            Assert.Equal(4, liuBei.MoveRange);
+        }
+
+        [Fact]
+        public void PrepareScenario_MountMoveBonusStacksWithRapidMarchPassive()
+        {
+            CampaignProgressionService service = new CampaignProgressionService();
+            CampaignUnitState rider = new CampaignUnitState(
+                "player-zhao-yun",
+                "Zhao Yun",
+                "unit.player_zhao_yun",
+                UnitRole.Scout,
+                "role.scout",
+                PassiveSkillType.RapidMarch,
+                "skill.rapid_march.name",
+                "skill.rapid_march.desc",
+                ActiveSkillType.PowerStrike,
+                "skill.power_strike.name",
+                "skill.power_strike.desc",
+                31,
+                11,
+                4,
+                4,
+                1,
+                18,
+                "scout",
+                "scout",
+                AiProfileType.Aggressor,
+                new EquipmentLoadout("white-dragon-spear", "scout-travel-mail", "field-horse"));
+            CampaignSaveData save = new CampaignSaveData(
+                "campaign-test",
+                new CampaignProgress(),
+                new CampaignInventoryState(),
+                new[] { rider },
+                2);
+
+            UnitDefinitionData placeholder = new UnitDefinitionData(
+                "player-zhao-yun",
+                "Zhao Yun",
+                "unit.player_zhao_yun",
+                UnitFaction.Player,
+                UnitRole.Scout,
+                "role.scout",
+                PassiveSkillType.None,
+                "skill.none.name",
+                "skill.none.desc",
+                ActiveSkillType.None,
+                "active.none.name",
+                "active.none.desc",
+                1,
+                1,
+                0,
+                1,
+                1);
+            BattleScenarioData scenario = new BattleScenarioData(
+                "scenario.mount_stack",
+                "Mount Stack",
+                "scenario.mount_stack",
+                new StageDefinitionData(
+                    "Mount Stack",
+                    "stage.mount_stack",
+                    8,
+                    8,
+                    new[] { new UnitSpawnData(placeholder, new GridPosition(1, 1)) },
+                    Array.Empty<GridPosition>()),
+                Array.Empty<ScenarioTrigger>(),
+                rewardBundle: new RewardBundle(0, 0));
+
+            BattleScenarioData prepared = service.PrepareScenario(scenario, save);
+            BattleSimulation simulation = new BattleSimulation(prepared.Stage);
+            UnitRuntimeState zhaoYun = simulation.Context.GetUnit("player-zhao-yun");
+
+            Assert.Equal(5, zhaoYun.MoveRange);
+            Assert.Equal(6, PassiveSkillRules.GetMoveRange(zhaoYun));
         }
 
         [Fact]
@@ -209,6 +353,117 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal("pinning_bow", huangZhong.ClassId);
             Assert.Equal(PassiveSkillType.LongShot, huangZhong.PassiveSkill);
             Assert.Equal(ActiveSkillType.PinningShot, huangZhong.ActiveSkill);
+        }
+
+        [Fact]
+        public void CampaignSaveNormalizer_UpdatesLegacyZhugeSkills()
+        {
+            CampaignUnitState commanderZhuge = new CampaignUnitState(
+                "player-zhuge-liang",
+                "Zhuge Liang",
+                "unit.player_zhuge_liang",
+                UnitRole.Commander,
+                "role.commander",
+                PassiveSkillType.CommandAura,
+                "skill.command_aura.name",
+                "skill.command_aura.desc",
+                ActiveSkillType.RoyalAid,
+                "skill.royal_aid.name",
+                "skill.royal_aid.desc",
+                28,
+                8,
+                4,
+                3,
+                1,
+                20,
+                "commander",
+                "commander",
+                AiProfileType.Support,
+                EquipmentLoadout.Empty);
+            CampaignUnitState sleepingDragonZhuge = new CampaignUnitState(
+                "player-zhuge-liang",
+                "Zhuge Liang",
+                "unit.player_zhuge_liang",
+                UnitRole.Commander,
+                "role.commander",
+                PassiveSkillType.BenevolentCommand,
+                "skill.benevolent_command.name",
+                "skill.benevolent_command.desc",
+                ActiveSkillType.ImperialAid,
+                "skill.imperial_aid.name",
+                "skill.imperial_aid.desc",
+                30,
+                9,
+                5,
+                3,
+                1,
+                24,
+                "sleeping_dragon",
+                "sleeping_dragon",
+                AiProfileType.Support,
+                EquipmentLoadout.Empty,
+                level: 10,
+                hasPromoted: true);
+
+            CampaignSaveData commanderSave = new CampaignSaveData("campaign", new CampaignProgress(), new CampaignInventoryState(), new[] { commanderZhuge });
+            CampaignSaveData sleepingDragonSave = new CampaignSaveData("campaign", new CampaignProgress(), new CampaignInventoryState(), new[] { sleepingDragonZhuge });
+
+            CampaignSaveNormalizer.Normalize(commanderSave);
+            CampaignSaveNormalizer.Normalize(sleepingDragonSave);
+
+            Assert.Equal(ActiveSkillType.FireStratagem, commanderZhuge.ActiveSkill);
+            Assert.Equal("skill.fire_stratagem.name", commanderZhuge.ActiveSkillNameKey);
+            Assert.Equal(ActiveSkillType.EightTrigramInferno, sleepingDragonZhuge.ActiveSkill);
+            Assert.Equal("skill.eight_trigram_inferno.name", sleepingDragonZhuge.ActiveSkillNameKey);
+        }
+
+        [Fact]
+        public void CampaignSaveNormalizer_PreservesTacticianGeneralSupportBranch()
+        {
+            CampaignUnitState tacticianZhuge = new CampaignUnitState(
+                "player-zhuge-liang",
+                "Zhuge Liang",
+                "unit.player_zhuge_liang",
+                UnitRole.Commander,
+                "role.commander",
+                PassiveSkillType.CommandAura,
+                "skill.command_aura.name",
+                "skill.command_aura.desc",
+                ActiveSkillType.GuardOrder,
+                "skill.guard_order.name",
+                "skill.guard_order.desc",
+                31,
+                9,
+                5,
+                3,
+                1,
+                23,
+                "tactician_general",
+                "tactician_general",
+                AiProfileType.Support,
+                EquipmentLoadout.Empty,
+                level: 10,
+                hasPromoted: true);
+            CampaignSaveData save = new CampaignSaveData("campaign", new CampaignProgress(), new CampaignInventoryState(), new[] { tacticianZhuge });
+
+            CampaignSaveNormalizer.Normalize(save);
+
+            Assert.Equal(ActiveSkillType.GuardOrder, tacticianZhuge.ActiveSkill);
+            Assert.Equal("skill.guard_order.name", tacticianZhuge.ActiveSkillNameKey);
+        }
+
+        [Fact]
+        public void PromotionCatalog_ZhugeSleepingDragon_UsesEightTrigramInferno()
+        {
+            PromotionDefinition sleepingDragon = PromotionCatalog
+                .GetOptions("player-zhuge-liang")
+                .Single(definition => definition.PromotionId == "sleeping_dragon");
+            PromotionDefinition tacticianGeneral = PromotionCatalog
+                .GetOptions("player-zhuge-liang")
+                .Single(definition => definition.PromotionId == "tactician_general");
+
+            Assert.Equal(ActiveSkillType.EightTrigramInferno, sleepingDragon.ActiveSkill);
+            Assert.Equal(ActiveSkillType.GuardOrder, tacticianGeneral.ActiveSkill);
         }
 
         private static BattleScenarioData CreateSingleDuelScenario()

@@ -31,37 +31,40 @@ namespace PhalanxChronicle.UI
                 new Vector2(0.5f, 0f),
                 new Vector2(0.5f, 0f),
                 new Vector2(0f, 24f),
-                new Vector2(820f, 154f));
+                new Vector2(872f, 210f));
 
             VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 12f;
-            layout.padding = new RectOffset(18, 18, 14, 18);
+            layout.spacing = 14f;
+            layout.padding = new RectOffset(22, 22, 18, 20);
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
             layout.childForceExpandWidth = true;
 
-            GameObject modePanel = CreateInsetPanel("ActionModePanel", rootObject.transform, 28f, new Color(0.16f, 0.14f, 0.11f, 0.98f));
-            modeLabel = CreateText(modePanel.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextGold);
+            GameObject modePanel = CreateInsetPanel("ActionModePanel", rootObject.transform, 36f, new Color(0.2f, 0.16f, 0.12f, 0.98f));
+            modeLabel = CreateText(modePanel.transform, string.Empty, 18, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextGold);
+            modeLabel.resizeTextForBestFit = true;
+            modeLabel.resizeTextMinSize = 16;
+            modeLabel.resizeTextMaxSize = 18;
             RectTransform modeRect = modeLabel.GetComponent<RectTransform>();
             modeRect.anchorMin = Vector2.zero;
             modeRect.anchorMax = Vector2.one;
-            modeRect.offsetMin = new Vector2(10f, 2f);
-            modeRect.offsetMax = new Vector2(-10f, -2f);
+            modeRect.offsetMin = new Vector2(14f, 4f);
+            modeRect.offsetMax = new Vector2(-14f, -4f);
             LayoutElement modeLayout = modePanel.GetComponent<LayoutElement>();
-            modeLayout.preferredHeight = 28f;
+            modeLayout.preferredHeight = 36f;
 
             GameObject buttonRow = new GameObject("ActionButtons", typeof(RectTransform));
             buttonRow.transform.SetParent(rootObject.transform, false);
             HorizontalLayoutGroup buttonLayout = buttonRow.AddComponent<HorizontalLayoutGroup>();
-            buttonLayout.spacing = 10f;
+            buttonLayout.spacing = 12f;
             buttonLayout.childAlignment = TextAnchor.MiddleCenter;
             buttonLayout.childControlHeight = true;
             buttonLayout.childControlWidth = true;
             buttonLayout.childForceExpandHeight = true;
             buttonLayout.childForceExpandWidth = true;
-            buttonRow.AddComponent<LayoutElement>().preferredHeight = 82f;
+            buttonRow.AddComponent<LayoutElement>().preferredHeight = 126f;
 
             attackButtonView = CreateButton(buttonRow.transform, LocalizationService.Text("ui.button.attack", "Attack"));
             skillButtonView = CreateButton(buttonRow.transform, LocalizationService.Text("ui.button.skill", "Skill"));
@@ -83,7 +86,7 @@ namespace PhalanxChronicle.UI
             BindButton(attackButtonView, LocalizationService.Text("ui.button.attack", "Attack"), model?.AttackDetail, model != null && model.CanAttack, onAttack);
             BindButton(skillButtonView, model?.SkillName ?? LocalizationService.Text("ui.button.skill", "Skill"), model?.SkillDetail, model != null && model.CanUseSkill, onSkill);
             BindButton(waitButtonView, LocalizationService.Text("ui.button.wait", "Wait"), model?.WaitDetail, model == null || model.CanWait, onWait);
-            BindButton(backButtonView, LocalizationService.Text("ui.button.back", "Back"), model?.BackDetail, model != null && model.CanBack, onBack);
+            BindButton(backButtonView, model?.BackLabel ?? LocalizationService.Text("ui.button.back", "Back"), model?.BackDetail, model != null && model.CanBack, onBack);
         }
 
         public void Hide()
@@ -104,10 +107,16 @@ namespace PhalanxChronicle.UI
             view.Button.onClick.RemoveAllListeners();
             view.Button.onClick.AddListener(() => onClick?.Invoke());
 
-            Color baseColor = interactable ? BattleUiTheme.ButtonPrimary : BattleUiTheme.PanelInset;
+            Color baseColor = interactable
+                ? BattleUiTheme.ButtonPrimary
+                : new Color(0.18f, 0.17f, 0.16f, 0.97f);
             view.Background.color = baseColor;
-            view.TitleLabel.color = interactable ? BattleUiTheme.ButtonText : BattleUiTheme.TextDisabled;
-            view.DetailLabel.color = interactable ? new Color(0.22f, 0.15f, 0.08f, 0.92f) : BattleUiTheme.TextDisabled;
+            view.TitleLabel.color = interactable
+                ? BattleUiTheme.ButtonText
+                : new Color(0.9f, 0.88f, 0.84f, 1f);
+            view.DetailLabel.color = interactable
+                ? new Color(0.22f, 0.15f, 0.08f, 0.94f)
+                : new Color(0.74f, 0.75f, 0.78f, 1f);
         }
 
         private static GameObject CreatePanel(
@@ -160,7 +169,7 @@ namespace PhalanxChronicle.UI
             buttonObject.transform.SetParent(parent, false);
 
             LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
-            layoutElement.preferredHeight = 82f;
+            layoutElement.preferredHeight = 124f;
             layoutElement.flexibleWidth = 1f;
 
             Image image = buttonObject.GetComponent<Image>();
@@ -175,7 +184,7 @@ namespace PhalanxChronicle.UI
             ColorBlock colors = button.colors;
             colors.highlightedColor = BattleUiTheme.ButtonPrimaryHighlight;
             colors.pressedColor = BattleUiTheme.ButtonPrimaryPressed;
-            colors.disabledColor = BattleUiTheme.ButtonDisabled;
+            colors.disabledColor = new Color(0.18f, 0.17f, 0.16f, 0.97f);
             button.colors = colors;
 
             GameObject contentObject = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup));
@@ -183,30 +192,30 @@ namespace PhalanxChronicle.UI
             RectTransform contentRect = contentObject.GetComponent<RectTransform>();
             contentRect.anchorMin = Vector2.zero;
             contentRect.anchorMax = Vector2.one;
-            contentRect.offsetMin = new Vector2(10f, 10f);
-            contentRect.offsetMax = new Vector2(-10f, -10f);
+            contentRect.offsetMin = new Vector2(14f, 12f);
+            contentRect.offsetMax = new Vector2(-14f, -12f);
 
             VerticalLayoutGroup contentLayout = contentObject.GetComponent<VerticalLayoutGroup>();
-            contentLayout.spacing = 4f;
+            contentLayout.spacing = 6f;
             contentLayout.childAlignment = TextAnchor.MiddleCenter;
             contentLayout.childControlHeight = true;
             contentLayout.childControlWidth = true;
             contentLayout.childForceExpandHeight = false;
             contentLayout.childForceExpandWidth = true;
 
-            Text titleLabel = CreateText(contentObject.transform, title, 18, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.ButtonText);
+            Text titleLabel = CreateText(contentObject.transform, title, 22, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.ButtonText);
             titleLabel.resizeTextForBestFit = true;
-            titleLabel.resizeTextMinSize = 12;
-            titleLabel.resizeTextMaxSize = 18;
-            titleLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            titleLabel.resizeTextMinSize = 16;
+            titleLabel.resizeTextMaxSize = 22;
+            titleLabel.horizontalOverflow = HorizontalWrapMode.Wrap;
             titleLabel.verticalOverflow = VerticalWrapMode.Truncate;
-            titleLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
+            titleLabel.GetComponent<LayoutElement>().preferredHeight = 50f;
 
-            Text detailLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.22f, 0.15f, 0.08f, 0.92f));
+            Text detailLabel = CreateText(contentObject.transform, string.Empty, 14, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.22f, 0.15f, 0.08f, 0.94f));
             detailLabel.resizeTextForBestFit = true;
-            detailLabel.resizeTextMinSize = 10;
-            detailLabel.resizeTextMaxSize = 12;
-            detailLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
+            detailLabel.resizeTextMinSize = 13;
+            detailLabel.resizeTextMaxSize = 14;
+            detailLabel.GetComponent<LayoutElement>().preferredHeight = 44f;
 
             return new ActionButtonView(button, image, titleLabel, detailLabel);
         }

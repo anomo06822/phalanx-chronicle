@@ -244,12 +244,24 @@ namespace PhalanxChronicle.Core
 
         public void EquipWeapon(string itemId)
         {
-            EquipmentLoadout = new EquipmentLoadout(itemId, EquipmentLoadout.ArmorId);
+            EquipmentLoadout = new EquipmentLoadout(itemId, EquipmentLoadout.ArmorId, EquipmentLoadout.MountId);
         }
 
         public void EquipArmor(string itemId)
         {
-            EquipmentLoadout = new EquipmentLoadout(EquipmentLoadout.WeaponId, itemId);
+            EquipmentLoadout = new EquipmentLoadout(EquipmentLoadout.WeaponId, itemId, EquipmentLoadout.MountId);
+        }
+
+        public void EquipMount(string itemId)
+        {
+            EquipmentLoadout = new EquipmentLoadout(EquipmentLoadout.WeaponId, EquipmentLoadout.ArmorId, itemId);
+        }
+
+        public void SetActiveSkill(ActiveSkillType activeSkill, string activeSkillNameKey, string activeSkillDescriptionKey)
+        {
+            ActiveSkill = activeSkill;
+            ActiveSkillNameKey = activeSkillNameKey ?? string.Empty;
+            ActiveSkillDescriptionKey = activeSkillDescriptionKey ?? string.Empty;
         }
 
         public void SyncFromBattle(UnitRuntimeState runtimeState, int hpBonus, int attackBonus, int defenseBonus)
@@ -304,7 +316,7 @@ namespace PhalanxChronicle.Core
             CampaignProgress progress,
             CampaignInventoryState inventory,
             IReadOnlyList<CampaignUnitState> units,
-            int version = 1)
+            int version = 3)
         {
             CampaignId = campaignId ?? string.Empty;
             Progress = progress ?? new CampaignProgress();

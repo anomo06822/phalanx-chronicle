@@ -32,6 +32,8 @@ namespace PhalanxChronicle.UI
 
         public bool CanBack { get; set; }
 
+        public string BackLabel { get; set; } = string.Empty;
+
         public string BackDetail { get; set; } = string.Empty;
     }
 
@@ -73,6 +75,10 @@ namespace PhalanxChronicle.UI
         public string RoleLabel { get; set; } = string.Empty;
 
         public string PositionLabel { get; set; } = string.Empty;
+
+        public string TerrainName { get; set; } = string.Empty;
+
+        public string TerrainEffectSummary { get; set; } = string.Empty;
 
         public UnitFaction Faction { get; set; }
 
@@ -236,5 +242,7 @@ namespace PhalanxChronicle.UI
         public bool IsEnabled { get; set; } = true;
 
         public bool IsEmphasized { get; set; }
+
+        public bool IsPromotionOption { get; set; }
     }
 }

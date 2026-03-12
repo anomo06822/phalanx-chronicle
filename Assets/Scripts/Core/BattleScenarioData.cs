@@ -13,7 +13,9 @@ namespace PhalanxChronicle.Core
             int recommendedLevel = 1,
             int victoryExpReward = 45,
             int defeatExpReward = 20,
-            RewardBundle rewardBundle = null)
+            RewardBundle rewardBundle = null,
+            int replayDifficultyTier = 0,
+            string scenarioVariantTag = "")
         {
             ScenarioId = scenarioId;
             ScenarioName = scenarioName;
@@ -24,6 +26,8 @@ namespace PhalanxChronicle.Core
             VictoryExpReward = victoryExpReward < 0 ? 0 : victoryExpReward;
             DefeatExpReward = defeatExpReward < 0 ? 0 : defeatExpReward;
             RewardBundle = rewardBundle ?? new RewardBundle(0, 0);
+            ReplayDifficultyTier = replayDifficultyTier < 0 ? 0 : replayDifficultyTier;
+            ScenarioVariantTag = scenarioVariantTag ?? string.Empty;
         }
 
         public string ScenarioId { get; }
@@ -43,5 +47,9 @@ namespace PhalanxChronicle.Core
         public int DefeatExpReward { get; }
 
         public RewardBundle RewardBundle { get; }
+
+        public int ReplayDifficultyTier { get; }
+
+        public string ScenarioVariantTag { get; }
     }
 }

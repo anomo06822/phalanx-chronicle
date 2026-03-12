@@ -11,7 +11,8 @@ namespace PhalanxChronicle.Core
             UnitRuntimeState attacker,
             GridPosition attackerPosition,
             UnitRuntimeState defender,
-            int flatAttackBonus = 0)
+            int flatAttackBonus = 0,
+            int ignoredDefenseBonus = 0)
         {
             if (context == null || attacker == null || defender == null)
             {
@@ -30,7 +31,8 @@ namespace PhalanxChronicle.Core
                                    SupportRules.GetDefenseBonus(context, defender) +
                                    TerrainRules.GetDefenseBonus(context.GetTerrainAt(defender.Position)) +
                                    StatusEffectRules.GetDefenseModifier(defender) -
-                                   PassiveSkillRules.GetIgnoredDefense(attacker);
+                                   PassiveSkillRules.GetIgnoredDefense(attacker) -
+                                   ignoredDefenseBonus;
             if (effectiveDefense < 0)
             {
                 effectiveDefense = 0;
@@ -65,6 +67,17 @@ namespace PhalanxChronicle.Core
                 .ToList();
         }
 
+        public static IReadOnlyList<GridPosition> GetVolleyAreaPositions(GridPosition primaryTargetPosition)
+        {
+            return primaryTargetPosition
+                .GetOrthogonalNeighbors()
+                .Append(primaryTargetPosition)
+                .Distinct()
+                .OrderBy(position => position.Y)
+                .ThenBy(position => position.X)
+                .ToList();
+        }
+
         public static IReadOnlyList<UnitRuntimeState> GetGreenDragonSlashTargets(
             BattleContext context,
             GridPosition attackerPosition,
@@ -95,6 +108,22 @@ namespace PhalanxChronicle.Core
             }
 
             return targets;
+        }
+
+        public static IReadOnlyList<GridPosition> GetGreenDragonSlashAreaPositions(
+            GridPosition attackerPosition,
+            GridPosition primaryTargetPosition)
+        {
+            List<GridPosition> positions = new List<GridPosition> { primaryTargetPosition };
+            int distanceX = primaryTargetPosition.X - attackerPosition.X;
+            int distanceY = primaryTargetPosition.Y - attackerPosition.Y;
+            if (Math.Abs(distanceX) + Math.Abs(distanceY) != 1)
+            {
+                return positions;
+            }
+
+            positions.Add(new GridPosition(primaryTargetPosition.X + distanceX, primaryTargetPosition.Y + distanceY));
+            return positions;
         }
     }
 }

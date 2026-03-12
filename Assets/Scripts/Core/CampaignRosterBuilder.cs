@@ -114,9 +114,9 @@ namespace PhalanxChronicle.Core
                     PassiveSkillType.CommandAura,
                     "skill.command_aura.name",
                     "skill.command_aura.desc",
-                    ActiveSkillType.RoyalAid,
-                    "skill.royal_aid.name",
-                    "skill.royal_aid.desc",
+                    ActiveSkillType.FireStratagem,
+                    "skill.fire_stratagem.name",
+                    "skill.fire_stratagem.desc",
                     26,
                     8,
                     3,
@@ -136,9 +136,9 @@ namespace PhalanxChronicle.Core
                     PassiveSkillType.RapidMarch,
                     "skill.rapid_march.name",
                     "skill.rapid_march.desc",
-                    ActiveSkillType.PowerStrike,
-                    "skill.power_strike.name",
-                    "skill.power_strike.desc",
+                    ActiveSkillType.DragonPierce,
+                    "skill.dragon_pierce.name",
+                    "skill.dragon_pierce.desc",
                     31,
                     11,
                     4,
@@ -158,9 +158,9 @@ namespace PhalanxChronicle.Core
                     PassiveSkillType.Vanguard,
                     "skill.vanguard.name",
                     "skill.vanguard.desc",
-                    ActiveSkillType.PowerStrike,
-                    "skill.power_strike.name",
-                    "skill.power_strike.desc",
+                    ActiveSkillType.WesternStampede,
+                    "skill.western_stampede.name",
+                    "skill.western_stampede.desc",
                     33,
                     12,
                     4,
@@ -185,6 +185,7 @@ namespace PhalanxChronicle.Core
             {
                 inventory.AddItem(unit.EquipmentLoadout.WeaponId);
                 inventory.AddItem(unit.EquipmentLoadout.ArmorId);
+                inventory.AddItem(unit.EquipmentLoadout.MountId);
             }
 
             return new CampaignSaveData(
@@ -192,7 +193,7 @@ namespace PhalanxChronicle.Core
                 new CampaignProgress(),
                 inventory,
                 units,
-                1);
+                3);
         }
 
         public BattleScenarioData BuildScenario(BattleScenarioData baseScenario, CampaignSaveData saveData, bool includeStageReward)
@@ -241,7 +242,9 @@ namespace PhalanxChronicle.Core
                 baseScenario.RecommendedLevel,
                 baseScenario.VictoryExpReward,
                 baseScenario.DefeatExpReward,
-                rewardBundle);
+                rewardBundle,
+                baseScenario.ReplayDifficultyTier,
+                baseScenario.ScenarioVariantTag);
         }
 
         public IReadOnlyList<string> AddRecruitsIfMissing(CampaignSaveData saveData, RewardBundle rewardBundle)
@@ -277,15 +280,18 @@ namespace PhalanxChronicle.Core
 
             inventory.AddItem(loadout.WeaponId);
             inventory.AddItem(loadout.ArmorId);
+            inventory.AddItem(loadout.MountId);
         }
 
         private static UnitDefinitionData BuildDefinition(CampaignUnitState unitState)
         {
             ItemDefinition weapon = ItemCatalog.Get(unitState.EquipmentLoadout.WeaponId);
             ItemDefinition armor = ItemCatalog.Get(unitState.EquipmentLoadout.ArmorId);
+            ItemDefinition mount = ItemCatalog.Get(unitState.EquipmentLoadout.MountId);
             int hpBonus = GetHpBonus(weapon) + GetHpBonus(armor);
             int attackBonus = GetAttackBonus(weapon) + GetAttackBonus(armor);
             int defenseBonus = GetDefenseBonus(weapon) + GetDefenseBonus(armor);
+            int moveBonus = GetMoveBonus(mount);
 
             return new UnitDefinitionData(
                 unitState.UnitId,
@@ -303,7 +309,7 @@ namespace PhalanxChronicle.Core
                 unitState.MaxHp + hpBonus,
                 unitState.Attack + attackBonus,
                 unitState.Defense + defenseBonus,
-                unitState.MoveRange,
+                unitState.MoveRange + moveBonus,
                 unitState.AttackRange,
                 unitState.MaxMana,
                 unitState.ClassId,
@@ -329,6 +335,11 @@ namespace PhalanxChronicle.Core
         private static int GetHpBonus(ItemDefinition definition)
         {
             return definition != null ? definition.HpBonus : 0;
+        }
+
+        private static int GetMoveBonus(ItemDefinition definition)
+        {
+            return definition != null ? definition.MoveBonus : 0;
         }
 
         private sealed class CampaignUnitTemplate

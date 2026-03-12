@@ -140,7 +140,7 @@ namespace PhalanxChronicle.Core
 
         public bool IsAlive => CurrentHp > 0;
 
-        public bool CanUseSkill => ActiveSkill != ActiveSkillType.None && CurrentSkillCooldown == 0;
+        public bool CanUseSkill => ActiveSkill != ActiveSkillType.None;
 
         public void MoveTo(GridPosition position)
         {

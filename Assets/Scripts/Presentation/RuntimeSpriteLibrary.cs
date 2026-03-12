@@ -358,32 +358,44 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateForestTileSprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 border = new Color32(46, 62, 35, 255);
-            Color32 fillA = new Color32(90, 106, 62, 255);
-            Color32 fillB = new Color32(72, 90, 52, 255);
-            Color32 accent = new Color32(128, 146, 83, 255);
+            Color32 border = new Color32(35, 52, 28, 255);
+            Color32 fillA = new Color32(88, 104, 60, 255);
+            Color32 fillB = new Color32(66, 82, 46, 255);
+            Color32 accent = new Color32(138, 162, 90, 255);
             FillBaseTile(texture, border, fillA, fillB, accent);
+            FillCircle(texture, 5, 15, 3, new Color32(90, 124, 61, 255));
+            FillCircle(texture, 14, 15, 3, new Color32(90, 124, 61, 255));
+            FillRect(texture, 8, 4, 11, 10, new Color32(78, 60, 37, 255));
+            DrawLine(texture, 3, 16, 8, 12, accent, 1);
+            DrawLine(texture, 16, 16, 11, 12, accent, 1);
+            DrawLine(texture, 5, 8, 15, 8, new Color32(57, 76, 40, 255), 1);
             return CreateSprite(texture, 20f);
         }
 
         private static Sprite CreateFortTileSprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 border = new Color32(70, 66, 61, 255);
-            Color32 fillA = new Color32(143, 140, 132, 255);
-            Color32 fillB = new Color32(121, 118, 111, 255);
-            Color32 accent = new Color32(175, 172, 162, 255);
+            Color32 border = new Color32(66, 61, 56, 255);
+            Color32 fillA = new Color32(152, 148, 141, 255);
+            Color32 fillB = new Color32(120, 116, 109, 255);
+            Color32 accent = new Color32(191, 184, 170, 255);
             FillBaseTile(texture, border, fillA, fillB, accent);
+            Color32 mortar = new Color32(91, 85, 78, 255);
             for (int y = 4; y <= 14; y += 5)
             {
-                DrawLine(texture, 2, y, 17, y, border, 1);
+                DrawLine(texture, 2, y, 17, y, mortar, 1);
             }
 
             for (int x = 5; x <= 15; x += 5)
             {
-                DrawLine(texture, x, 2, x, 17, border, 1);
+                DrawLine(texture, x, 2, x, 17, mortar, 1);
             }
 
+            FillRect(texture, 2, 2, 5, 5, accent);
+            FillRect(texture, 14, 2, 17, 5, accent);
+            FillRect(texture, 2, 14, 5, 17, accent);
+            FillRect(texture, 14, 14, 17, 17, accent);
+            StrokeRect(texture, 3, 3, 16, 16, border);
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
@@ -391,14 +403,19 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateHazardTileSprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 border = new Color32(62, 34, 22, 255);
-            Color32 fillA = new Color32(93, 58, 40, 255);
-            Color32 fillB = new Color32(75, 44, 33, 255);
-            Color32 accent = new Color32(167, 92, 50, 255);
+            Color32 border = new Color32(74, 30, 17, 255);
+            Color32 fillA = new Color32(101, 48, 30, 255);
+            Color32 fillB = new Color32(78, 30, 21, 255);
+            Color32 accent = new Color32(214, 105, 47, 255);
+            Color32 core = new Color32(255, 190, 104, 255);
             FillBaseTile(texture, border, fillA, fillB, accent);
-            DrawLine(texture, 4, 3, 8, 10, accent, 1);
-            DrawLine(texture, 12, 4, 15, 10, accent, 1);
+            DrawLine(texture, 4, 4, 8, 11, accent, 1);
+            DrawLine(texture, 5, 5, 7, 9, core, 1);
+            DrawLine(texture, 13, 4, 16, 10, accent, 1);
+            DrawLine(texture, 14, 5, 15, 8, core, 1);
             DrawLine(texture, 6, 15, 11, 11, accent, 1);
+            DrawLine(texture, 7, 14, 10, 12, core, 1);
+            FillCircle(texture, 10, 10, 2, new Color32(232, 120, 55, 255));
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
@@ -406,13 +423,16 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateBlockedTileSprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 border = new Color32(36, 40, 44, 255);
-            Color32 fillA = new Color32(83, 88, 95, 255);
-            Color32 fillB = new Color32(65, 70, 78, 255);
-            Color32 accent = new Color32(118, 126, 136, 255);
+            Color32 border = new Color32(27, 31, 37, 255);
+            Color32 fillA = new Color32(67, 72, 80, 255);
+            Color32 fillB = new Color32(50, 56, 64, 255);
+            Color32 accent = new Color32(104, 112, 123, 255);
+            Color32 warning = new Color32(170, 178, 188, 255);
             FillBaseTile(texture, border, fillA, fillB, accent);
-            FillRect(texture, 4, 10, 15, 16, accent);
-            StrokeRect(texture, 4, 10, 15, 16, border);
+            FillRect(texture, 3, 8, 16, 17, accent);
+            StrokeRect(texture, 3, 8, 16, 17, border);
+            DrawLine(texture, 4, 7, 15, 17, warning, 1);
+            DrawLine(texture, 15, 7, 4, 17, warning, 1);
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
@@ -880,7 +900,7 @@ namespace PhalanxChronicle.Presentation
 
         private static Sprite CreateUnitSprite(UnitVisualProfile profile)
         {
-            Texture2D texture = CreateTexture(48, 48);
+            Texture2D texture = CreateTexture(48, 48, FilterMode.Bilinear);
             uint hash = StableHash(profile.UnitId ?? profile.Archetype.ToString());
             int variant = (int)(hash % 3u);
 
@@ -893,7 +913,10 @@ namespace PhalanxChronicle.Presentation
             Color32 primaryShadow = Darken(primary, 0.22f);
             Color32 cloak = Darken(primary, 0.36f);
             Color32 metal = Blend(secondary, new Color32(225, 220, 206, 255), 0.58f);
+            Color32 glow = new Color32(accent.r, accent.g, accent.b, 40);
 
+            FillCircle(texture, 24, 16, 11, glow);
+            FillDiamond(texture, 24, 14, 13, new Color32(accent.r, accent.g, accent.b, 22));
             DrawFieldCloak(texture, profile.Role, cloak, outline);
             DrawFieldBody(texture, profile.Role, primary, primaryShadow, accent, metal, outline);
             DrawFieldHead(texture, profile.Role, profile.Archetype, skin, hair, accent, secondary, outline, variant);
@@ -906,7 +929,7 @@ namespace PhalanxChronicle.Presentation
 
         private static Sprite CreatePortraitSprite(UnitVisualProfile profile)
         {
-            Texture2D texture = CreateTexture(84, 84);
+            Texture2D texture = CreateTexture(84, 84, FilterMode.Bilinear);
             uint hash = StableHash(profile.UnitId ?? profile.Archetype.ToString());
             int variant = (int)(hash % 3u);
 
@@ -921,7 +944,8 @@ namespace PhalanxChronicle.Presentation
             Color32 glow = new Color32(accent.r, accent.g, accent.b, 74);
 
             FillCircle(texture, 42, 48, 24, glow);
-            FillDiamond(texture, 42, 44, 28, new Color32(accent.r, accent.g, accent.b, 36));
+            FillDiamond(texture, 42, 44, 28, new Color32(accent.r, accent.g, accent.b, 28));
+            DrawEllipseRing(texture, 42f, 42f, 28f, 16f, new Color(1f, 1f, 1f, 0.12f), 0.08f);
             DrawPortraitProp(texture, profile.Role, accent, outline);
             DrawPortraitShoulders(texture, profile.Role, primary, cloak, armor, outline);
             DrawPortraitHead(texture, profile.Role, profile.Archetype, skin, hair, accent, secondary, outline, variant);
@@ -937,80 +961,99 @@ namespace PhalanxChronicle.Presentation
             switch (role)
             {
                 case UnitRole.Commander:
-                    FillRect(texture, 8, 11, 39, 27, cloak);
-                    StrokeRect(texture, 8, 11, 39, 27, outline);
+                    FillRect(texture, 11, 10, 36, 24, cloak);
+                    FillTriangle(texture, new Vector2Int(11, 24), new Vector2Int(5, 18), new Vector2Int(10, 9), cloak);
+                    FillTriangle(texture, new Vector2Int(36, 24), new Vector2Int(42, 18), new Vector2Int(37, 9), cloak);
+                    FillTriangle(texture, new Vector2Int(16, 10), new Vector2Int(11, 0), new Vector2Int(22, 10), cloak);
+                    FillTriangle(texture, new Vector2Int(31, 10), new Vector2Int(26, 10), new Vector2Int(36, 0), cloak);
+                    StrokeRect(texture, 11, 10, 36, 24, outline);
                     break;
                 case UnitRole.Guardian:
-                    FillRect(texture, 7, 10, 40, 25, cloak);
-                    StrokeRect(texture, 7, 10, 40, 25, outline);
+                    FillRect(texture, 9, 10, 38, 23, cloak);
+                    FillRect(texture, 5, 18, 14, 28, cloak);
+                    FillRect(texture, 33, 18, 42, 28, cloak);
+                    FillTriangle(texture, new Vector2Int(16, 10), new Vector2Int(12, 0), new Vector2Int(21, 10), cloak);
+                    FillTriangle(texture, new Vector2Int(31, 10), new Vector2Int(27, 10), new Vector2Int(36, 0), cloak);
+                    StrokeRect(texture, 9, 10, 38, 23, outline);
                     break;
                 case UnitRole.Ranger:
-                    FillRect(texture, 10, 11, 37, 25, cloak);
-                    StrokeRect(texture, 10, 11, 37, 25, outline);
+                    FillRect(texture, 13, 11, 34, 23, cloak);
+                    FillTriangle(texture, new Vector2Int(13, 23), new Vector2Int(8, 17), new Vector2Int(12, 10), cloak);
+                    FillTriangle(texture, new Vector2Int(34, 20), new Vector2Int(40, 7), new Vector2Int(34, 9), cloak);
+                    FillTriangle(texture, new Vector2Int(17, 11), new Vector2Int(14, 1), new Vector2Int(24, 11), cloak);
+                    StrokeRect(texture, 13, 11, 34, 23, outline);
                     break;
                 case UnitRole.Scout:
-                    FillRect(texture, 11, 9, 35, 24, cloak);
-                    DrawLine(texture, 11, 9, 7, 4, cloak, 1);
-                    DrawLine(texture, 35, 10, 40, 5, cloak, 1);
+                    FillRect(texture, 14, 12, 31, 22, cloak);
+                    FillTriangle(texture, new Vector2Int(14, 22), new Vector2Int(7, 12), new Vector2Int(13, 9), cloak);
+                    FillTriangle(texture, new Vector2Int(31, 20), new Vector2Int(38, 8), new Vector2Int(30, 10), cloak);
                     break;
                 case UnitRole.Raider:
-                    FillRect(texture, 9, 10, 38, 25, cloak);
-                    DrawLine(texture, 10, 10, 5, 4, cloak, 1);
-                    StrokeRect(texture, 9, 10, 38, 25, outline);
+                    FillRect(texture, 10, 11, 36, 23, cloak);
+                    FillTriangle(texture, new Vector2Int(10, 23), new Vector2Int(4, 8), new Vector2Int(12, 12), cloak);
+                    FillTriangle(texture, new Vector2Int(36, 23), new Vector2Int(42, 14), new Vector2Int(34, 10), cloak);
+                    FillTriangle(texture, new Vector2Int(18, 11), new Vector2Int(10, 0), new Vector2Int(25, 11), cloak);
+                    StrokeRect(texture, 10, 11, 36, 23, outline);
                     break;
             }
         }
 
         private static void DrawFieldBody(Texture2D texture, UnitRole role, Color primary, Color primaryShadow, Color accent, Color metal, Color outline)
         {
-            FillRect(texture, 15, 0, 19, 9, primaryShadow);
-            FillRect(texture, 28, 0, 32, 9, primaryShadow);
-            FillRect(texture, 15, 10, 19, 20, primary);
-            FillRect(texture, 28, 10, 32, 20, primary);
-            FillRect(texture, 13, 21, 34, 38, primary);
-            FillRect(texture, 13, 21, 34, 24, accent);
-            FillRect(texture, 14, 25, 33, 38, primaryShadow);
+            FillRect(texture, 16, 0, 19, 10, primaryShadow);
+            FillRect(texture, 28, 0, 31, 10, primaryShadow);
+            FillRect(texture, 15, 10, 20, 21, primary);
+            FillRect(texture, 27, 10, 32, 21, primary);
+            FillRect(texture, 13, 22, 34, 37, primary);
+            FillRect(texture, 15, 24, 32, 36, primaryShadow);
 
             switch (role)
             {
                 case UnitRole.Commander:
-                    FillRect(texture, 9, 24, 38, 38, primary);
-                    FillRect(texture, 18, 20, 29, 22, accent);
+                    FillRect(texture, 11, 22, 36, 39, primary);
+                    FillRect(texture, 15, 24, 32, 26, accent);
+                    FillRect(texture, 21, 16, 26, 31, metal);
+                    DrawLine(texture, 23, 12, 23, 30, accent, 1);
                     break;
                 case UnitRole.Guardian:
-                    FillRect(texture, 8, 24, 39, 39, primary);
-                    FillRect(texture, 7, 24, 13, 31, metal);
-                    FillRect(texture, 34, 24, 40, 31, metal);
+                    FillRect(texture, 10, 22, 37, 39, primary);
+                    FillRect(texture, 8, 25, 15, 33, metal);
+                    FillRect(texture, 32, 25, 39, 33, metal);
+                    FillRect(texture, 18, 27, 29, 35, Blend(metal, accent, 0.24f));
+                    DrawLine(texture, 14, 35, 33, 35, accent, 1);
                     break;
                 case UnitRole.Ranger:
-                    FillRect(texture, 13, 22, 32, 36, primary);
-                    FillRect(texture, 34, 21, 39, 36, Darken(accent, 0.28f));
-                    DrawLine(texture, 14, 36, 32, 26, accent, 1);
+                    FillRect(texture, 14, 22, 31, 35, primary);
+                    FillRect(texture, 31, 21, 35, 36, Darken(accent, 0.28f));
+                    DrawLine(texture, 15, 33, 31, 26, accent, 1);
+                    DrawLine(texture, 20, 22, 28, 38, metal, 1);
                     break;
                 case UnitRole.Scout:
-                    FillRect(texture, 13, 22, 31, 35, primary);
-                    DrawLine(texture, 12, 32, 33, 21, accent, 1);
-                    DrawLine(texture, 13, 21, 20, 12, accent, 1);
+                    FillRect(texture, 14, 22, 30, 35, primary);
+                    DrawLine(texture, 13, 31, 32, 22, accent, 1);
+                    DrawLine(texture, 17, 22, 22, 12, accent, 1);
+                    DrawLine(texture, 28, 23, 24, 13, metal, 1);
                     break;
                 case UnitRole.Raider:
-                    FillRect(texture, 11, 22, 36, 36, primary);
-                    FillRect(texture, 11, 20, 36, 22, accent);
-                    FillRect(texture, 8, 24, 12, 31, metal);
+                    FillRect(texture, 11, 22, 35, 35, primary);
+                    FillRect(texture, 12, 20, 35, 22, accent);
+                    FillRect(texture, 8, 24, 12, 30, metal);
+                    DrawLine(texture, 30, 34, 39, 22, metal, 1);
                     break;
             }
 
-            StrokeRect(texture, 13, 21, 34, 38, outline);
-            StrokeRect(texture, 15, 10, 19, 20, outline);
-            StrokeRect(texture, 28, 10, 32, 20, outline);
+            StrokeRect(texture, 13, 22, 34, 37, outline);
+            StrokeRect(texture, 15, 10, 20, 21, outline);
+            StrokeRect(texture, 27, 10, 32, 21, outline);
         }
 
         private static void DrawFieldHead(Texture2D texture, UnitRole role, UnitVisualArchetype archetype, Color skin, Color hair, Color accent, Color secondary, Color outline, int variant)
         {
-            FillRect(texture, 16, 36, 31, 46, skin);
-            StrokeRect(texture, 16, 36, 31, 46, outline);
-            FillRect(texture, 15, 43, 32, 47, hair);
-            FillRect(texture, 15, 40, 18, 43, hair);
-            FillRect(texture, 29, 40, 32, 43, hair);
+            FillRect(texture, 17, 36, 30, 45, skin);
+            StrokeRect(texture, 17, 36, 30, 45, outline);
+            FillRect(texture, 16, 43, 31, 47, hair);
+            FillRect(texture, 16, 40, 19, 43, hair);
+            FillRect(texture, 28, 40, 31, 43, hair);
             FillRect(texture, 20, 41, 21, 41, outline);
             FillRect(texture, 26, 41, 27, 41, outline);
 
@@ -1026,53 +1069,78 @@ namespace PhalanxChronicle.Presentation
             switch (archetype)
             {
                 case UnitVisualArchetype.LiuBei:
-                    FillRect(texture, 18, 47, 29, 49, accent);
-                    FillRect(texture, 22, 49, 25, 52, accent);
-                    DrawLine(texture, 21, 37, 26, 37, outline, 1);
+                    FillRect(texture, 19, 45, 28, 48, accent);
+                    FillTriangle(texture, new Vector2Int(21, 48), new Vector2Int(23, 52), new Vector2Int(25, 48), accent);
+                    DrawLine(texture, 19, 37, 21, 34, outline, 1);
+                    DrawLine(texture, 28, 37, 26, 34, outline, 1);
                     break;
                 case UnitVisualArchetype.GuanYu:
-                    FillRect(texture, 17, 46, 30, 49, accent);
-                    FillRect(texture, 21, 35, 26, 46, outline);
-                    FillRect(texture, 22, 31, 25, 35, outline);
+                    FillRect(texture, 18, 45, 29, 48, accent);
+                    FillRect(texture, 21, 34, 26, 45, outline);
+                    FillRect(texture, 22, 30, 25, 34, outline);
+                    DrawLine(texture, 21, 45, 19, 39, outline, 1);
+                    DrawLine(texture, 26, 45, 28, 39, outline, 1);
                     break;
                 case UnitVisualArchetype.ZhangFei:
-                    FillRect(texture, 18, 46, 29, 48, hair);
-                    DrawLine(texture, 18, 36, 20, 38, outline, 1);
-                    DrawLine(texture, 29, 36, 27, 38, outline, 1);
+                    FillRect(texture, 18, 45, 29, 49, hair);
+                    DrawLine(texture, 18, 36, 20, 39, outline, 1);
+                    DrawLine(texture, 29, 36, 27, 39, outline, 1);
+                    DrawLine(texture, 21, 46, 18, 39, outline, 1);
+                    DrawLine(texture, 26, 46, 29, 39, outline, 1);
                     DrawLine(texture, 20, 32, 18, 28, outline, 1);
                     DrawLine(texture, 27, 32, 29, 28, outline, 1);
                     break;
                 case UnitVisualArchetype.HuangZhong:
-                    FillRect(texture, 17, 46, 30, 49, secondary);
-                    DrawLine(texture, 20, 35, 20, 31, secondary, 1);
-                    DrawLine(texture, 27, 35, 27, 31, secondary, 1);
+                    FillRect(texture, 18, 45, 29, 48, secondary);
+                    DrawLine(texture, 20, 44, 18, 38, secondary, 1);
+                    DrawLine(texture, 27, 44, 29, 38, secondary, 1);
+                    DrawLine(texture, 19, 36, 19, 31, secondary, 1);
+                    DrawLine(texture, 28, 36, 28, 31, secondary, 1);
                     break;
                 case UnitVisualArchetype.YellowTurban:
                 case UnitVisualArchetype.YellowTurbanBoss:
                     FillRect(texture, 15, 44, 32, 48, accent);
+                    FillTriangle(texture, new Vector2Int(18, 48), new Vector2Int(24, 52), new Vector2Int(30, 48), accent);
                     if (archetype == UnitVisualArchetype.YellowTurbanBoss)
                     {
-                        FillRect(texture, 21, 48, 26, 50, secondary);
+                        FillRect(texture, 21, 48, 26, 51, secondary);
+                        DrawLine(texture, 23, 51, 23, 54, secondary, 1);
                     }
 
                     break;
                 case UnitVisualArchetype.WeiCommander:
+                    FillRect(texture, 15, 44, 32, 47, secondary);
+                    FillRect(texture, 19, 47, 28, 49, accent);
+                    FillRect(texture, 22, 49, 25, 53, accent);
+                    break;
                 case UnitVisualArchetype.WeiGuardian:
+                    FillRect(texture, 14, 43, 33, 47, secondary);
+                    FillRect(texture, 17, 47, 30, 49, accent);
+                    FillRect(texture, 14, 40, 17, 43, secondary);
+                    FillRect(texture, 30, 40, 33, 43, secondary);
+                    break;
                 case UnitVisualArchetype.WeiRanger:
+                    FillRect(texture, 15, 44, 32, 47, secondary);
+                    DrawLine(texture, 17, 47, 28, 49, accent, 1);
+                    DrawLine(texture, 29, 45, 32, 50, accent, 1);
+                    break;
                 case UnitVisualArchetype.WeiRaider:
-                    FillRect(texture, 14, 44, 33, 47, secondary);
-                    FillRect(texture, 18, 47, 29, 49, accent);
+                    FillRect(texture, 15, 43, 32, 47, secondary);
+                    FillRect(texture, 19, 47, 28, 49, accent);
+                    DrawLine(texture, 15, 43, 12, 48, secondary, 1);
                     break;
                 case UnitVisualArchetype.BossCommander:
-                    FillRect(texture, 17, 47, 30, 49, accent);
+                    FillRect(texture, 16, 46, 31, 49, accent);
                     FillRect(texture, 22, 49, 25, 54, accent);
-                    FillRect(texture, 18, 45, 20, 48, secondary);
-                    FillRect(texture, 27, 45, 29, 48, secondary);
+                    FillRect(texture, 17, 44, 19, 49, secondary);
+                    FillRect(texture, 28, 44, 30, 49, secondary);
+                    DrawLine(texture, 18, 49, 13, 54, accent, 1);
+                    DrawLine(texture, 29, 49, 34, 54, accent, 1);
                     break;
                 default:
                     if (role == UnitRole.Commander)
                     {
-                        FillRect(texture, 18, 47, 29, 49, accent);
+                        FillRect(texture, 18, 46, 29, 49, accent);
                     }
 
                     break;
@@ -1084,25 +1152,27 @@ namespace PhalanxChronicle.Presentation
             switch (role)
             {
                 case UnitRole.Commander:
-                    FillRect(texture, 10, 25, 13, 35, metal);
-                    FillRect(texture, 10, 33, 16, 36, accent);
-                    StrokeRect(texture, 10, 25, 13, 35, outline);
+                    DrawLine(texture, 9, 18, 9, 36, metal, 1);
+                    FillTriangle(texture, new Vector2Int(10, 33), new Vector2Int(17, 30), new Vector2Int(10, 26), accent);
+                    StrokeRect(texture, 8, 25, 10, 35, outline);
                     break;
                 case UnitRole.Guardian:
-                    FillRect(texture, 35, 14, 41, 28, metal);
-                    StrokeRect(texture, 35, 14, 41, 28, outline);
+                    FillRect(texture, 35, 15, 41, 28, metal);
+                    FillRect(texture, 36, 16, 40, 26, Darken(metal, 0.2f));
+                    StrokeRect(texture, 35, 15, 41, 28, outline);
                     break;
                 case UnitRole.Ranger:
-                    DrawLine(texture, 35, 11, 41, 25, metal, 1);
-                    DrawLine(texture, 30, 16, 40, 16, accent, 1);
+                    DrawLine(texture, 36, 12, 41, 25, metal, 1);
+                    DrawLine(texture, 31, 16, 40, 16, accent, 1);
+                    DrawLine(texture, 31, 16, 37, 24, accent, 1);
                     break;
                 case UnitRole.Scout:
-                    DrawLine(texture, 10, 13, 15, 27, metal, 1);
-                    DrawLine(texture, 36, 13, 31, 27, metal, 1);
+                    DrawLine(texture, 11, 14, 16, 28, metal, 1);
+                    DrawLine(texture, 35, 14, 30, 28, metal, 1);
                     break;
                 case UnitRole.Raider:
-                    DrawLine(texture, 7, 10, 39, 37, metal, 1);
-                    DrawLine(texture, 10, 8, 42, 32, metal, 1);
+                    DrawLine(texture, 8, 12, 40, 38, metal, 1);
+                    DrawLine(texture, 11, 10, 43, 34, metal, 1);
                     break;
             }
         }
@@ -1148,20 +1218,22 @@ namespace PhalanxChronicle.Presentation
             switch (role)
             {
                 case UnitRole.Commander:
-                    DrawLine(texture, 14, 20, 14, 66, weaponTint, 1);
-                    FillRect(texture, 14, 46, 24, 54, accent);
-                    StrokeRect(texture, 14, 46, 24, 54, outline);
+                    DrawLine(texture, 16, 18, 16, 68, weaponTint, 1);
+                    FillTriangle(texture, new Vector2Int(17, 50), new Vector2Int(30, 45), new Vector2Int(17, 38), accent);
+                    StrokeRect(texture, 15, 40, 18, 53, outline);
                     break;
                 case UnitRole.Guardian:
-                    DrawLine(texture, 67, 12, 53, 62, weaponTint, 1);
-                    FillRect(texture, 56, 42, 70, 58, accent);
-                    StrokeRect(texture, 56, 42, 70, 58, outline);
+                    DrawLine(texture, 69, 14, 54, 66, weaponTint, 1);
+                    FillRect(texture, 54, 42, 71, 60, accent);
+                    FillRect(texture, 57, 45, 68, 57, Darken(accent, 0.2f));
+                    StrokeRect(texture, 54, 42, 71, 60, outline);
                     break;
                 case UnitRole.Ranger:
-                    DrawLine(texture, 67, 17, 67, 62, accent, 1);
-                    DrawLine(texture, 55, 17, 55, 62, accent, 1);
-                    DrawLine(texture, 55, 17, 67, 40, weaponTint, 1);
-                    DrawLine(texture, 55, 62, 67, 40, weaponTint, 1);
+                    DrawLine(texture, 67, 18, 67, 65, accent, 1);
+                    DrawLine(texture, 55, 18, 55, 65, accent, 1);
+                    DrawLine(texture, 55, 18, 67, 41, weaponTint, 1);
+                    DrawLine(texture, 55, 65, 67, 41, weaponTint, 1);
+                    DrawLine(texture, 60, 26, 60, 54, new Color32(240, 240, 240, 180), 1);
                     break;
                 case UnitRole.Scout:
                     DrawLine(texture, 16, 18, 28, 56, weaponTint, 1);
@@ -1176,24 +1248,27 @@ namespace PhalanxChronicle.Presentation
 
         private static void DrawPortraitShoulders(Texture2D texture, UnitRole role, Color primary, Color cloak, Color armor, Color outline)
         {
-            FillRect(texture, 17, 9, 66, 29, cloak);
-            FillRect(texture, 22, 18, 61, 38, primary);
-            FillRect(texture, 24, 30, 59, 45, Darken(primary, 0.18f));
+            FillRect(texture, 18, 11, 65, 31, cloak);
+            FillRect(texture, 22, 19, 61, 40, primary);
+            FillRect(texture, 24, 31, 59, 46, Darken(primary, 0.18f));
 
             switch (role)
             {
                 case UnitRole.Commander:
-                    FillRect(texture, 15, 23, 69, 35, primary);
+                    FillRect(texture, 16, 23, 68, 37, primary);
                     FillRect(texture, 20, 33, 58, 37, Blend(primary, armor, 0.25f));
+                    DrawLine(texture, 42, 18, 42, 46, armor, 1);
                     break;
                 case UnitRole.Guardian:
-                    FillRect(texture, 13, 21, 70, 39, primary);
-                    FillRect(texture, 12, 26, 23, 42, armor);
-                    FillRect(texture, 60, 26, 71, 42, armor);
+                    FillRect(texture, 13, 21, 70, 40, primary);
+                    FillRect(texture, 11, 26, 24, 43, armor);
+                    FillRect(texture, 59, 26, 72, 43, armor);
+                    FillRect(texture, 31, 29, 52, 40, Blend(armor, primary, 0.34f));
                     break;
                 case UnitRole.Ranger:
-                    FillRect(texture, 21, 21, 60, 35, primary);
-                    FillRect(texture, 57, 22, 65, 47, Darken(primary, 0.26f));
+                    FillRect(texture, 22, 22, 59, 35, primary);
+                    FillRect(texture, 56, 20, 65, 49, Darken(primary, 0.26f));
+                    DrawLine(texture, 29, 35, 54, 21, armor, 1);
                     break;
                 case UnitRole.Scout:
                     FillRect(texture, 20, 21, 61, 34, primary);
@@ -1233,47 +1308,73 @@ namespace PhalanxChronicle.Presentation
             switch (archetype)
             {
                 case UnitVisualArchetype.LiuBei:
-                    FillRect(texture, 34, 64, 49, 69, accent);
-                    FillRect(texture, 39, 69, 44, 75, accent);
+                    FillRect(texture, 34, 63, 49, 68, accent);
+                    FillTriangle(texture, new Vector2Int(38, 68), new Vector2Int(42, 76), new Vector2Int(46, 68), accent);
+                    DrawLine(texture, 34, 40, 37, 34, outline, 1);
+                    DrawLine(texture, 49, 40, 46, 34, outline, 1);
                     break;
                 case UnitVisualArchetype.GuanYu:
                     FillRect(texture, 33, 60, 50, 64, accent);
-                    FillRect(texture, 38, 32, 44, 59, outline);
-                    FillRect(texture, 39, 25, 43, 32, outline);
+                    FillRect(texture, 38, 32, 44, 60, outline);
+                    FillRect(texture, 39, 24, 43, 32, outline);
+                    DrawLine(texture, 37, 60, 33, 48, outline, 1);
+                    DrawLine(texture, 46, 60, 50, 48, outline, 1);
                     break;
                 case UnitVisualArchetype.ZhangFei:
-                    FillRect(texture, 33, 60, 50, 64, hair);
+                    FillRect(texture, 33, 60, 50, 65, hair);
                     DrawLine(texture, 31, 42, 35, 45, outline, 1);
                     DrawLine(texture, 52, 42, 48, 45, outline, 1);
                     DrawLine(texture, 35, 33, 31, 27, outline, 1);
                     DrawLine(texture, 48, 33, 52, 27, outline, 1);
+                    DrawLine(texture, 36, 60, 33, 49, outline, 1);
+                    DrawLine(texture, 47, 60, 50, 49, outline, 1);
                     break;
                 case UnitVisualArchetype.HuangZhong:
                     FillRect(texture, 33, 60, 50, 65, secondary);
-                    DrawLine(texture, 35, 41, 35, 31, secondary, 1);
-                    DrawLine(texture, 48, 41, 48, 31, secondary, 1);
+                    DrawLine(texture, 34, 43, 32, 31, secondary, 1);
+                    DrawLine(texture, 49, 43, 51, 31, secondary, 1);
+                    DrawLine(texture, 34, 60, 30, 49, secondary, 1);
+                    DrawLine(texture, 49, 60, 53, 49, secondary, 1);
                     break;
                 case UnitVisualArchetype.YellowTurban:
                 case UnitVisualArchetype.YellowTurbanBoss:
                     FillRect(texture, 26, 57, 57, 63, accent);
+                    FillTriangle(texture, new Vector2Int(31, 63), new Vector2Int(42, 69), new Vector2Int(54, 63), accent);
                     if (archetype == UnitVisualArchetype.YellowTurbanBoss)
                     {
                         FillRect(texture, 36, 63, 47, 66, secondary);
+                        DrawLine(texture, 41, 66, 41, 74, secondary, 1);
                     }
 
                     break;
                 case UnitVisualArchetype.WeiCommander:
-                case UnitVisualArchetype.WeiGuardian:
-                case UnitVisualArchetype.WeiRanger:
-                case UnitVisualArchetype.WeiRaider:
                     FillRect(texture, 25, 57, 58, 63, secondary);
                     FillRect(texture, 31, 63, 52, 67, accent);
+                    FillRect(texture, 38, 67, 45, 75, accent);
+                    break;
+                case UnitVisualArchetype.WeiGuardian:
+                    FillRect(texture, 25, 56, 58, 63, secondary);
+                    FillRect(texture, 32, 63, 51, 67, accent);
+                    FillRect(texture, 24, 49, 29, 58, secondary);
+                    FillRect(texture, 54, 49, 59, 58, secondary);
+                    break;
+                case UnitVisualArchetype.WeiRanger:
+                    FillRect(texture, 25, 57, 58, 63, secondary);
+                    DrawLine(texture, 31, 63, 52, 67, accent, 1);
+                    DrawLine(texture, 55, 59, 61, 68, accent, 1);
+                    break;
+                case UnitVisualArchetype.WeiRaider:
+                    FillRect(texture, 25, 56, 58, 62, secondary);
+                    FillRect(texture, 31, 62, 52, 66, accent);
+                    DrawLine(texture, 26, 62, 19, 69, secondary, 1);
                     break;
                 case UnitVisualArchetype.BossCommander:
                     FillRect(texture, 33, 63, 50, 69, accent);
                     FillRect(texture, 39, 69, 44, 77, accent);
                     FillRect(texture, 31, 61, 34, 66, secondary);
                     FillRect(texture, 49, 61, 52, 66, secondary);
+                    DrawLine(texture, 33, 68, 24, 78, accent, 1);
+                    DrawLine(texture, 50, 68, 59, 78, accent, 1);
                     break;
             }
 
@@ -1288,12 +1389,14 @@ namespace PhalanxChronicle.Presentation
             switch (role)
             {
                 case UnitRole.Commander:
-                    FillRect(texture, 32, 21, 51, 25, accent);
-                    FillRect(texture, 37, 18, 45, 20, armor);
+                    FillRect(texture, 32, 20, 51, 24, accent);
+                    FillRect(texture, 37, 17, 45, 20, armor);
+                    DrawLine(texture, 42, 20, 42, 36, armor, 1);
                     break;
                 case UnitRole.Guardian:
-                    FillRect(texture, 32, 20, 51, 24, armor);
+                    FillRect(texture, 31, 19, 52, 24, armor);
                     FillRect(texture, 35, 24, 48, 29, accent);
+                    FillRect(texture, 28, 28, 55, 31, armor);
                     break;
                 case UnitRole.Ranger:
                     DrawLine(texture, 27, 31, 56, 20, accent, 1);
@@ -1322,6 +1425,7 @@ namespace PhalanxChronicle.Presentation
                     break;
                 case UnitVisualArchetype.GuanYu:
                     FillRect(texture, 36, 18, 47, 22, accent);
+                    DrawLine(texture, 41, 22, 41, 16, armor, 1);
                     break;
                 case UnitVisualArchetype.ZhangFei:
                     FillRect(texture, 31, 24, 52, 27, accent);
@@ -1330,9 +1434,18 @@ namespace PhalanxChronicle.Presentation
                     DrawLine(texture, 32, 28, 50, 28, secondary, 1);
                     DrawLine(texture, 36, 31, 47, 31, armor, 1);
                     break;
+                case UnitVisualArchetype.YellowTurban:
+                    FillRect(texture, 34, 22, 49, 25, accent);
+                    break;
                 case UnitVisualArchetype.YellowTurbanBoss:
                     FillRect(texture, 34, 22, 49, 25, armor);
                     DrawLine(texture, 41, 22, 41, 17, outline, 1);
+                    break;
+                case UnitVisualArchetype.WeiCommander:
+                case UnitVisualArchetype.WeiGuardian:
+                case UnitVisualArchetype.WeiRanger:
+                case UnitVisualArchetype.WeiRaider:
+                    FillRect(texture, 34, 21, 49, 25, armor);
                     break;
                 case UnitVisualArchetype.BossCommander:
                     FillRect(texture, 33, 23, 50, 26, armor);
@@ -1387,12 +1500,14 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateForestOverlaySprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 canopy = new Color32(61, 86, 41, 255);
+            Color32 canopy = new Color32(57, 84, 38, 255);
+            Color32 highlight = new Color32(101, 135, 67, 255);
             FillCircle(texture, 5, 14, 4, canopy);
-            FillCircle(texture, 13, 13, 5, canopy);
-            FillCircle(texture, 16, 16, 3, canopy);
-            FillRect(texture, 8, 4, 10, 8, new Color32(90, 66, 44, 255));
-            FillRect(texture, 12, 5, 14, 9, new Color32(90, 66, 44, 255));
+            FillCircle(texture, 12, 13, 5, canopy);
+            FillCircle(texture, 16, 15, 3, canopy);
+            FillCircle(texture, 11, 15, 2, highlight);
+            FillRect(texture, 7, 4, 9, 9, new Color32(86, 61, 39, 255));
+            FillRect(texture, 11, 5, 13, 10, new Color32(86, 61, 39, 255));
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
@@ -1400,13 +1515,18 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateFortOverlaySprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 wall = new Color32(116, 83, 52, 255);
+            Color32 wall = new Color32(124, 88, 57, 255);
+            Color32 trim = new Color32(207, 176, 96, 255);
             FillRect(texture, 2, 12, 17, 14, wall);
-            for (int x = 3; x <= 16; x += 3)
+            FillRect(texture, 3, 14, 6, 17, trim);
+            FillRect(texture, 8, 14, 11, 17, trim);
+            FillRect(texture, 13, 14, 16, 17, trim);
+            for (int x = 2; x <= 17; x += 5)
             {
                 DrawLine(texture, x, 14, x, 18, wall, 1);
             }
 
+            DrawLine(texture, 2, 12, 17, 12, trim, 1);
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
@@ -1414,11 +1534,15 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateHazardOverlaySprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 ember = new Color32(234, 130, 59, 255);
+            Color32 ember = new Color32(244, 132, 50, 255);
+            Color32 core = new Color32(255, 216, 144, 255);
             DrawLine(texture, 4, 15, 9, 10, ember, 1);
+            DrawLine(texture, 6, 14, 8, 11, core, 1);
             DrawLine(texture, 8, 10, 12, 12, ember, 1);
             DrawLine(texture, 12, 12, 16, 7, ember, 1);
+            DrawLine(texture, 13, 11, 15, 8, core, 1);
             DrawLine(texture, 11, 5, 13, 3, ember, 1);
+            FillCircle(texture, 10, 10, 2, core);
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
@@ -1426,10 +1550,13 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateBlockedOverlaySprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 ridge = new Color32(48, 52, 58, 255);
+            Color32 ridge = new Color32(44, 48, 55, 255);
+            Color32 seal = new Color32(190, 197, 206, 255);
             FillRect(texture, 2, 11, 17, 18, ridge);
             DrawLine(texture, 3, 11, 6, 16, Color.white, 1);
             DrawLine(texture, 9, 12, 12, 18, Color.white, 1);
+            DrawLine(texture, 4, 4, 15, 15, seal, 1);
+            DrawLine(texture, 15, 4, 4, 15, seal, 1);
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
@@ -1438,10 +1565,12 @@ namespace PhalanxChronicle.Presentation
         {
             Texture2D texture = CreateTexture(20, 20);
             Color32 canopy = new Color32(43, 72, 35, 255);
+            Color32 highlight = new Color32(102, 136, 68, 255);
             Color32 trunk = new Color32(93, 63, 36, 255);
             FillCircle(texture, 10, 13, 5, canopy);
             FillCircle(texture, 6, 11, 3, canopy);
             FillCircle(texture, 14, 11, 3, canopy);
+            FillCircle(texture, 11, 14, 2, highlight);
             FillRect(texture, 9, 2, 11, 9, trunk);
             texture.Apply();
             return CreateSprite(texture, 20f);
@@ -1450,15 +1579,14 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateFortPropSprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 timber = new Color32(111, 76, 44, 255);
-            Color32 banner = new Color32(205, 170, 82, 255);
-            for (int x = 5; x <= 14; x += 4)
-            {
-                DrawLine(texture, x, 4, x, 16, timber, 1);
-            }
-
+            Color32 timber = new Color32(109, 74, 42, 255);
+            Color32 banner = new Color32(214, 177, 86, 255);
+            DrawLine(texture, 6, 4, 6, 16, timber, 1);
+            DrawLine(texture, 10, 4, 10, 16, timber, 1);
+            DrawLine(texture, 14, 4, 14, 16, timber, 1);
             FillRect(texture, 10, 10, 15, 14, banner);
             DrawLine(texture, 9, 16, 15, 16, timber, 1);
+            DrawLine(texture, 6, 7, 10, 7, banner, 1);
             texture.Apply();
             return CreateSprite(texture, 20f);
         }
@@ -1466,10 +1594,11 @@ namespace PhalanxChronicle.Presentation
         private static Sprite CreateFlamePropSprite()
         {
             Texture2D texture = CreateTexture(20, 20);
-            Color32 flame = new Color32(249, 173, 82, 255);
-            Color32 core = new Color32(255, 225, 162, 255);
-            FillTriangle(texture, new Vector2Int(10, 18), new Vector2Int(6, 6), new Vector2Int(12, 8), flame);
-            FillTriangle(texture, new Vector2Int(11, 16), new Vector2Int(9, 8), new Vector2Int(14, 10), core);
+            Color32 flame = new Color32(250, 168, 73, 255);
+            Color32 core = new Color32(255, 229, 166, 255);
+            FillTriangle(texture, new Vector2Int(10, 18), new Vector2Int(5, 5), new Vector2Int(13, 8), flame);
+            FillTriangle(texture, new Vector2Int(12, 16), new Vector2Int(9, 8), new Vector2Int(15, 10), core);
+            DrawLine(texture, 7, 9, 10, 16, core, 1);
             FillRect(texture, 8, 2, 12, 4, new Color32(96, 54, 36, 255));
             texture.Apply();
             return CreateSprite(texture, 20f);

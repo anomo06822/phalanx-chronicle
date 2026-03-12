@@ -334,11 +334,15 @@ namespace PhalanxChronicle.Battle
                     options.Add(new CampaignOptionEntryModel
                     {
                         OptionId = "promote|" + unit.UnitId + "|" + promotion.PromotionId,
-                        Title = LocalizationService.Text(UnitClassCatalog.Get(promotion.TargetClassId).DisplayNameKey, promotion.TargetClassId),
-                        Status = LocalizationService.Text("camp.promote.title", "Promote"),
+                        Title = LocalizationService.Format(
+                            "camp.promote.to",
+                            "Promote to {0}",
+                            LocalizationService.Text(UnitClassCatalog.Get(promotion.TargetClassId).DisplayNameKey, promotion.TargetClassId)),
+                        Status = LocalizationService.Text("camp.promote.branch", "Promotion Branch"),
                         Description = BuildPromotionSummary(promotion),
                         IsEnabled = true,
                         IsEmphasized = true,
+                        IsPromotionOption = true,
                     });
                 }
             }
@@ -370,6 +374,21 @@ namespace PhalanxChronicle.Battle
                     Description = BuildItemSummary(item),
                     IsEnabled = true,
                     IsEmphasized = string.Equals(unit.EquipmentLoadout.ArmorId, item.ItemId, StringComparison.Ordinal),
+                });
+            }
+
+            foreach (ItemDefinition item in campaignProgressionService.GetEquippableItems(campaignSaveData, unit.UnitId, ItemCategory.Mount))
+            {
+                options.Add(new CampaignOptionEntryModel
+                {
+                    OptionId = "mount|" + unit.UnitId + "|" + item.ItemId,
+                    Title = LocalizationService.Text(item.NameKey, item.NameFallback),
+                    Status = string.Equals(unit.EquipmentLoadout.MountId, item.ItemId, StringComparison.Ordinal)
+                        ? LocalizationService.Text("camp.equip.current", "Equipped")
+                        : LocalizationService.Format("camp.equip.available", "Available {0}", campaignProgressionService.GetAvailableEquipmentCount(campaignSaveData, item.ItemId, unit.UnitId)),
+                    Description = BuildItemSummary(item),
+                    IsEnabled = true,
+                    IsEmphasized = string.Equals(unit.EquipmentLoadout.MountId, item.ItemId, StringComparison.Ordinal),
                 });
             }
 
@@ -419,7 +438,9 @@ namespace PhalanxChronicle.Battle
             string itemId = segments[2];
             bool equipped = segments[0] == "weapon"
                 ? campaignProgressionService.TryEquipWeapon(campaignSaveData, unitId, itemId)
-                : campaignProgressionService.TryEquipArmor(campaignSaveData, unitId, itemId);
+                : segments[0] == "armor"
+                    ? campaignProgressionService.TryEquipArmor(campaignSaveData, unitId, itemId)
+                    : campaignProgressionService.TryEquipMount(campaignSaveData, unitId, itemId);
             if (equipped)
             {
                 campaignSaveRepository.Save(campaignSaveData);
@@ -439,7 +460,7 @@ namespace PhalanxChronicle.Battle
                 Body = string.Join(
                     "\n",
                     LocalizationService.Format("camp.resources", "Supplies {0}  Renown {1}", campaignSaveData.Inventory.Supplies, campaignSaveData.Inventory.Renown),
-                    string.IsNullOrWhiteSpace(message) ? LocalizationService.Text("camp.shop.desc", "Buy stronger weapons and armor for the next push.") : message),
+                    string.IsNullOrWhiteSpace(message) ? LocalizationService.Text("camp.shop.desc", "Buy stronger weapons, armor, and mounts for the next push.") : message),
                 Options = options,
                 PrimaryActionLabel = LocalizationService.Text("ui.button.back_to_camp", "Back to Camp"),
                 SecondaryActionLabel = string.Empty,
@@ -686,20 +707,24 @@ namespace PhalanxChronicle.Battle
         {
             ItemDefinition weapon = ItemCatalog.Get(unit.EquipmentLoadout.WeaponId);
             ItemDefinition armor = ItemCatalog.Get(unit.EquipmentLoadout.ArmorId);
+            ItemDefinition mount = ItemCatalog.Get(unit.EquipmentLoadout.MountId);
             return LocalizationService.Format(
                 "camp.unit.equipment",
-                "Weapon: {0} | Armor: {1}",
+                "Weapon: {0} | Armor: {1} | Mount: {2}",
                 weapon != null ? LocalizationService.Text(weapon.NameKey, weapon.NameFallback) : LocalizationService.Text("camp.equip.none", "None"),
-                armor != null ? LocalizationService.Text(armor.NameKey, armor.NameFallback) : LocalizationService.Text("camp.equip.none", "None"));
+                armor != null ? LocalizationService.Text(armor.NameKey, armor.NameFallback) : LocalizationService.Text("camp.equip.none", "None"),
+                mount != null ? LocalizationService.Text(mount.NameKey, mount.NameFallback) : LocalizationService.Text("camp.equip.none", "None"));
         }
 
         private string BuildUnitManagementBody(CampaignUnitState unit, string message)
         {
+            ItemDefinition mount = ItemCatalog.Get(unit.EquipmentLoadout.MountId);
+            int moveValue = unit.MoveRange + (mount != null ? mount.MoveBonus : 0);
             List<string> parts = new List<string>
             {
                 LocalizationService.Format(
                     "camp.unit.detail",
-                    "{0}  Lv {1}  EXP {2}/{3}\nATK {4}  DEF {5}  HP {6}  MP {7}",
+                    "{0}  Lv {1}  EXP {2}/{3}\nATK {4}  DEF {5}  HP {6}  MP {7}  MOVE {8}",
                     LocalizationService.Text(UnitClassCatalog.Get(unit.ClassId).DisplayNameKey, unit.ClassId),
                     unit.Level,
                     unit.CurrentExp,
@@ -707,8 +732,31 @@ namespace PhalanxChronicle.Battle
                     unit.Attack,
                     unit.Defense,
                     unit.MaxHp,
-                    unit.MaxMana),
+                    unit.MaxMana,
+                    moveValue),
+                BuildCampUnitEquipmentSummary(unit),
             };
+
+            if (CanPromote(unit))
+            {
+                parts.Add(LocalizationService.Text(
+                    "camp.promote.ready_hint",
+                    "Promotion is available. The highlighted Promotion Branch cards below are the class change options."));
+            }
+            else if (unit != null && unit.HasPromoted)
+            {
+                parts.Add(LocalizationService.Text(
+                    "camp.promote.done_hint",
+                    "This unit has already promoted. Promotion cannot be changed again."));
+            }
+            else if (unit != null)
+            {
+                parts.Add(LocalizationService.Format(
+                    "camp.promote.locked_hint",
+                    "Promotion unlocks at Lv10. Current level: Lv {0}.",
+                    unit.Level));
+            }
+
             if (!string.IsNullOrWhiteSpace(message))
             {
                 parts.Add(message);
@@ -730,6 +778,7 @@ namespace PhalanxChronicle.Battle
                 definition.ManaBonus);
             return string.Join(
                 "\n",
+                LocalizationService.Text("camp.promote.tap_hint", "Tap to promote immediately."),
                 statSummary,
                 LocalizationService.Text("ui.label.passive", "Passive Doctrine") + ": " + passiveName,
                 LocalizationService.Text("ui.label.active", "Battle Art") + ": " + activeName);
@@ -751,6 +800,11 @@ namespace PhalanxChronicle.Battle
             if (item.HpBonus != 0)
             {
                 statParts.Add(LocalizationService.Format("camp.item.hp", "HP +{0}", item.HpBonus));
+            }
+
+            if (item.MoveBonus != 0)
+            {
+                statParts.Add(LocalizationService.Format("camp.item.move", "MOVE +{0}", item.MoveBonus));
             }
 
             string description = LocalizationService.Text(item.DescriptionKey, item.DescriptionFallback);

@@ -141,18 +141,23 @@ namespace PhalanxChronicle.Core
             {
                 case ActiveSkillType.RoyalAid:
                 case ActiveSkillType.ImperialAid:
-                    return EvaluateRoyalAid(target);
+                    return EvaluateRoyalAid(enemyUnit, target);
                 case ActiveSkillType.GuardOrder:
                     return EvaluateGuardOrder(context, enemyUnit, target);
                 case ActiveSkillType.PowerStrike:
                     return EvaluatePowerStrike(context, enemyUnit, destination, target);
+                case ActiveSkillType.DragonPierce:
+                    return EvaluateDragonPierce(context, enemyUnit, destination, target);
                 case ActiveSkillType.PinningShot:
                     return EvaluatePinningShot(context, enemyUnit, destination, target);
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.SkyVolley:
+                case ActiveSkillType.FireStratagem:
+                case ActiveSkillType.EightTrigramInferno:
                     return EvaluateVolley(context, enemyUnit, destination, target);
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
+                case ActiveSkillType.WesternStampede:
                     return EvaluateGreenDragonSlash(context, enemyUnit, destination, target);
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
@@ -162,13 +167,18 @@ namespace PhalanxChronicle.Core
             }
         }
 
-        private static SkillEvaluation EvaluateRoyalAid(UnitRuntimeState target)
+        private static SkillEvaluation EvaluateRoyalAid(UnitRuntimeState caster, UnitRuntimeState target)
         {
-            int healedAmount = BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetRoyalAidAmount());
+            int healedAmount = BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetRoyalAidAmount(caster));
             float reward = (healedAmount * HealingWeight) + (target.HasStatus(StatusEffectType.Inspired) ? 4f : 10f);
             if (target.CurrentHp <= target.MaxHp / 3)
             {
                 reward += 8f;
+            }
+
+            if (!target.HasStatus(StatusEffectType.Guarded))
+            {
+                reward += 4f;
             }
 
             return new SkillEvaluation(reward - 3f, new HashSet<string>());
@@ -185,12 +195,17 @@ namespace PhalanxChronicle.Core
                 .ThenBy(unit => unit.Id)
                 .ToList();
 
-            int healedAmount = BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetGuardOrderHealAmount());
+            int healedAmount = BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetGuardOrderHealAmount(enemyUnit));
             int freshGuardApplications = affectedUnits.Count(unit => !unit.HasStatus(StatusEffectType.Guarded));
             float reward = (healedAmount * HealingWeight) +
                            (freshGuardApplications * (StatusBonus + 2f)) +
                            ((affectedUnits.Count - 1) * 2f) -
                            2f;
+            if (ActiveSkillRules.IsMastered(enemyUnit) && !target.HasStatus(StatusEffectType.Inspired))
+            {
+                reward += StatusBonus;
+            }
+
             if (target.CurrentHp <= target.MaxHp / 2)
             {
                 reward += 5f;
@@ -215,13 +230,18 @@ namespace PhalanxChronicle.Core
                 enemyUnit,
                 destination,
                 target,
-                ActiveSkillRules.GetPowerStrikeBonus());
+                ActiveSkillRules.GetPowerStrikeBonus(enemyUnit));
             bool targetDies = rawDamage >= target.CurrentHp;
             int realizedDamage = rawDamage > target.CurrentHp ? target.CurrentHp : rawDamage;
             float reward = 5f + (realizedDamage * SkillDamageWeight) + (targetDies ? KillBonus : 0f);
             if (!targetDies && !target.HasStatus(StatusEffectType.ShatteredArmor))
             {
                 reward += StatusBonus;
+            }
+
+            if (!targetDies && !target.HasStatus(StatusEffectType.Bleeding))
+            {
+                reward += 3f;
             }
 
             HashSet<string> defeatedUnitIds = targetDies ? new HashSet<string> { target.Id } : new HashSet<string>();
@@ -239,7 +259,7 @@ namespace PhalanxChronicle.Core
                 enemyUnit,
                 destination,
                 target,
-                ActiveSkillRules.GetPinningShotBonus());
+                ActiveSkillRules.GetPinningShotBonus(enemyUnit));
             bool targetDies = rawDamage >= target.CurrentHp;
             int realizedDamage = rawDamage > target.CurrentHp ? target.CurrentHp : rawDamage;
             float reward = 4f + (realizedDamage * SkillDamageWeight) + (targetDies ? KillBonus : 0f);
@@ -250,6 +270,36 @@ namespace PhalanxChronicle.Core
 
             HashSet<string> defeatedUnitIds = targetDies ? new HashSet<string> { target.Id } : new HashSet<string>();
             return new SkillEvaluation(reward - SkillCommitmentPenalty, defeatedUnitIds);
+        }
+
+        private static SkillEvaluation EvaluateDragonPierce(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            UnitRuntimeState target)
+        {
+            int rawDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                context,
+                enemyUnit,
+                destination,
+                target,
+                ActiveSkillRules.GetDragonPierceBonus(enemyUnit),
+                ActiveSkillRules.GetDragonPierceIgnoredDefense(enemyUnit));
+            bool targetDies = rawDamage >= target.CurrentHp;
+            int realizedDamage = rawDamage > target.CurrentHp ? target.CurrentHp : rawDamage;
+            int guardValue = 1;
+            if (context.GetUnits(enemyUnit.Faction)
+                    .Any(unit => unit.Id != enemyUnit.Id && unit.Position.ManhattanDistance(destination) == 1 && !unit.HasStatus(StatusEffectType.Guarded)))
+            {
+                guardValue++;
+            }
+
+            float reward = 6f +
+                           (realizedDamage * SkillDamageWeight) +
+                           (targetDies ? KillBonus : 0f) +
+                           (guardValue * (StatusBonus + 1f)) -
+                           SkillCommitmentPenalty;
+            return new SkillEvaluation(reward, targetDies ? new HashSet<string> { target.Id } : new HashSet<string>());
         }
 
         private static SkillEvaluation EvaluateVolley(
@@ -263,6 +313,7 @@ namespace PhalanxChronicle.Core
             int defeatedCount = 0;
             int statusApplications = 0;
             HashSet<string> defeatedUnitIds = new HashSet<string>();
+            int bonusDamage = GetAreaSkillBonus(enemyUnit);
 
             foreach (UnitRuntimeState affectedUnit in affectedUnits)
             {
@@ -271,7 +322,7 @@ namespace PhalanxChronicle.Core
                     enemyUnit,
                     destination,
                     affectedUnit,
-                    ActiveSkillRules.GetVolleyBonus());
+                    bonusDamage);
                 int realizedDamage = rawDamage > affectedUnit.CurrentHp ? affectedUnit.CurrentHp : rawDamage;
                 totalDamage += realizedDamage;
 
@@ -279,6 +330,26 @@ namespace PhalanxChronicle.Core
                 {
                     defeatedCount++;
                     defeatedUnitIds.Add(affectedUnit.Id);
+                }
+                else if (enemyUnit.ActiveSkill == ActiveSkillType.FireStratagem)
+                {
+                    if ((affectedUnit.Id == primaryTarget.Id || ActiveSkillRules.IsMastered(enemyUnit)) &&
+                        !affectedUnit.HasStatus(StatusEffectType.Intimidated))
+                    {
+                        statusApplications++;
+                    }
+                }
+                else if (enemyUnit.ActiveSkill == ActiveSkillType.EightTrigramInferno)
+                {
+                    if (!affectedUnit.HasStatus(StatusEffectType.Intimidated))
+                    {
+                        statusApplications++;
+                    }
+
+                    if (!affectedUnit.HasStatus(StatusEffectType.ShatteredArmor))
+                    {
+                        statusApplications++;
+                    }
                 }
                 else if (!affectedUnit.HasStatus(StatusEffectType.ShatteredArmor))
                 {
@@ -316,7 +387,11 @@ namespace PhalanxChronicle.Core
                     enemyUnit,
                     destination,
                     affectedUnit,
-                    ActiveSkillRules.GetGreenDragonSlashBonus());
+                    enemyUnit.ActiveSkill == ActiveSkillType.AzureDragonSlash
+                        ? ActiveSkillRules.GetAzureDragonSlashBonus(enemyUnit)
+                        : enemyUnit.ActiveSkill == ActiveSkillType.WesternStampede
+                            ? ActiveSkillRules.GetWesternStampedeBonus(enemyUnit)
+                        : ActiveSkillRules.GetGreenDragonSlashBonus(enemyUnit));
                 int realizedDamage = rawDamage > affectedUnit.CurrentHp ? affectedUnit.CurrentHp : rawDamage;
                 totalDamage += realizedDamage;
 
@@ -325,12 +400,21 @@ namespace PhalanxChronicle.Core
                     defeatedCount++;
                     defeatedUnitIds.Add(affectedUnit.Id);
                 }
+                else if (enemyUnit.ActiveSkill == ActiveSkillType.WesternStampede &&
+                         !affectedUnit.HasStatus(StatusEffectType.Intimidated))
+                {
+                    totalDamage += 0;
+                    defeatedCount += 0;
+                }
             }
 
             float reward = 6f +
                            (totalDamage * SkillDamageWeight) +
                            (defeatedCount * KillBonus) +
-                           ((affectedUnits.Count - 1) * AdditionalTargetBonus) -
+                           ((affectedUnits.Count - 1) * AdditionalTargetBonus) +
+                           (enemyUnit.ActiveSkill == ActiveSkillType.WesternStampede
+                               ? affectedUnits.Count(unit => unit.CurrentHp > 0 && !unit.HasStatus(StatusEffectType.Intimidated)) * StatusBonus
+                               : 0f) -
                            SkillCommitmentPenalty;
             return new SkillEvaluation(reward, defeatedUnitIds);
         }
@@ -432,22 +516,34 @@ namespace PhalanxChronicle.Core
                 switch (opposingUnit.ActiveSkill)
                 {
                     case ActiveSkillType.PowerStrike:
-                        bonusDamage = ActiveSkillRules.GetPowerStrikeBonus();
+                        bonusDamage = ActiveSkillRules.GetPowerStrikeBonus(opposingUnit);
+                        break;
+                    case ActiveSkillType.DragonPierce:
+                        bonusDamage = ActiveSkillRules.GetDragonPierceBonus(opposingUnit);
                         break;
                     case ActiveSkillType.PinningShot:
-                        bonusDamage = ActiveSkillRules.GetPinningShotBonus();
+                        bonusDamage = ActiveSkillRules.GetPinningShotBonus(opposingUnit);
                         break;
                     case ActiveSkillType.GreenDragonSlash:
-                        bonusDamage = ActiveSkillRules.GetGreenDragonSlashBonus();
+                        bonusDamage = ActiveSkillRules.GetGreenDragonSlashBonus(opposingUnit);
                         break;
                     case ActiveSkillType.AzureDragonSlash:
-                        bonusDamage = ActiveSkillRules.GetAzureDragonSlashBonus();
+                        bonusDamage = ActiveSkillRules.GetAzureDragonSlashBonus(opposingUnit);
+                        break;
+                    case ActiveSkillType.WesternStampede:
+                        bonusDamage = ActiveSkillRules.GetWesternStampedeBonus(opposingUnit);
+                        break;
+                    case ActiveSkillType.FireStratagem:
+                        bonusDamage = ActiveSkillRules.GetFireStratagemBonus(opposingUnit);
+                        break;
+                    case ActiveSkillType.EightTrigramInferno:
+                        bonusDamage = ActiveSkillRules.GetEightTrigramInfernoBonus(opposingUnit);
                         break;
                     case ActiveSkillType.SkyVolley:
-                        bonusDamage = ActiveSkillRules.GetSkyVolleyBonus();
+                        bonusDamage = ActiveSkillRules.GetSkyVolleyBonus(opposingUnit);
                         break;
                     default:
-                        bonusDamage = ActiveSkillRules.GetVolleyBonus();
+                        bonusDamage = ActiveSkillRules.GetVolleyBonus(opposingUnit);
                         break;
                 }
 
@@ -456,7 +552,10 @@ namespace PhalanxChronicle.Core
                     opposingUnit,
                     origin,
                     enemyUnit,
-                    bonusDamage);
+                    bonusDamage,
+                    opposingUnit.ActiveSkill == ActiveSkillType.DragonPierce
+                        ? ActiveSkillRules.GetDragonPierceIgnoredDefense(opposingUnit)
+                        : 0);
                 if (skillDamage > bestDamage)
                 {
                     bestDamage = skillDamage;
@@ -464,6 +563,21 @@ namespace PhalanxChronicle.Core
             }
 
             return bestDamage;
+        }
+
+        private static int GetAreaSkillBonus(UnitRuntimeState unit)
+        {
+            switch (unit.ActiveSkill)
+            {
+                case ActiveSkillType.SkyVolley:
+                    return ActiveSkillRules.GetSkyVolleyBonus(unit);
+                case ActiveSkillType.FireStratagem:
+                    return ActiveSkillRules.GetFireStratagemBonus(unit);
+                case ActiveSkillType.EightTrigramInferno:
+                    return ActiveSkillRules.GetEightTrigramInfernoBonus(unit);
+                default:
+                    return ActiveSkillRules.GetVolleyBonus(unit);
+            }
         }
 
         private static float CalculatePressureScore(int nearestOpponentDistance)
@@ -558,7 +672,7 @@ namespace PhalanxChronicle.Core
             GridPosition occupiedPosition,
             ISet<string> defeatedUnitIds)
         {
-            int moveRange = PassiveSkillRules.GetMoveRange(unit);
+            int moveRange = PassiveSkillRules.GetMoveRange(unit) + EquipmentEffectRules.GetMoveBonus(context, unit);
             Dictionary<GridPosition, int> distances = new Dictionary<GridPosition, int>();
             Queue<GridPosition> frontier = new Queue<GridPosition>();
             frontier.Enqueue(unit.Position);
