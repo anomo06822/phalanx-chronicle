@@ -145,6 +145,16 @@ namespace PhalanxChronicle.Battle.States
 
             BattleManager.ChangeState<UnitActionMenuState>();
         }
+
+        public override void OnCellHovered(GridPosition position, bool isHovered)
+        {
+            BattleManager.PreviewMoveDestination(position, isHovered);
+        }
+
+        public override void OnUnitHovered(Unit unitView, bool isHovered)
+        {
+            BattleManager.PreviewQuickAttackTarget(unitView, isHovered);
+        }
     }
 
     public sealed class UnitActionMenuState : BattleStateBase

@@ -17,7 +17,7 @@ namespace PhalanxChronicle.Headless.Tests
 
             Assert.Equal(CampaignCatalog.LiuBeiLegendCampaignId, save.CampaignId);
             Assert.Equal(4, save.Units.Count);
-            Assert.Equal(3, save.Version);
+            Assert.Equal(4, save.Version);
             Assert.Equal("vermilion-jian", save.GetUnit("player-liu-bei").EquipmentLoadout.WeaponId);
             Assert.Equal("commander-travel-cloak", save.GetUnit("player-liu-bei").EquipmentLoadout.ArmorId);
             Assert.Equal(string.Empty, save.GetUnit("player-liu-bei").EquipmentLoadout.MountId);

@@ -25,7 +25,7 @@ MonoBehaviour:
   portraitBackdropColor: {r: 1, g: 1, b: 1, a: 1}
   battleScale: 1
   portraitSprite: {fileID: 21300000, guid: 819076f9b019c45dfb47bb1083ba9343, type: 3}
-  battleSprite: {fileID: 21300000, guid: aa570399ec69c4853aa84f0ae34331a9, type: 3}
+  battleSprite: {fileID: 21300000, guid: ad4d2f7d4f3fd49daa6de4c79c2ba28c, type: 3}
   weaponIcon: {fileID: 21300000, guid: 55b1c7b1e8ba9424cb3fa1f4bc84e6a3, type: 3}
   factionMarker: {fileID: 0}
   selectionFrame: {fileID: 0}

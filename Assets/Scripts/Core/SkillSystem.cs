@@ -180,6 +180,11 @@ namespace PhalanxChronicle.Core
 
         public IReadOnlyList<UnitRuntimeState> GetSkillAffectedUnits(BattleContext context, UnitRuntimeState caster, UnitRuntimeState primaryTarget)
         {
+            return GetSkillAffectedUnits(context, caster, caster != null ? caster.Position : new GridPosition(0, 0), primaryTarget);
+        }
+
+        public IReadOnlyList<UnitRuntimeState> GetSkillAffectedUnits(BattleContext context, UnitRuntimeState caster, GridPosition origin, UnitRuntimeState primaryTarget)
+        {
             if (context == null || caster == null || primaryTarget == null || !caster.IsAlive || !primaryTarget.IsAlive)
             {
                 return new List<UnitRuntimeState>();
@@ -214,12 +219,12 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
-                    return BattlePreviewCalculator.GetGreenDragonSlashTargets(context, caster.Position, primaryTarget);
+                    return BattlePreviewCalculator.GetGreenDragonSlashTargets(context, origin, primaryTarget);
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
                     return context.GetUnits(caster.Faction == UnitFaction.Player ? UnitFaction.Enemy : UnitFaction.Player)
-                        .Where(unit => caster.Position.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(caster))
-                        .OrderBy(unit => caster.Position.ManhattanDistance(unit.Position))
+                        .Where(unit => origin.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(caster))
+                        .OrderBy(unit => origin.ManhattanDistance(unit.Position))
                         .ThenBy(unit => unit.Id)
                         .ToList();
                 default:
@@ -228,6 +233,11 @@ namespace PhalanxChronicle.Core
         }
 
         public IReadOnlyList<GridPosition> GetSkillAffectedPositions(BattleContext context, UnitRuntimeState caster, UnitRuntimeState primaryTarget)
+        {
+            return GetSkillAffectedPositions(context, caster, caster != null ? caster.Position : new GridPosition(0, 0), primaryTarget);
+        }
+
+        public IReadOnlyList<GridPosition> GetSkillAffectedPositions(BattleContext context, UnitRuntimeState caster, GridPosition origin, UnitRuntimeState primaryTarget)
         {
             if (context == null || caster == null || primaryTarget == null)
             {
@@ -244,9 +254,9 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
-                    return BattlePreviewCalculator.GetGreenDragonSlashAreaPositions(caster.Position, primaryTarget.Position);
+                    return BattlePreviewCalculator.GetGreenDragonSlashAreaPositions(origin, primaryTarget.Position);
                 default:
-                    return GetSkillAffectedUnits(context, caster, primaryTarget)
+                    return GetSkillAffectedUnits(context, caster, origin, primaryTarget)
                         .Select(unit => unit.Position)
                         .Distinct()
                         .OrderBy(position => position.Y)

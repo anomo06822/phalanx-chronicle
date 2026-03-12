@@ -16,7 +16,10 @@ namespace PhalanxChronicle.Core
             IReadOnlyList<string> clearedScenarioIds = null,
             BattleResultSummary lastBattleResult = null,
             IReadOnlyList<string> claimedRewardScenarioIds = null,
-            IReadOnlyDictionary<string, int> scenarioClearCounts = null)
+            IReadOnlyDictionary<string, int> scenarioClearCounts = null,
+            bool hasSeenFirstLaunchIntro = false,
+            bool hasCompletedFirstBattleOnboarding = false,
+            bool hasSkippedOnboarding = false)
         {
             UnlockedStageIndex = Math.Max(0, unlockedStageIndex);
             this.clearedScenarioIds = new HashSet<string>(clearedScenarioIds ?? Array.Empty<string>());
@@ -44,6 +47,9 @@ namespace PhalanxChronicle.Core
             }
 
             LastBattleResult = lastBattleResult;
+            HasSeenFirstLaunchIntro = hasSeenFirstLaunchIntro;
+            HasCompletedFirstBattleOnboarding = hasCompletedFirstBattleOnboarding;
+            HasSkippedOnboarding = hasSkippedOnboarding;
         }
 
         public int UnlockedStageIndex { get; private set; }
@@ -55,6 +61,12 @@ namespace PhalanxChronicle.Core
         public IReadOnlyDictionary<string, int> ScenarioClearCounts => new Dictionary<string, int>(scenarioClearCounts);
 
         public BattleResultSummary LastBattleResult { get; private set; }
+
+        public bool HasSeenFirstLaunchIntro { get; private set; }
+
+        public bool HasCompletedFirstBattleOnboarding { get; private set; }
+
+        public bool HasSkippedOnboarding { get; private set; }
 
         public bool IsCleared(string scenarioId)
         {
@@ -102,6 +114,21 @@ namespace PhalanxChronicle.Core
         public void SetLastBattleResult(BattleResultSummary summary)
         {
             LastBattleResult = summary;
+        }
+
+        public void MarkFirstLaunchIntroSeen()
+        {
+            HasSeenFirstLaunchIntro = true;
+        }
+
+        public void MarkFirstBattleOnboardingCompleted()
+        {
+            HasCompletedFirstBattleOnboarding = true;
+        }
+
+        public void MarkFirstBattleOnboardingSkipped()
+        {
+            HasSkippedOnboarding = true;
         }
     }
 }

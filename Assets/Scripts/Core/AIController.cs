@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,6 +18,13 @@ namespace PhalanxChronicle.Core
         private const float LethalThreatPenalty = 10f;
         private const float PressureBaseScore = 20f;
         private const float PressureDistancePenalty = 2.5f;
+        private const float FocusFireBonus = 10f;
+        private const float ChokeHoldBonus = 12f;
+        private const float ProtectorScreenBonus = 8f;
+        private const float SupportSafetyPenalty = 10f;
+        private const float LowValueSkillPenalty = 18f;
+        private const float BossHoldLinePenalty = 18f;
+        private const float BossHoldLineBonus = 10f;
 
         private readonly RangeCalculator rangeCalculator;
         private readonly SkillSystem skillSystem;
@@ -29,13 +37,18 @@ namespace PhalanxChronicle.Core
 
         public AiDecision Decide(BattleContext context, UnitRuntimeState enemyUnit)
         {
+            return Decide(context, enemyUnit, CreateTacticalPlan(context));
+        }
+
+        internal AiDecision Decide(BattleContext context, UnitRuntimeState enemyUnit, EnemyTacticalPlan plan)
+        {
             IReadOnlyList<UnitRuntimeState> playerUnits = context.GetUnits(UnitFaction.Player);
             if (enemyUnit == null || !enemyUnit.IsAlive || enemyUnit.HasActed || playerUnits.Count == 0)
             {
                 return new AiDecision(enemyUnit != null ? enemyUnit.Position : new GridPosition(0, 0), AiActionType.None, null);
             }
 
-            AiCandidate bestCandidate = BuildCandidates(context, enemyUnit)
+            AiCandidate bestCandidate = BuildCandidates(context, enemyUnit, plan)
                 .OrderByDescending(candidate => candidate.Score)
                 .ThenBy(candidate => candidate.Risk)
                 .ThenByDescending(candidate => candidate.ActionPriority)
@@ -49,35 +62,51 @@ namespace PhalanxChronicle.Core
             return new AiDecision(bestCandidate.Destination, bestCandidate.ActionType, bestCandidate.TargetUnitId);
         }
 
-        private IEnumerable<AiCandidate> BuildCandidates(BattleContext context, UnitRuntimeState enemyUnit)
+        internal EnemyTacticalPlan CreateTacticalPlan(BattleContext context)
+        {
+            List<UnitRuntimeState> enemies = context.GetUnits(UnitFaction.Enemy).ToList();
+            if (enemies.Count == 0)
+            {
+                return new EnemyTacticalPlan(string.Empty, new HashSet<string>(), new HashSet<GridPosition>(), new List<string>(), false);
+            }
+
+            string focusTargetId = SelectFocusTarget(context, enemies);
+            HashSet<string> protectedUnitIds = SelectProtectedUnitIds(context, enemies);
+            HashSet<GridPosition> chokeTiles = GetStageChokeTiles(context);
+            List<string> orderedUnitIds = BuildEnemyTurnOrder(context, enemies, focusTargetId, protectedUnitIds, chokeTiles);
+            return new EnemyTacticalPlan(focusTargetId, protectedUnitIds, chokeTiles, orderedUnitIds, enemies.Count >= 2);
+        }
+
+        private IEnumerable<AiCandidate> BuildCandidates(BattleContext context, UnitRuntimeState enemyUnit, EnemyTacticalPlan plan)
         {
             IReadOnlyList<GridPosition> reachableCells = rangeCalculator.GetMoveRange(context, enemyUnit);
             foreach (GridPosition destination in reachableCells)
             {
-                yield return CreateIdleCandidate(context, enemyUnit, destination);
+                yield return CreateIdleCandidate(context, enemyUnit, destination, plan);
 
                 foreach (UnitRuntimeState attackTarget in rangeCalculator.GetAttackableTargets(context, enemyUnit, destination))
                 {
-                    yield return CreateAttackCandidate(context, enemyUnit, destination, attackTarget);
+                    yield return CreateAttackCandidate(context, enemyUnit, destination, attackTarget, plan);
                 }
 
                 foreach (UnitRuntimeState skillTarget in skillSystem.GetSkillTargets(context, enemyUnit, destination))
                 {
-                    yield return CreateSkillCandidate(context, enemyUnit, destination, skillTarget);
+                    yield return CreateSkillCandidate(context, enemyUnit, destination, skillTarget, plan);
                 }
             }
         }
 
-        private AiCandidate CreateIdleCandidate(BattleContext context, UnitRuntimeState enemyUnit, GridPosition destination)
+        private AiCandidate CreateIdleCandidate(BattleContext context, UnitRuntimeState enemyUnit, GridPosition destination, EnemyTacticalPlan plan)
         {
             int nearestOpponentDistance = CalculateNearestOpponentDistance(context, enemyUnit.Faction, destination, null);
             float pressure = CalculatePressureScore(nearestOpponentDistance) + GetProfilePressureBonus(context, enemyUnit, destination);
             float risk = EstimateExposure(context, enemyUnit, destination, null) * GetRiskMultiplier(enemyUnit.AiProfile);
+            float tacticalBonus = GetTacticalBonus(context, enemyUnit, destination, AiActionType.None, null, false, plan);
             return new AiCandidate(
                 destination,
                 AiActionType.None,
                 null,
-                pressure - risk,
+                pressure + tacticalBonus - risk,
                 risk,
                 int.MaxValue,
                 nearestOpponentDistance,
@@ -88,7 +117,8 @@ namespace PhalanxChronicle.Core
             BattleContext context,
             UnitRuntimeState enemyUnit,
             GridPosition destination,
-            UnitRuntimeState target)
+            UnitRuntimeState target,
+            EnemyTacticalPlan plan)
         {
             int rawDamage = BattlePreviewCalculator.EstimateAttackDamage(context, enemyUnit, destination, target);
             bool targetDies = rawDamage >= target.CurrentHp;
@@ -98,12 +128,13 @@ namespace PhalanxChronicle.Core
             float pressure = CalculatePressureScore(nearestOpponentDistance) + GetProfilePressureBonus(context, enemyUnit, destination);
             float risk = EstimateExposure(context, enemyUnit, destination, defeatedUnitIds) * GetRiskMultiplier(enemyUnit.AiProfile);
             float reward = 6f + (realizedDamage * DamageWeight) + (targetDies ? KillBonus : 0f) + GetActionBias(enemyUnit.AiProfile, false, targetDies);
+            float tacticalBonus = GetTacticalBonus(context, enemyUnit, destination, AiActionType.Attack, target, targetDies, plan);
 
             return new AiCandidate(
                 destination,
                 AiActionType.Attack,
                 target.Id,
-                reward + pressure - risk,
+                reward + pressure + tacticalBonus - risk,
                 risk,
                 target.CurrentHp,
                 nearestOpponentDistance,
@@ -114,21 +145,346 @@ namespace PhalanxChronicle.Core
             BattleContext context,
             UnitRuntimeState enemyUnit,
             GridPosition destination,
-            UnitRuntimeState target)
+            UnitRuntimeState target,
+            EnemyTacticalPlan plan)
         {
             SkillEvaluation evaluation = EvaluateSkill(context, enemyUnit, destination, target);
             int nearestOpponentDistance = CalculateNearestOpponentDistance(context, enemyUnit.Faction, destination, evaluation.DefeatedUnitIds);
             float pressure = CalculatePressureScore(nearestOpponentDistance) + GetProfilePressureBonus(context, enemyUnit, destination);
             float risk = EstimateExposure(context, enemyUnit, destination, evaluation.DefeatedUnitIds) * GetRiskMultiplier(enemyUnit.AiProfile);
+            bool targetDies = evaluation.DefeatedUnitIds.Contains(target.Id);
+            float tacticalBonus = GetTacticalBonus(context, enemyUnit, destination, AiActionType.Skill, target, targetDies, plan);
+            tacticalBonus += GetSkillValueAdjustment(context, enemyUnit, destination, target, targetDies);
             return new AiCandidate(
                 destination,
                 AiActionType.Skill,
                 target.Id,
-                evaluation.Reward + GetActionBias(enemyUnit.AiProfile, true, evaluation.DefeatedUnitIds.Count > 0) + pressure - risk,
+                evaluation.Reward + GetActionBias(enemyUnit.AiProfile, true, evaluation.DefeatedUnitIds.Count > 0) + pressure + tacticalBonus - risk,
                 risk,
                 target.CurrentHp,
                 nearestOpponentDistance,
                 enemyUnit.Position.ManhattanDistance(destination));
+        }
+
+        private List<string> BuildEnemyTurnOrder(
+            BattleContext context,
+            IReadOnlyList<UnitRuntimeState> enemies,
+            string focusTargetId,
+            HashSet<string> protectedUnitIds,
+            HashSet<GridPosition> chokeTiles)
+        {
+            List<UnitRuntimeState> orderedEnemies = enemies
+                .Where(unit => unit.IsAlive && !unit.HasActed)
+                .OrderByDescending(unit => CanLikelySecureKill(context, unit, focusTargetId))
+                .ThenByDescending(unit => unit.AiProfile == AiProfileType.Protector && CanReachChokeTile(context, unit, chokeTiles))
+                .ThenByDescending(unit => unit.AiProfile == AiProfileType.Protector && IsNearProtectedAlly(context, unit.Position, protectedUnitIds))
+                .ThenBy(unit => GetPriority(unit.AiProfile))
+                .ThenBy(unit => unit.Position.ManhattanDistance(GetEnemyFrontlineAnchor(context)))
+                .ThenBy(unit => unit.Id)
+                .ToList();
+
+            return orderedEnemies.Select(unit => unit.Id).ToList();
+        }
+
+        private string SelectFocusTarget(BattleContext context, IReadOnlyList<UnitRuntimeState> enemies)
+        {
+            UnitRuntimeState bestTarget = null;
+            float bestScore = float.MinValue;
+
+            foreach (UnitRuntimeState playerUnit in context.GetUnits(UnitFaction.Player))
+            {
+                int threateningEnemies = enemies.Count(enemy => CanThreatenTarget(context, enemy, playerUnit));
+                int nearestEnemyDistance = enemies.Count == 0
+                    ? 0
+                    : enemies.Min(enemy => enemy.Position.ManhattanDistance(playerUnit.Position));
+                float score = (threateningEnemies * 12f) +
+                              ((playerUnit.MaxHp - playerUnit.CurrentHp) * 0.7f) +
+                              (Math.Max(0, 6 - nearestEnemyDistance) * 1.8f) +
+                              GetRoleFocusBonus(playerUnit.Role);
+
+                if (playerUnit.CurrentHp <= (int)Math.Ceiling(playerUnit.MaxHp * 0.5f))
+                {
+                    score += 6f;
+                }
+
+                if (threateningEnemies >= 2)
+                {
+                    score += 7f;
+                }
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestTarget = playerUnit;
+                }
+            }
+
+            return bestTarget != null ? bestTarget.Id : string.Empty;
+        }
+
+        private static HashSet<string> SelectProtectedUnitIds(BattleContext context, IReadOnlyList<UnitRuntimeState> enemies)
+        {
+            HashSet<string> protectedUnits = new HashSet<string>();
+            foreach (UnitRuntimeState unit in enemies)
+            {
+                if (!unit.IsAlive)
+                {
+                    continue;
+                }
+
+                if (unit.AiProfile == AiProfileType.Support || unit.AiProfile == AiProfileType.Boss || unit.CurrentHp <= (int)Math.Ceiling(unit.MaxHp * 0.55f))
+                {
+                    protectedUnits.Add(unit.Id);
+                }
+            }
+
+            return protectedUnits;
+        }
+
+        private static HashSet<GridPosition> GetStageChokeTiles(BattleContext context)
+        {
+            HashSet<GridPosition> chokeTiles = new HashSet<GridPosition>();
+            switch (context.StageNameKey)
+            {
+                case "stage.guangzong":
+                    AddChokeTiles(chokeTiles, new[]
+                    {
+                        new GridPosition(8, 6),
+                        new GridPosition(8, 7),
+                        new GridPosition(9, 5),
+                        new GridPosition(9, 8),
+                        new GridPosition(12, 6),
+                        new GridPosition(12, 7),
+                    });
+                    break;
+                case "stage.jiangxia_ferry":
+                    AddChokeTiles(chokeTiles, new[]
+                    {
+                        new GridPosition(11, 2),
+                        new GridPosition(11, 6),
+                        new GridPosition(11, 7),
+                        new GridPosition(11, 11),
+                        new GridPosition(8, 6),
+                        new GridPosition(9, 6),
+                        new GridPosition(8, 7),
+                        new GridPosition(9, 7),
+                    });
+                    break;
+                case "stage.luocheng_siege":
+                    AddChokeTiles(chokeTiles, new[]
+                    {
+                        new GridPosition(8, 7),
+                        new GridPosition(9, 7),
+                        new GridPosition(8, 8),
+                        new GridPosition(9, 8),
+                        new GridPosition(8, 10),
+                        new GridPosition(9, 10),
+                        new GridPosition(8, 11),
+                        new GridPosition(9, 11),
+                    });
+                    break;
+            }
+
+            return chokeTiles;
+        }
+
+        private float GetTacticalBonus(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            AiActionType actionType,
+            UnitRuntimeState target,
+            bool targetDies,
+            EnemyTacticalPlan plan)
+        {
+            if (plan == null)
+            {
+                return 0f;
+            }
+
+            float bonus = 0f;
+            if (plan.EnableCoordinatedFocus && target != null && target.Id == plan.FocusTargetId)
+            {
+                bonus += enemyUnit.AiProfile == AiProfileType.Aggressor ? FocusFireBonus + 2f : FocusFireBonus;
+            }
+
+            switch (enemyUnit.AiProfile)
+            {
+                case AiProfileType.Support:
+                    bonus += GetSupportTacticalBonus(context, enemyUnit, destination, actionType, target, targetDies, plan);
+                    break;
+                case AiProfileType.Protector:
+                    bonus += GetProtectorTacticalBonus(context, enemyUnit, destination, actionType, target, plan);
+                    break;
+                case AiProfileType.Aggressor:
+                    bonus += GetAggressorTacticalBonus(context, enemyUnit, destination, target, plan);
+                    break;
+                case AiProfileType.Boss:
+                    bonus += GetBossTacticalBonus(context, enemyUnit, destination, actionType, target, targetDies, plan);
+                    break;
+            }
+
+            return bonus;
+        }
+
+        private float GetSkillValueAdjustment(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            UnitRuntimeState target,
+            bool targetDies)
+        {
+            if (!enemyUnit.CanUseSkill)
+            {
+                return 0f;
+            }
+
+            if (enemyUnit.AiProfile != AiProfileType.Support)
+            {
+                return 0f;
+            }
+
+            if (ActiveSkillRules.IsOffensiveSkill(enemyUnit.ActiveSkill))
+            {
+                int affectedUnits = GetProjectedSkillAffectedCount(context, enemyUnit, destination, target);
+                return affectedUnits >= 2 || targetDies
+                    ? (affectedUnits - 1) * 3f
+                    : -LowValueSkillPenalty;
+            }
+
+            if (ActiveSkillRules.IsSupportSkill(enemyUnit.ActiveSkill))
+            {
+                return IsSupportSkillWorthwhile(context, enemyUnit, target) ? 8f : -10f;
+            }
+
+            return 0f;
+        }
+
+        private float GetSupportTacticalBonus(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            AiActionType actionType,
+            UnitRuntimeState target,
+            bool targetDies,
+            EnemyTacticalPlan plan)
+        {
+            float bonus = 0f;
+            int nearestOpponentDistance = CalculateNearestOpponentDistance(context, enemyUnit.Faction, destination, null);
+            if (nearestOpponentDistance <= 1)
+            {
+                bonus -= SupportSafetyPenalty;
+            }
+
+            if (CountNearbyProtectors(context, enemyUnit, destination) > 0)
+            {
+                bonus += 5f;
+            }
+
+            if (IsNearProtectedAlly(context, destination, plan.ProtectedUnitIds))
+            {
+                bonus += 4f;
+            }
+
+            if (actionType == AiActionType.Skill && target != null)
+            {
+                bonus += GetSkillValueAdjustment(context, enemyUnit, destination, target, targetDies);
+            }
+
+            return bonus;
+        }
+
+        private float GetProtectorTacticalBonus(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            AiActionType actionType,
+            UnitRuntimeState target,
+            EnemyTacticalPlan plan)
+        {
+            float bonus = 0f;
+            if (plan.ChokeTiles.Contains(destination))
+            {
+                bonus += actionType == AiActionType.None ? ChokeHoldBonus : ChokeHoldBonus - 3f;
+            }
+
+            if (IsNearProtectedAlly(context, destination, plan.ProtectedUnitIds))
+            {
+                bonus += ProtectorScreenBonus;
+            }
+
+            if (plan.EnableCoordinatedFocus && target != null && target.Id == plan.FocusTargetId)
+            {
+                bonus += 4f;
+            }
+
+            return bonus;
+        }
+
+        private float GetAggressorTacticalBonus(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            UnitRuntimeState target,
+            EnemyTacticalPlan plan)
+        {
+            if (target == null)
+            {
+                return 0f;
+            }
+
+            int alliedPressure = context.GetUnits(enemyUnit.Faction)
+                .Count(ally => ally.Id != enemyUnit.Id && ally.IsAlive && ally.Position.ManhattanDistance(target.Position) <= 2);
+
+            float bonus = alliedPressure * 2.5f;
+            if (plan.EnableCoordinatedFocus && target.Id == plan.FocusTargetId)
+            {
+                bonus += FocusFireBonus + 2f;
+            }
+
+            if (destination.ManhattanDistance(target.Position) <= 1 && alliedPressure > 0)
+            {
+                bonus += 3f;
+            }
+
+            return bonus;
+        }
+
+        private float GetBossTacticalBonus(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            AiActionType actionType,
+            UnitRuntimeState target,
+            bool targetDies,
+            EnemyTacticalPlan plan)
+        {
+            float bonus = 0f;
+            if (ShouldBossHoldLine(context, enemyUnit) && BreaksBossHoldLine(context, destination))
+            {
+                bonus -= BossHoldLinePenalty;
+            }
+            else if (ShouldBossHoldLine(context, enemyUnit))
+            {
+                bonus += BossHoldLineBonus;
+            }
+
+            if (target != null && target.CurrentHp <= (int)Math.Ceiling(target.MaxHp * 0.5f))
+            {
+                bonus += 6f;
+            }
+
+            if (plan.EnableCoordinatedFocus && target != null && target.Id == plan.FocusTargetId)
+            {
+                bonus += 6f;
+            }
+
+            if (actionType != AiActionType.None && targetDies)
+            {
+                bonus += 4f;
+            }
+
+            return bonus;
         }
 
         private SkillEvaluation EvaluateSkill(
@@ -437,6 +793,271 @@ namespace PhalanxChronicle.Core
             return new SkillEvaluation(reward, new HashSet<string>());
         }
 
+        private static void AddChokeTiles(HashSet<GridPosition> chokeTiles, IEnumerable<GridPosition> tiles)
+        {
+            foreach (GridPosition tile in tiles)
+            {
+                chokeTiles.Add(tile);
+            }
+        }
+
+        private static float GetRoleFocusBonus(UnitRole role)
+        {
+            switch (role)
+            {
+                case UnitRole.Commander:
+                    return 7f;
+                case UnitRole.Ranger:
+                    return 5f;
+                case UnitRole.Scout:
+                case UnitRole.Raider:
+                    return 4f;
+                default:
+                    return 2f;
+            }
+        }
+
+        private static EnemyTacticalPriority GetPriority(AiProfileType aiProfile)
+        {
+            switch (aiProfile)
+            {
+                case AiProfileType.Support:
+                    return EnemyTacticalPriority.Support;
+                case AiProfileType.Protector:
+                    return EnemyTacticalPriority.Protector;
+                case AiProfileType.Boss:
+                    return EnemyTacticalPriority.Boss;
+                case AiProfileType.Aggressor:
+                default:
+                    return EnemyTacticalPriority.Aggressor;
+            }
+        }
+
+        private bool CanThreatenTarget(BattleContext context, UnitRuntimeState enemyUnit, UnitRuntimeState target)
+        {
+            if (enemyUnit == null || target == null || !enemyUnit.IsAlive || !target.IsAlive)
+            {
+                return false;
+            }
+
+            IReadOnlyList<GridPosition> moveRange = rangeCalculator.GetMoveRange(context, enemyUnit);
+            int attackRange = PassiveSkillRules.GetAttackRange(enemyUnit);
+            int skillRange = enemyUnit.CanUseSkill ? ActiveSkillRules.GetRange(enemyUnit) : 0;
+            foreach (GridPosition origin in moveRange)
+            {
+                int distance = origin.ManhattanDistance(target.Position);
+                if (distance > 0 && distance <= attackRange)
+                {
+                    return true;
+                }
+
+                if (enemyUnit.CanUseSkill && ActiveSkillRules.IsOffensiveSkill(enemyUnit.ActiveSkill) && distance > 0 && distance <= skillRange)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool CanLikelySecureKill(BattleContext context, UnitRuntimeState enemyUnit, string focusTargetId)
+        {
+            if (enemyUnit == null || !enemyUnit.IsAlive)
+            {
+                return false;
+            }
+
+            UnitRuntimeState preferredTarget = string.IsNullOrWhiteSpace(focusTargetId) ? null : context.GetUnit(focusTargetId);
+            if (preferredTarget != null && EstimatePotentialDamageAgainstTarget(context, enemyUnit, preferredTarget) >= preferredTarget.CurrentHp)
+            {
+                return true;
+            }
+
+            return context.GetUnits(UnitFaction.Player)
+                .Any(playerUnit => EstimatePotentialDamageAgainstTarget(context, enemyUnit, playerUnit) >= playerUnit.CurrentHp);
+        }
+
+        private int EstimatePotentialDamageAgainstTarget(BattleContext context, UnitRuntimeState enemyUnit, UnitRuntimeState target)
+        {
+            if (enemyUnit == null || target == null || !enemyUnit.IsAlive || !target.IsAlive)
+            {
+                return 0;
+            }
+
+            int bestDamage = 0;
+            IReadOnlyList<GridPosition> moveRange = rangeCalculator.GetMoveRange(context, enemyUnit);
+            int attackRange = PassiveSkillRules.GetAttackRange(enemyUnit);
+            int skillRange = enemyUnit.CanUseSkill ? ActiveSkillRules.GetRange(enemyUnit) : 0;
+            foreach (GridPosition origin in moveRange)
+            {
+                int distance = origin.ManhattanDistance(target.Position);
+                if (distance > 0 && distance <= attackRange)
+                {
+                    bestDamage = Math.Max(bestDamage, BattlePreviewCalculator.EstimateAttackDamage(context, enemyUnit, origin, target));
+                }
+
+                if (!enemyUnit.CanUseSkill || !ActiveSkillRules.IsOffensiveSkill(enemyUnit.ActiveSkill) || distance <= 0 || distance > skillRange)
+                {
+                    continue;
+                }
+
+                bestDamage = Math.Max(
+                    bestDamage,
+                    BattlePreviewCalculator.EstimateAttackDamage(
+                        context,
+                        enemyUnit,
+                        origin,
+                        target,
+                        GetOffensiveSkillBonus(enemyUnit),
+                        enemyUnit.ActiveSkill == ActiveSkillType.DragonPierce
+                            ? ActiveSkillRules.GetDragonPierceIgnoredDefense(enemyUnit)
+                            : 0));
+            }
+
+            return bestDamage;
+        }
+
+        private static GridPosition GetEnemyFrontlineAnchor(BattleContext context)
+        {
+            IReadOnlyList<UnitRuntimeState> players = context.GetUnits(UnitFaction.Player);
+            if (players.Count == 0)
+            {
+                return new GridPosition(0, 0);
+            }
+
+            int x = 0;
+            int y = 0;
+            foreach (UnitRuntimeState unit in players)
+            {
+                x += unit.Position.X;
+                y += unit.Position.Y;
+            }
+
+            return new GridPosition(x / players.Count, y / players.Count);
+        }
+
+        private static bool CanReachChokeTile(BattleContext context, UnitRuntimeState enemyUnit, HashSet<GridPosition> chokeTiles)
+        {
+            if (chokeTiles == null || chokeTiles.Count == 0)
+            {
+                return false;
+            }
+
+            return chokeTiles.Any(tile => tile.ManhattanDistance(enemyUnit.Position) <= PassiveSkillRules.GetMoveRange(enemyUnit) + 1);
+        }
+
+        private static bool IsNearProtectedAlly(BattleContext context, GridPosition destination, HashSet<string> protectedUnitIds)
+        {
+            if (protectedUnitIds == null || protectedUnitIds.Count == 0)
+            {
+                return false;
+            }
+
+            foreach (string protectedUnitId in protectedUnitIds)
+            {
+                UnitRuntimeState protectedUnit = context.GetUnit(protectedUnitId);
+                if (protectedUnit == null || !protectedUnit.IsAlive)
+                {
+                    continue;
+                }
+
+                if (destination.ManhattanDistance(protectedUnit.Position) <= 1)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static int CountNearbyProtectors(BattleContext context, UnitRuntimeState enemyUnit, GridPosition destination)
+        {
+            return context.GetUnits(enemyUnit.Faction)
+                .Count(ally =>
+                    ally.Id != enemyUnit.Id &&
+                    ally.IsAlive &&
+                    (ally.AiProfile == AiProfileType.Protector || ally.AiProfile == AiProfileType.Boss) &&
+                    ally.Position.ManhattanDistance(destination) <= 2);
+        }
+
+        private int GetProjectedSkillAffectedCount(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            GridPosition destination,
+            UnitRuntimeState target)
+        {
+            switch (enemyUnit.ActiveSkill)
+            {
+                case ActiveSkillType.Volley:
+                case ActiveSkillType.SkyVolley:
+                case ActiveSkillType.FireStratagem:
+                case ActiveSkillType.EightTrigramInferno:
+                    return BattlePreviewCalculator.GetVolleyTargets(context, target).Count;
+                case ActiveSkillType.GreenDragonSlash:
+                case ActiveSkillType.AzureDragonSlash:
+                case ActiveSkillType.WesternStampede:
+                    return BattlePreviewCalculator.GetGreenDragonSlashTargets(context, destination, target).Count;
+                case ActiveSkillType.WarCry:
+                case ActiveSkillType.LionWarCry:
+                    return context.GetUnits(UnitFaction.Player)
+                        .Count(unit => destination.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(enemyUnit));
+                case ActiveSkillType.ImperialAid:
+                case ActiveSkillType.GuardOrder:
+                    return context.GetUnits(enemyUnit.Faction)
+                        .Count(unit => unit.Id == target.Id || unit.Position.ManhattanDistance(target.Position) <= 1);
+                default:
+                    return 1;
+            }
+        }
+
+        private static bool IsSupportSkillWorthwhile(BattleContext context, UnitRuntimeState enemyUnit, UnitRuntimeState target)
+        {
+            switch (enemyUnit.ActiveSkill)
+            {
+                case ActiveSkillType.RoyalAid:
+                case ActiveSkillType.ImperialAid:
+                    return target.CurrentHp < target.MaxHp || !target.HasStatus(StatusEffectType.Inspired);
+                case ActiveSkillType.GuardOrder:
+                    return target.CurrentHp < target.MaxHp ||
+                           !target.HasStatus(StatusEffectType.Guarded) ||
+                           context.GetUnits(enemyUnit.Faction).Any(unit =>
+                               unit.Position.ManhattanDistance(target.Position) == 1 &&
+                               !unit.HasStatus(StatusEffectType.Guarded));
+                default:
+                    return true;
+            }
+        }
+
+        private static bool ShouldBossHoldLine(BattleContext context, UnitRuntimeState enemyUnit)
+        {
+            if (enemyUnit == null || enemyUnit.AiProfile != AiProfileType.Boss)
+            {
+                return false;
+            }
+
+            switch (context.StageNameKey)
+            {
+                case "stage.guangzong":
+                    return context.GetUnit("enemy-zhang-liang") == null &&
+                           (context.RoundNumber < 3 ||
+                            context.GetUnit("enemy-yellow_turban_raider") != null ||
+                            context.GetUnit("enemy-armored_zealot") != null);
+                default:
+                    return false;
+            }
+        }
+
+        private static bool BreaksBossHoldLine(BattleContext context, GridPosition destination)
+        {
+            switch (context.StageNameKey)
+            {
+                case "stage.guangzong":
+                    return destination.X < 12;
+                default:
+                    return false;
+            }
+        }
+
         private float EstimateExposure(
             BattleContext context,
             UnitRuntimeState enemyUnit,
@@ -506,40 +1127,7 @@ namespace PhalanxChronicle.Core
                     continue;
                 }
 
-                int bonusDamage;
-                switch (opposingUnit.ActiveSkill)
-                {
-                    case ActiveSkillType.PowerStrike:
-                        bonusDamage = ActiveSkillRules.GetPowerStrikeBonus(opposingUnit);
-                        break;
-                    case ActiveSkillType.DragonPierce:
-                        bonusDamage = ActiveSkillRules.GetDragonPierceBonus(opposingUnit);
-                        break;
-                    case ActiveSkillType.PinningShot:
-                        bonusDamage = ActiveSkillRules.GetPinningShotBonus(opposingUnit);
-                        break;
-                    case ActiveSkillType.GreenDragonSlash:
-                        bonusDamage = ActiveSkillRules.GetGreenDragonSlashBonus(opposingUnit);
-                        break;
-                    case ActiveSkillType.AzureDragonSlash:
-                        bonusDamage = ActiveSkillRules.GetAzureDragonSlashBonus(opposingUnit);
-                        break;
-                    case ActiveSkillType.WesternStampede:
-                        bonusDamage = ActiveSkillRules.GetWesternStampedeBonus(opposingUnit);
-                        break;
-                    case ActiveSkillType.FireStratagem:
-                        bonusDamage = ActiveSkillRules.GetFireStratagemBonus(opposingUnit);
-                        break;
-                    case ActiveSkillType.EightTrigramInferno:
-                        bonusDamage = ActiveSkillRules.GetEightTrigramInfernoBonus(opposingUnit);
-                        break;
-                    case ActiveSkillType.SkyVolley:
-                        bonusDamage = ActiveSkillRules.GetSkyVolleyBonus(opposingUnit);
-                        break;
-                    default:
-                        bonusDamage = ActiveSkillRules.GetVolleyBonus(opposingUnit);
-                        break;
-                }
+                int bonusDamage = GetOffensiveSkillBonus(opposingUnit);
 
                 int skillDamage = BattlePreviewCalculator.EstimateAttackDamage(
                     context,
@@ -571,6 +1159,35 @@ namespace PhalanxChronicle.Core
                     return ActiveSkillRules.GetEightTrigramInfernoBonus(unit);
                 default:
                     return ActiveSkillRules.GetVolleyBonus(unit);
+            }
+        }
+
+        private static int GetOffensiveSkillBonus(UnitRuntimeState unit)
+        {
+            switch (unit.ActiveSkill)
+            {
+                case ActiveSkillType.PowerStrike:
+                    return ActiveSkillRules.GetPowerStrikeBonus(unit);
+                case ActiveSkillType.DragonPierce:
+                    return ActiveSkillRules.GetDragonPierceBonus(unit);
+                case ActiveSkillType.PinningShot:
+                    return ActiveSkillRules.GetPinningShotBonus(unit);
+                case ActiveSkillType.GreenDragonSlash:
+                    return ActiveSkillRules.GetGreenDragonSlashBonus(unit);
+                case ActiveSkillType.AzureDragonSlash:
+                    return ActiveSkillRules.GetAzureDragonSlashBonus(unit);
+                case ActiveSkillType.WesternStampede:
+                    return ActiveSkillRules.GetWesternStampedeBonus(unit);
+                case ActiveSkillType.FireStratagem:
+                    return ActiveSkillRules.GetFireStratagemBonus(unit);
+                case ActiveSkillType.EightTrigramInferno:
+                    return ActiveSkillRules.GetEightTrigramInfernoBonus(unit);
+                case ActiveSkillType.SkyVolley:
+                    return ActiveSkillRules.GetSkyVolleyBonus(unit);
+                case ActiveSkillType.Volley:
+                    return ActiveSkillRules.GetVolleyBonus(unit);
+                default:
+                    return 0;
             }
         }
 

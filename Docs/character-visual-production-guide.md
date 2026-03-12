@@ -133,14 +133,14 @@ Assets/
 
 目前專案最佳匯入設定：
 
-- `128x128` 圖請設 `Pixels Per Unit = 64`
-- `96x96` 圖請設 `Pixels Per Unit = 48`
+- `128x128` 圖請設 `Pixels Per Unit = 128`
+- `96x96` 圖僅作舊資產 fallback，不再建議新增
 
 原因：
 
-- 專案目前 fallback 角色是 `48px @ 24 PPU`，等效世界尺寸是 `2.0`
-- 若正式圖沿用這個世界尺寸，`128/64 = 2.0`，`96/48 = 2.0`
-- 這樣可最大程度對齊 `Assets/Scripts/Battle/Units/Unit.cs` 內既有縮放與裝飾位置
+- 現行戰場角色已切到 `小比例現代曹操傳` 基線，角色實體佔圖高度約 `46px - 54px`
+- `128/128 = 1.0` 可讓 `battleScale` 與 `Unit.cs` 的裝飾縮放直接對齊
+- 同時能避免舊版 `64 PPU` 導致的角色過大與視覺稚嫩感
 
 Pivot 規則：
 
@@ -177,12 +177,11 @@ Pivot 規則：
 - Sprite Mode: `Single`
 - Mesh Type: `Full Rect`
 - Mip Maps: `Off`
-- Compression: `Normal` 或 `None`
-- Filter Mode: `Bilinear`
+- Compression: `None`
+- Filter Mode: `Point`
 - Pivot: `Center`
 - Pixels Per Unit:
-  - `128x128 -> 64`
-  - `96x96 -> 48`
+  - `128x128 -> 128`
 
 ### 6.3 Weapon Icon
 
@@ -210,7 +209,7 @@ Pivot 規則：
 | `frameColor` | 頭像框與選取外框色 |
 | `markerColor` | 地面陣營 marker 色 |
 | `portraitBackdropColor` | 頭像背板色，建議低彩低明度 |
-| `battleScale` | 初值建議 `1.00`，可微調在 `0.92 - 1.08` |
+| `battleScale` | 依職責給基線：`Commander 0.84`、`Guardian 0.88`、`Ranger/Scout/Raider 0.80`、`Boss 0.92`，僅允許微調 `±0.04` |
 | `portraitSprite` | 專屬立繪 |
 | `battleSprite` | 戰場小比例角色 |
 | `weaponIcon` | 武器圖示 |

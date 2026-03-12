@@ -193,7 +193,7 @@ namespace PhalanxChronicle.Core
                 new CampaignProgress(),
                 inventory,
                 units,
-                3);
+                4);
         }
 
         public BattleScenarioData BuildScenario(BattleScenarioData baseScenario, CampaignSaveData saveData, bool includeStageReward)

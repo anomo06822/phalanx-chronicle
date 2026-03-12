@@ -47,10 +47,13 @@ dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj
 
 ## 視覺製作文件
 - `Docs/character-visual-production-guide.md`
+- `Docs/terrain-visual-production-guide.md`
 - `Docs/character-asset-manifest.csv`
 - `Docs/templates/character-visual-brief-template.md`
 - Unity 選單：`Phalanx Chronicle/Visuals/Prepare Character Art Pipeline`
 - 角色美術生成器：`python3 scripts/generate_character_art.py`
+- SRPG 戰場像素角色：`python3 scripts/generate_srpg_battle_art.py`
+- 地形像素資產生成器：`python3 scripts/generate_terrain_art.py`
 
 ## GitHub 協作
 - 已補上 `.gitignore`，可避免 Unity 產生檔進版控

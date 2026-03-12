@@ -129,5 +129,124 @@ namespace PhalanxChronicle.Core
                 .ThenBy(unit => unit.Id)
                 .ToList();
         }
+
+        public bool TryBuildMovePath(
+            BattleContext context,
+            UnitRuntimeState unit,
+            GridPosition destination,
+            out IReadOnlyList<GridPosition> path,
+            out int moveCost)
+        {
+            path = new List<GridPosition>();
+            moveCost = 0;
+
+            if (context == null || unit == null || !unit.IsAlive || unit.HasActed)
+            {
+                return false;
+            }
+
+            if (!context.IsInside(destination))
+            {
+                return false;
+            }
+
+            if (StatusEffectRules.IsMovementBlocked(unit))
+            {
+                if (destination != unit.Position)
+                {
+                    return false;
+                }
+
+                path = new List<GridPosition> { unit.Position };
+                return true;
+            }
+
+            int maxMove = PassiveSkillRules.GetMoveRange(unit) + EquipmentEffectRules.GetMoveBonus(context, unit);
+            Dictionary<GridPosition, int> costs = new Dictionary<GridPosition, int>
+            {
+                [unit.Position] = 0,
+            };
+            Dictionary<GridPosition, GridPosition> previous = new Dictionary<GridPosition, GridPosition>();
+            List<GridPosition> frontier = new List<GridPosition> { unit.Position };
+
+            while (frontier.Count > 0)
+            {
+                int bestIndex = 0;
+                for (int index = 1; index < frontier.Count; index++)
+                {
+                    if (costs[frontier[index]] < costs[frontier[bestIndex]])
+                    {
+                        bestIndex = index;
+                    }
+                }
+
+                GridPosition current = frontier[bestIndex];
+                frontier.RemoveAt(bestIndex);
+                int currentCost = costs[current];
+                if (current == destination)
+                {
+                    break;
+                }
+
+                foreach (GridPosition neighbor in current.GetOrthogonalNeighbors())
+                {
+                    if (!context.IsInside(neighbor))
+                    {
+                        continue;
+                    }
+
+                    if (!context.IsWalkable(neighbor))
+                    {
+                        continue;
+                    }
+
+                    if (neighbor != destination && neighbor != unit.Position && context.IsOccupied(neighbor))
+                    {
+                        continue;
+                    }
+
+                    int nextCost = currentCost + TerrainRules.GetMoveCost(unit, context.GetTerrainAt(neighbor));
+                    if (nextCost > maxMove)
+                    {
+                        continue;
+                    }
+
+                    if (costs.TryGetValue(neighbor, out int knownCost) && knownCost <= nextCost)
+                    {
+                        continue;
+                    }
+
+                    costs[neighbor] = nextCost;
+                    previous[neighbor] = current;
+                    if (!frontier.Contains(neighbor))
+                    {
+                        frontier.Add(neighbor);
+                    }
+                }
+            }
+
+            if (!costs.TryGetValue(destination, out moveCost))
+            {
+                return false;
+            }
+
+            List<GridPosition> orderedPath = new List<GridPosition>();
+            GridPosition cursor = destination;
+            orderedPath.Add(cursor);
+            while (cursor != unit.Position)
+            {
+                if (!previous.TryGetValue(cursor, out GridPosition prior))
+                {
+                    return false;
+                }
+
+                cursor = prior;
+                orderedPath.Add(cursor);
+            }
+
+            orderedPath.Reverse();
+            path = orderedPath;
+            return true;
+        }
     }
 }

@@ -9,6 +9,7 @@ namespace PhalanxChronicle.Editor
         private const string PortraitsRoot = "Assets/Art/Characters/Portraits/";
         private const string BattleRoot = "Assets/Art/Characters/Battle/";
         private const string WeaponsRoot = "Assets/Art/UI/Weapons/";
+        private const string TerrainRoot = "Assets/Resources/Terrain/";
 
         private void OnPreprocessTexture()
         {
@@ -27,6 +28,12 @@ namespace PhalanxChronicle.Editor
             if (assetPath.StartsWith(BattleRoot))
             {
                 ConfigureBattle(importer);
+                return;
+            }
+
+            if (assetPath.StartsWith(TerrainRoot))
+            {
+                ConfigureTerrain(importer);
                 return;
             }
 
@@ -57,11 +64,25 @@ namespace PhalanxChronicle.Editor
             importer.spritePixelsPerUnit = 128f;
             importer.mipmapEnabled = false;
             importer.alphaIsTransparency = true;
-            importer.filterMode = FilterMode.Bilinear;
+            importer.filterMode = FilterMode.Point;
             importer.textureCompression = TextureImporterCompression.Uncompressed;
             importer.wrapMode = TextureWrapMode.Clamp;
             importer.npotScale = TextureImporterNPOTScale.None;
             importer.maxTextureSize = 256;
+        }
+
+        private static void ConfigureTerrain(TextureImporter importer)
+        {
+            importer.textureType = TextureImporterType.Sprite;
+            importer.spriteImportMode = SpriteImportMode.Single;
+            importer.spritePixelsPerUnit = 64f;
+            importer.mipmapEnabled = false;
+            importer.alphaIsTransparency = true;
+            importer.filterMode = FilterMode.Point;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.npotScale = TextureImporterNPOTScale.None;
+            importer.maxTextureSize = 128;
         }
 
         private static void ConfigureWeapon(TextureImporter importer)

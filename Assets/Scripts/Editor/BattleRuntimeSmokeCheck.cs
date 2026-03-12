@@ -99,6 +99,22 @@ namespace PhalanxChronicle.Editor
                     throw new InvalidOperationException("Expected campaign stage selection to appear before any battle starts.");
                 }
 
+                BattleHUD battleHud = UnityEngine.Object.FindObjectOfType<BattleHUD>();
+                Text campaignBodyLabel = GetPrivateField<Text>(battleHud, "campaignBodyLabel");
+                Button campaignPrimaryButton = GetPrivateField<Button>(battleHud, "campaignPrimaryButton");
+                if (campaignBodyLabel == null ||
+                    !ContainsAny(campaignBodyLabel.text, "15-20", "15-20 分鐘", "15-20 minutes"))
+                {
+                    throw new InvalidOperationException("Expected first-launch intro copy to describe the first-session length.");
+                }
+
+                Text primaryButtonLabel = campaignPrimaryButton != null ? campaignPrimaryButton.GetComponentInChildren<Text>() : null;
+                if (primaryButtonLabel == null ||
+                    !ContainsAny(primaryButtonLabel.text, "開始首場戰鬥", "Start First Battle"))
+                {
+                    throw new InvalidOperationException("Expected the first-launch overlay to expose the guided first-battle CTA.");
+                }
+
                 gameManager.StartCampaignStage(0);
                 units = UnityEngine.Object.FindObjectsOfType<Unit>();
 
@@ -134,6 +150,11 @@ namespace PhalanxChronicle.Editor
                     throw new InvalidOperationException("Fixed story scenario should not expose reroll.");
                 }
 
+                if (!battleManager.IsOnboardingVisible)
+                {
+                    throw new InvalidOperationException("Expected Guangzong onboarding prompts to appear after the opening dialogue.");
+                }
+
                 battleManager.ChangeState<UnitSelectionState>();
                 Unit liuBeiView = units.Single(unit => unit.UnitId == "player-liu-bei");
                 battleManager.Simulation.Context.GetUnit("player-guan-yu").ApplyDamage(6);
@@ -153,6 +174,13 @@ namespace PhalanxChronicle.Editor
                 if (!ContainsAny(battleManager.CurrentActionMenuModeText, "原地行動", "Hold Position"))
                 {
                     throw new InvalidOperationException("Expected the action menu to show hold-position context.");
+                }
+
+                ActionMenuPanel actionMenuPanel = UnityEngine.Object.FindObjectOfType<ActionMenuPanel>();
+                Text contextHintLabel = GetPrivateField<Text>(actionMenuPanel, "contextHintLabel");
+                if (contextHintLabel == null || string.IsNullOrWhiteSpace(contextHintLabel.text))
+                {
+                    throw new InvalidOperationException("Expected the action menu to expose the new context hint copy.");
                 }
 
                 if (battleManager.IsActionMenuBackEnabled)
@@ -197,7 +225,6 @@ namespace PhalanxChronicle.Editor
                     throw new InvalidOperationException("Expected long world-space names to scale down for readability.");
                 }
 
-                BattleHUD battleHud = UnityEngine.Object.FindObjectOfType<BattleHUD>();
                 Text selectedNameLabel = GetPrivateField<Text>(battleHud, "selectedNameLabel");
                 if (selectedNameLabel == null || !selectedNameLabel.resizeTextForBestFit)
                 {
@@ -318,8 +345,19 @@ namespace PhalanxChronicle.Editor
 
         private static T GetPrivateField<T>(object target, string fieldName) where T : class
         {
-            FieldInfo fieldInfo = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-            return fieldInfo?.GetValue(target) as T;
+            Type currentType = target != null ? target.GetType() : null;
+            while (currentType != null)
+            {
+                FieldInfo fieldInfo = currentType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
+                if (fieldInfo != null)
+                {
+                    return fieldInfo.GetValue(target) as T;
+                }
+
+                currentType = currentType.BaseType;
+            }
+
+            return null;
         }
 
         private static bool ContainsAny(string text, params string[] candidates)

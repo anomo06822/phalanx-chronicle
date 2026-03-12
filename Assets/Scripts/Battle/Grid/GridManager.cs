@@ -14,7 +14,7 @@ namespace PhalanxChronicle.Battle.Grid
         private int height;
         private float cellSize = 1f;
 
-        public void BuildGrid(BattleContext context, Action<GridCellView> onCellClicked)
+        public void BuildGrid(BattleContext context, Action<GridCellView> onCellClicked, Action<GridCellView, bool> onCellHovered)
         {
             if (context == null)
             {
@@ -39,7 +39,21 @@ namespace PhalanxChronicle.Battle.Grid
                     cellObject.transform.localScale = Vector3.one * 0.98f;
 
                     GridCellView cellView = cellObject.AddComponent<GridCellView>();
-                    cellView.Initialize(position, cell.TerrainType, cell.IsBlocked, (x + y) % 2 == 0, stageVisual.TerrainPaletteId, onCellClicked);
+                    TerrainVariantDefinition terrainVariant = TerrainVariantResolver.Resolve(
+                        context,
+                        position,
+                        cell.TerrainType,
+                        cell.IsBlocked,
+                        stageVisual.TerrainPaletteId);
+                    cellView.Initialize(
+                        position,
+                        cell.TerrainType,
+                        cell.IsBlocked,
+                        (x + y) % 2 == 0,
+                        stageVisual.TerrainPaletteId,
+                        terrainVariant,
+                        onCellClicked,
+                        onCellHovered);
                     cellViews[position] = cellView;
                 }
             }
@@ -98,6 +112,25 @@ namespace PhalanxChronicle.Battle.Grid
             if (cellViews.TryGetValue(position, out GridCellView cellView))
             {
                 cellView.SetSelectedHighlight(BattleUiTheme.SelectedHighlight);
+            }
+        }
+
+        public void ShowPathPreview(IEnumerable<GridPosition> positions)
+        {
+            foreach (GridPosition position in positions)
+            {
+                if (cellViews.TryGetValue(position, out GridCellView cellView))
+                {
+                    cellView.SetPathHighlight(BattleUiTheme.PathHighlight);
+                }
+            }
+        }
+
+        public void HighlightPreviewDestination(GridPosition position)
+        {
+            if (cellViews.TryGetValue(position, out GridCellView cellView))
+            {
+                cellView.SetPreviewDestinationHighlight(BattleUiTheme.PreviewDestinationHighlight);
             }
         }
 

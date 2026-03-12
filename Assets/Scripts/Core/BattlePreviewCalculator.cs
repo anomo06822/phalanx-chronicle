@@ -14,6 +14,25 @@ namespace PhalanxChronicle.Core
             int flatAttackBonus = 0,
             int ignoredDefenseBonus = 0)
         {
+            return EstimateAttackDamage(
+                context,
+                attacker,
+                attackerPosition,
+                defender,
+                defender != null ? defender.Position : new GridPosition(0, 0),
+                flatAttackBonus,
+                ignoredDefenseBonus);
+        }
+
+        public static int EstimateAttackDamage(
+            BattleContext context,
+            UnitRuntimeState attacker,
+            GridPosition attackerPosition,
+            UnitRuntimeState defender,
+            GridPosition defenderPosition,
+            int flatAttackBonus = 0,
+            int ignoredDefenseBonus = 0)
+        {
             if (context == null || attacker == null || defender == null)
             {
                 return 0;
@@ -29,7 +48,7 @@ namespace PhalanxChronicle.Core
             int effectiveDefense = defender.Defense +
                                    PassiveSkillRules.GetDefenseBonus(defender) +
                                    SupportRules.GetDefenseBonus(context, defender) +
-                                   TerrainRules.GetDefenseBonus(context.GetTerrainAt(defender.Position)) +
+                                   TerrainRules.GetDefenseBonus(context.GetTerrainAt(defenderPosition)) +
                                    StatusEffectRules.GetDefenseModifier(defender) -
                                    PassiveSkillRules.GetIgnoredDefense(attacker) -
                                    ignoredDefenseBonus;

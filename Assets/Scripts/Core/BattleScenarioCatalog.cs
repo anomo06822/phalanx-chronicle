@@ -56,45 +56,74 @@ namespace PhalanxChronicle.Core
             List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
             AddCoreSquad(
                 openingSpawns,
-                new GridPosition(1, 4),
                 new GridPosition(1, 6),
-                new GridPosition(1, 2),
-                new GridPosition(0, 5));
-            openingSpawns.Add(SpawnEnemy("enemy-zhang-bao", "Zhang Bao", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 32, 10, 4, 3, 1, new GridPosition(8, 4), AiProfileType.Boss));
-            openingSpawns.Add(SpawnEnemy("enemy-yellow_turban_raider", "Yellow Turban Raider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 24, 9, 3, 4, 1, new GridPosition(7, 2), AiProfileType.Aggressor));
-            openingSpawns.Add(SpawnEnemy("enemy-armored_zealot", "Armored Zealot", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 8, 6, 2, 1, new GridPosition(7, 6), AiProfileType.Protector));
-            openingSpawns.Add(SpawnEnemy("enemy-yellow_turban_archer", "Yellow Turban Archer", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 22, 9, 3, 3, 2, new GridPosition(8, 2), AiProfileType.Support));
+                new GridPosition(2, 7),
+                new GridPosition(2, 5),
+                new GridPosition(1, 8));
+            openingSpawns.Add(SpawnEnemy("enemy-zhang-bao", "Zhang Bao", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 32, 10, 4, 3, 1, new GridPosition(13, 6), AiProfileType.Boss));
+            openingSpawns.Add(SpawnEnemy("enemy-yellow_turban_raider", "Yellow Turban Raider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 24, 9, 3, 4, 1, new GridPosition(10, 3), AiProfileType.Aggressor));
+            openingSpawns.Add(SpawnEnemy("enemy-armored_zealot", "Armored Zealot", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 8, 6, 2, 1, new GridPosition(11, 9), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-yellow_turban_archer", "Yellow Turban Archer", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 22, 9, 3, 3, 2, new GridPosition(12, 4), AiProfileType.Support));
+
+            List<GridPosition> blockedCells = new List<GridPosition>
+            {
+                new GridPosition(4, 1),
+                new GridPosition(4, 2),
+                new GridPosition(5, 1),
+                new GridPosition(5, 2),
+                new GridPosition(4, 11),
+                new GridPosition(4, 12),
+                new GridPosition(5, 11),
+                new GridPosition(5, 12),
+                new GridPosition(6, 4),
+                new GridPosition(6, 5),
+                new GridPosition(6, 8),
+                new GridPosition(6, 9),
+                new GridPosition(8, 5),
+                new GridPosition(8, 8),
+                new GridPosition(9, 2),
+                new GridPosition(9, 11),
+                new GridPosition(10, 4),
+                new GridPosition(10, 9),
+                new GridPosition(11, 5),
+                new GridPosition(11, 8),
+                new GridPosition(12, 2),
+                new GridPosition(12, 3),
+                new GridPosition(12, 10),
+                new GridPosition(12, 11),
+                new GridPosition(13, 5),
+                new GridPosition(13, 8),
+            };
+            List<TerrainTileData> terrainTiles = new List<TerrainTileData>
+            {
+                new TerrainTileData(new GridPosition(3, 2), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(3, 3), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(4, 4), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(5, 5), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(3, 10), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(3, 11), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(4, 9), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(5, 8), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(7, 6), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(7, 7), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(12, 6), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(12, 7), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(8, 6), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(8, 7), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(9, 6), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(9, 7), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(10, 6), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(10, 7), TerrainType.Hazard),
+            };
 
             StageDefinitionData stage = new StageDefinitionData(
                 "Battle of Guangzong",
                 "stage.guangzong",
-                10,
-                10,
+                16,
+                14,
                 openingSpawns,
-                new List<GridPosition>
-                {
-                    new GridPosition(3, 1),
-                    new GridPosition(3, 2),
-                    new GridPosition(3, 7),
-                    new GridPosition(3, 8),
-                    new GridPosition(4, 3),
-                    new GridPosition(4, 6),
-                    new GridPosition(5, 3),
-                    new GridPosition(5, 6),
-                    new GridPosition(6, 1),
-                    new GridPosition(6, 2),
-                    new GridPosition(6, 7),
-                    new GridPosition(6, 8),
-                },
-                new List<TerrainTileData>
-                {
-                    new TerrainTileData(new GridPosition(2, 2), TerrainType.Forest),
-                    new TerrainTileData(new GridPosition(2, 7), TerrainType.Forest),
-                    new TerrainTileData(new GridPosition(4, 4), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(5, 5), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(7, 3), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(7, 6), TerrainType.Hazard),
-                });
+                blockedCells,
+                terrainTiles);
 
             ObjectiveState openingObjective = new ObjectiveState(
                 "objective.guangzong.opening",
@@ -112,9 +141,9 @@ namespace PhalanxChronicle.Core
                 ScenarioDirective.SetFlag(GuangzongReinforcementsArrivedFlag),
                 ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
                 {
-                    SpawnEnemy("enemy-zhang-liang", "Zhang Liang", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 30, 9, 4, 3, 1, new GridPosition(9, 1), AiProfileType.Boss),
-                    SpawnEnemy("enemy-yellow_turban_hunter", "Yellow Turban Hunter", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 9, 4, 4, 1, new GridPosition(9, 3), AiProfileType.Aggressor),
-                    SpawnEnemy("enemy-fervent_spearman", "Fervent Spearman", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 9, 4, 4, 1, new GridPosition(9, 6), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-zhang-liang", "Zhang Liang", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 30, 9, 4, 3, 1, new GridPosition(15, 2), AiProfileType.Boss),
+                    SpawnEnemy("enemy-yellow_turban_hunter", "Yellow Turban Hunter", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 9, 4, 4, 1, new GridPosition(14, 4), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-fervent_spearman", "Fervent Spearman", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 9, 4, 4, 1, new GridPosition(14, 10), AiProfileType.Aggressor),
                 }),
                 ScenarioDirective.UpdateObjective(finalObjective),
                 ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
@@ -542,53 +571,57 @@ namespace PhalanxChronicle.Core
             List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
             AddCoreSquad(
                 openingSpawns,
-                new GridPosition(1, 5),
-                new GridPosition(2, 6),
-                new GridPosition(2, 4),
-                new GridPosition(1, 7));
-            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(0, 4)));
-            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(1, 3)));
-            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-bridge-captain", "Bridge Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 6, 2, 1, new GridPosition(8, 5), AiProfileType.Protector));
-            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-bow-chief", "River Bow Chief", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(9, 2), AiProfileType.Support));
-            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-outer-warden-a", "Outer Bridge Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 26, 8, 5, 2, 1, new GridPosition(8, 2), AiProfileType.Protector));
-            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-outer-warden-b", "Outer Bridge Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 26, 8, 5, 2, 1, new GridPosition(8, 8), AiProfileType.Protector));
+                new GridPosition(1, 6),
+                new GridPosition(2, 7),
+                new GridPosition(2, 5),
+                new GridPosition(1, 8));
+            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(0, 5)));
+            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(1, 4)));
+            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-bridge-captain", "Bridge Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 6, 2, 1, new GridPosition(12, 6), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-bow-chief", "River Bow Chief", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(14, 3), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-outer-warden-a", "Outer Bridge Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 26, 8, 5, 2, 1, new GridPosition(12, 2), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-jiangxia-outer-warden-b", "Outer Bridge Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 26, 8, 5, 2, 1, new GridPosition(12, 11), AiProfileType.Protector));
+
+            List<GridPosition> blockedCells = new List<GridPosition>();
+            for (int x = 7; x <= 10; x++)
+            {
+                for (int y = 0; y < 14; y++)
+                {
+                    if (y == 2 || y == 6 || y == 7 || y == 11)
+                    {
+                        continue;
+                    }
+
+                    blockedCells.Add(new GridPosition(x, y));
+                }
+            }
+
+            List<TerrainTileData> terrainTiles = new List<TerrainTileData>();
+            for (int x = 7; x <= 10; x++)
+            {
+                terrainTiles.Add(new TerrainTileData(new GridPosition(x, 2), TerrainType.Fort));
+                terrainTiles.Add(new TerrainTileData(new GridPosition(x, 6), TerrainType.Fort));
+                terrainTiles.Add(new TerrainTileData(new GridPosition(x, 7), TerrainType.Fort));
+                terrainTiles.Add(new TerrainTileData(new GridPosition(x, 11), TerrainType.Fort));
+            }
+
+            terrainTiles.Add(new TerrainTileData(new GridPosition(5, 2), TerrainType.Forest));
+            terrainTiles.Add(new TerrainTileData(new GridPosition(5, 3), TerrainType.Forest));
+            terrainTiles.Add(new TerrainTileData(new GridPosition(5, 10), TerrainType.Forest));
+            terrainTiles.Add(new TerrainTileData(new GridPosition(5, 11), TerrainType.Forest));
+            terrainTiles.Add(new TerrainTileData(new GridPosition(12, 4), TerrainType.Hazard));
+            terrainTiles.Add(new TerrainTileData(new GridPosition(12, 9), TerrainType.Hazard));
+            terrainTiles.Add(new TerrainTileData(new GridPosition(13, 5), TerrainType.Hazard));
+            terrainTiles.Add(new TerrainTileData(new GridPosition(13, 8), TerrainType.Hazard));
 
             StageDefinitionData stage = new StageDefinitionData(
                 "Jiangxia Ferry",
                 "stage.jiangxia_ferry",
-                12,
-                10,
+                18,
+                14,
                 openingSpawns,
-                new List<GridPosition>
-                {
-                    new GridPosition(5, 0),
-                    new GridPosition(6, 0),
-                    new GridPosition(5, 1),
-                    new GridPosition(6, 1),
-                    new GridPosition(5, 3),
-                    new GridPosition(6, 3),
-                    new GridPosition(5, 4),
-                    new GridPosition(6, 4),
-                    new GridPosition(5, 6),
-                    new GridPosition(6, 6),
-                    new GridPosition(5, 7),
-                    new GridPosition(6, 7),
-                    new GridPosition(5, 9),
-                    new GridPosition(6, 9),
-                },
-                new List<TerrainTileData>
-                {
-                    new TerrainTileData(new GridPosition(5, 2), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(6, 2), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(5, 5), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(6, 5), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(5, 8), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(6, 8), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(3, 1), TerrainType.Forest),
-                    new TerrainTileData(new GridPosition(3, 8), TerrainType.Forest),
-                    new TerrainTileData(new GridPosition(9, 4), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(9, 6), TerrainType.Hazard),
-                });
+                blockedCells,
+                terrainTiles);
 
             ObjectiveState openingObjective = new ObjectiveState(
                 "objective.jiangxia.opening",
@@ -604,17 +637,25 @@ namespace PhalanxChronicle.Core
             BattlefieldMutation bridgeCutMutation = new BattlefieldMutation(
                 new List<TerrainTileData>
                 {
-                    new TerrainTileData(new GridPosition(5, 2), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(6, 2), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(5, 8), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(6, 8), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(9, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(10, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 11), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 11), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(9, 11), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(10, 11), TerrainType.Hazard),
                 },
                 new List<BlockedCellStateChange>
                 {
-                    new BlockedCellStateChange(new GridPosition(5, 2), true),
-                    new BlockedCellStateChange(new GridPosition(6, 2), true),
-                    new BlockedCellStateChange(new GridPosition(5, 8), true),
-                    new BlockedCellStateChange(new GridPosition(6, 8), true),
+                    new BlockedCellStateChange(new GridPosition(7, 2), true),
+                    new BlockedCellStateChange(new GridPosition(8, 2), true),
+                    new BlockedCellStateChange(new GridPosition(9, 2), true),
+                    new BlockedCellStateChange(new GridPosition(10, 2), true),
+                    new BlockedCellStateChange(new GridPosition(7, 11), true),
+                    new BlockedCellStateChange(new GridPosition(8, 11), true),
+                    new BlockedCellStateChange(new GridPosition(9, 11), true),
+                    new BlockedCellStateChange(new GridPosition(10, 11), true),
                 });
 
             List<ScenarioDirective> bridgeCutDirectives = new List<ScenarioDirective>
@@ -623,9 +664,9 @@ namespace PhalanxChronicle.Core
                 ScenarioDirective.ApplyBattlefieldMutation(bridgeCutMutation),
                 ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
                 {
-                    SpawnEnemy("enemy-jiangxia-ferry-captain", "Jiangxia Ferry Captain", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 34, 11, 5, 3, 1, new GridPosition(11, 5), AiProfileType.Boss),
-                    SpawnEnemy("enemy-jiangxia-river-rider", "River Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 25, 9, 3, 4, 1, new GridPosition(10, 4), AiProfileType.Aggressor),
-                    SpawnEnemy("enemy-jiangxia-river-rider-b", "River Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 25, 9, 3, 4, 1, new GridPosition(10, 6), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-jiangxia-ferry-captain", "Jiangxia Ferry Captain", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 34, 11, 5, 3, 1, new GridPosition(16, 6), AiProfileType.Boss),
+                    SpawnEnemy("enemy-jiangxia-river-rider", "River Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 25, 9, 3, 4, 1, new GridPosition(15, 5), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-jiangxia-river-rider-b", "River Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 25, 9, 3, 4, 1, new GridPosition(15, 8), AiProfileType.Aggressor),
                 }),
                 ScenarioDirective.UpdateObjective(finalObjective),
                 ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
@@ -865,47 +906,68 @@ namespace PhalanxChronicle.Core
             List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
             AddCoreSquad(
                 openingSpawns,
-                new GridPosition(4, 1),
-                new GridPosition(3, 2),
-                new GridPosition(5, 2),
-                new GridPosition(2, 1));
-            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(6, 1)));
-            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(4, 3)));
-            openingSpawns.Add(SpawnPlayerMaChao(new GridPosition(5, 3)));
-            openingSpawns.Add(SpawnEnemy("enemy-luocheng-gate-captain", "Gate Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 32, 10, 6, 2, 1, new GridPosition(5, 4), AiProfileType.Protector));
-            openingSpawns.Add(SpawnEnemy("enemy-luocheng-wall-bow", "Wall Bow Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 25, 9, 3, 3, 2, new GridPosition(7, 4), AiProfileType.Support));
-            openingSpawns.Add(SpawnEnemy("enemy-luocheng-outer-guard", "Outer Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 9, 5, 2, 1, new GridPosition(4, 5), AiProfileType.Protector));
+                new GridPosition(7, 2),
+                new GridPosition(8, 3),
+                new GridPosition(6, 3),
+                new GridPosition(7, 4));
+            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(9, 2)));
+            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(6, 1)));
+            openingSpawns.Add(SpawnPlayerMaChao(new GridPosition(10, 2)));
+            openingSpawns.Add(SpawnEnemy("enemy-luocheng-gate-captain", "Gate Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 32, 10, 6, 2, 1, new GridPosition(8, 7), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-luocheng-wall-bow", "Wall Bow Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 25, 9, 3, 3, 2, new GridPosition(10, 9), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-luocheng-outer-guard", "Outer Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 9, 5, 2, 1, new GridPosition(6, 7), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-wei_shieldman", "Wei Shieldman", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 28, 8, 6, 2, 1, new GridPosition(11, 7), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-wei_deadeye", "Wei Deadeye", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(14, 10), AiProfileType.Support));
+
+            List<GridPosition> blockedCells = new List<GridPosition>();
+            for (int x = 3; x <= 14; x++)
+            {
+                blockedCells.Add(new GridPosition(x, 8));
+            }
+
+            blockedCells.Add(new GridPosition(3, 9));
+            blockedCells.Add(new GridPosition(4, 9));
+            blockedCells.Add(new GridPosition(13, 9));
+            blockedCells.Add(new GridPosition(14, 9));
+            blockedCells.Add(new GridPosition(4, 10));
+            blockedCells.Add(new GridPosition(4, 11));
+            blockedCells.Add(new GridPosition(13, 10));
+            blockedCells.Add(new GridPosition(13, 11));
+            blockedCells.Add(new GridPosition(5, 12));
+            blockedCells.Add(new GridPosition(6, 12));
+            blockedCells.Add(new GridPosition(11, 12));
+            blockedCells.Add(new GridPosition(12, 12));
+
+            List<TerrainTileData> terrainTiles = new List<TerrainTileData>
+            {
+                new TerrainTileData(new GridPosition(4, 8), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(7, 8), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(8, 8), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(9, 8), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(10, 8), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(13, 8), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(7, 6), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(8, 6), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(9, 6), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(10, 6), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(8, 10), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(9, 10), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(8, 11), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(9, 11), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(5, 10), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(5, 11), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(12, 10), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(12, 11), TerrainType.Forest),
+            };
 
             StageDefinitionData stage = new StageDefinitionData(
                 "Luocheng Siege",
                 "stage.luocheng_siege",
-                12,
-                12,
+                18,
+                16,
                 openingSpawns,
-                new List<GridPosition>
-                {
-                    new GridPosition(2, 6),
-                    new GridPosition(3, 6),
-                    new GridPosition(4, 6),
-                    new GridPosition(5, 6),
-                    new GridPosition(6, 6),
-                    new GridPosition(7, 6),
-                    new GridPosition(8, 6),
-                    new GridPosition(9, 6),
-                    new GridPosition(3, 8),
-                    new GridPosition(8, 8),
-                },
-                new List<TerrainTileData>
-                {
-                    new TerrainTileData(new GridPosition(5, 6), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(6, 6), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(4, 4), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(7, 4), TerrainType.Fort),
-                    new TerrainTileData(new GridPosition(5, 9), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(6, 9), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(2, 4), TerrainType.Forest),
-                    new TerrainTileData(new GridPosition(9, 4), TerrainType.Forest),
-                });
+                blockedCells,
+                terrainTiles);
 
             ObjectiveState openingObjective = new ObjectiveState(
                 "objective.luocheng.opening",
@@ -921,17 +983,17 @@ namespace PhalanxChronicle.Core
             BattlefieldMutation gateBreachMutation = new BattlefieldMutation(
                 new List<TerrainTileData>
                 {
-                    new TerrainTileData(new GridPosition(5, 6), TerrainType.Plain),
-                    new TerrainTileData(new GridPosition(6, 6), TerrainType.Plain),
-                    new TerrainTileData(new GridPosition(5, 8), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(6, 8), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(5, 9), TerrainType.Hazard),
-                    new TerrainTileData(new GridPosition(6, 9), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 8), TerrainType.Plain),
+                    new TerrainTileData(new GridPosition(9, 8), TerrainType.Plain),
+                    new TerrainTileData(new GridPosition(8, 10), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(9, 10), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 11), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(9, 11), TerrainType.Hazard),
                 },
                 new List<BlockedCellStateChange>
                 {
-                    new BlockedCellStateChange(new GridPosition(5, 6), false),
-                    new BlockedCellStateChange(new GridPosition(6, 6), false),
+                    new BlockedCellStateChange(new GridPosition(8, 8), false),
+                    new BlockedCellStateChange(new GridPosition(9, 8), false),
                 });
 
             List<ScenarioDirective> breachDirectives = new List<ScenarioDirective>
@@ -940,9 +1002,9 @@ namespace PhalanxChronicle.Core
                 ScenarioDirective.ApplyBattlefieldMutation(gateBreachMutation),
                 ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
                 {
-                    SpawnEnemy("enemy-luocheng-commandant", "Luocheng Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 35, 11, 5, 3, 1, new GridPosition(6, 10), AiProfileType.Boss),
-                    SpawnEnemy("enemy-luocheng-street-guard-a", "Street Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(4, 9), AiProfileType.Protector),
-                    SpawnEnemy("enemy-luocheng-street-guard-b", "Street Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(8, 9), AiProfileType.Protector),
+                    SpawnEnemy("enemy-luocheng-commandant", "Luocheng Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 35, 11, 5, 3, 1, new GridPosition(9, 13), AiProfileType.Boss),
+                    SpawnEnemy("enemy-luocheng-street-guard-a", "Street Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(7, 11), AiProfileType.Protector),
+                    SpawnEnemy("enemy-luocheng-street-guard-b", "Street Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(11, 11), AiProfileType.Protector),
                 }),
                 ScenarioDirective.UpdateObjective(finalObjective),
                 ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>

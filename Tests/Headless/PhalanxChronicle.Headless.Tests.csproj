@@ -22,5 +22,11 @@
   <ItemGroup>
     <Compile Include="..\..\Assets\Scripts\Core\*.cs" Link="Core\%(Filename)%(Extension)" />
     <Compile Include="..\..\Assets\Scripts\Localization\*.cs" Link="Localization\%(Filename)%(Extension)" />
+    <Compile Include="..\..\Assets\Scripts\Presentation\BattleUiTheme.cs" Link="Presentation\BattleUiTheme.cs" />
+    <Compile Include="..\..\Assets\Scripts\Presentation\RoleLoadoutCatalog.cs" Link="Presentation\RoleLoadoutCatalog.cs" />
+    <Compile Include="..\..\Assets\Scripts\UI\BattleHudModels.cs" Link="UI\BattleHudModels.cs" />
+    <Compile Include="..\..\Assets\Scripts\Battle\BattleHudModelBuilder.cs" Link="Battle\BattleHudModelBuilder.cs" />
+    <Compile Include="..\..\Assets\Scripts\Battle\Effects\BattleActionSequencer.cs" Link="Battle\Effects\BattleActionSequencer.cs" />
+    <Compile Include="..\..\Assets\Scripts\Battle\Effects\BattlePresentationProfile.cs" Link="Battle\Effects\BattlePresentationProfile.cs" />
   </ItemGroup>
 </Project>

@@ -30,7 +30,7 @@ namespace PhalanxChronicle.Battle
             {
                 CampaignSaveFileDto dto = JsonUtility.FromJson<CampaignSaveFileDto>(File.ReadAllText(savePath));
                 if (dto == null ||
-                    (dto.version != 1 && dto.version != 2 && dto.version != 3) ||
+                    (dto.version != 1 && dto.version != 2 && dto.version != 3 && dto.version != 4) ||
                     (!string.IsNullOrWhiteSpace(expectedCampaignId) && dto.campaignId != expectedCampaignId))
                 {
                     return false;
@@ -38,7 +38,7 @@ namespace PhalanxChronicle.Battle
 
                 saveData = ToModel(dto);
                 bool normalized = progressionService.NormalizeSave(saveData);
-                if (normalized || dto.version < 3)
+                if (normalized || dto.version < 4)
                 {
                     Save(saveData);
                 }
@@ -113,7 +113,10 @@ namespace PhalanxChronicle.Battle
                         .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.scenarioId))
                         .GroupBy(entry => entry.scenarioId)
                         .ToDictionary(group => group.Key, group => group.Max(entry => entry.clearCount))
-                    : null);
+                    : null,
+                dto.progress != null && dto.progress.hasSeenFirstLaunchIntro,
+                dto.progress != null && dto.progress.hasCompletedFirstBattleOnboarding,
+                dto.progress != null && dto.progress.hasSkippedOnboarding);
 
             CampaignInventoryState inventory = new CampaignInventoryState(
                 dto.inventory != null ? dto.inventory.supplies : 0,
@@ -152,7 +155,7 @@ namespace PhalanxChronicle.Battle
                 .ToList()
                 : new List<CampaignUnitState>();
 
-            return new CampaignSaveData(dto.campaignId, progress, inventory, units, dto.version < 3 ? 3 : dto.version);
+            return new CampaignSaveData(dto.campaignId, progress, inventory, units, dto.version < 4 ? 4 : dto.version);
         }
 
         private static CampaignSaveFileDto ToDto(CampaignSaveData saveData)
@@ -174,6 +177,9 @@ namespace PhalanxChronicle.Battle
                             clearCount = entry.Value,
                         })
                         .ToList(),
+                    hasSeenFirstLaunchIntro = saveData.Progress.HasSeenFirstLaunchIntro,
+                    hasCompletedFirstBattleOnboarding = saveData.Progress.HasCompletedFirstBattleOnboarding,
+                    hasSkippedOnboarding = saveData.Progress.HasSkippedOnboarding,
                     lastBattleResult = saveData.Progress.LastBattleResult == null
                         ? null
                         : new BattleResultSummaryDto
@@ -245,6 +251,9 @@ namespace PhalanxChronicle.Battle
             public List<string> clearedScenarioIds;
             public List<string> claimedRewardScenarioIds;
             public List<ScenarioClearCountDto> scenarioClearCounts;
+            public bool hasSeenFirstLaunchIntro;
+            public bool hasCompletedFirstBattleOnboarding;
+            public bool hasSkippedOnboarding;
             public BattleResultSummaryDto lastBattleResult;
         }
 

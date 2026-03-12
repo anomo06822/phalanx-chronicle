@@ -158,6 +158,143 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void MovePreview_ReturnsShortestPathAndProjectedTargets()
+        {
+            BattleSimulation simulation = CreateSimulation();
+
+            BattlePathPreview preview = simulation.GetMovePreview("player-1", new GridPosition(1, 1));
+
+            Assert.NotNull(preview);
+            Assert.Equal(new GridPosition(1, 1), preview.Destination);
+            Assert.Equal(2, preview.MoveCost);
+            Assert.Equal(
+                new[]
+                {
+                    new GridPosition(0, 0),
+                    new GridPosition(0, 1),
+                    new GridPosition(1, 1),
+                },
+                preview.Path);
+            Assert.True(preview.AttackTargetCount >= 1);
+        }
+
+        [Fact]
+        public void QuickAttackPreview_UsesProjectedDestinationDamage()
+        {
+            BattleSimulation simulation = CreateSimulation();
+
+            BattleQuickAttackPreview preview = simulation.GetQuickAttackPreview("player-1", "enemy-1");
+
+            Assert.NotNull(preview);
+            Assert.Equal(new GridPosition(1, 1), preview.Destination);
+            Assert.Equal("enemy-1", preview.TargetUnitId);
+            Assert.Equal(7, preview.ProjectedDamage);
+            Assert.Equal(13, preview.DefenderRemainingHp);
+            Assert.False(preview.IsLethal);
+            Assert.Equal(
+                new[]
+                {
+                    new GridPosition(0, 0),
+                    new GridPosition(0, 1),
+                    new GridPosition(1, 1),
+                },
+                preview.Path);
+        }
+
+        [Fact]
+        public void PreviewMoveIntent_ReturnsPathAndProjectedThreat()
+        {
+            BattleSimulation simulation = CreateSimulation();
+
+            BattleIntentPreview preview = simulation.PreviewMoveIntent("player-1", new GridPosition(1, 1));
+
+            Assert.NotNull(preview);
+            Assert.Equal(BattleIntentActionKind.Move, preview.ActionKind);
+            Assert.True(preview.CanCommit);
+            Assert.Equal(new GridPosition(1, 1), preview.Destination);
+            Assert.Equal(2, preview.MoveCost);
+            Assert.Equal(
+                new[]
+                {
+                    new GridPosition(0, 0),
+                    new GridPosition(0, 1),
+                    new GridPosition(1, 1),
+                },
+                preview.Path);
+            Assert.NotNull(preview.ThreatAfterAction);
+            Assert.True(preview.ThreatAfterAction.ThreateningEnemyCount > 0);
+        }
+
+        [Fact]
+        public void PreviewAttackIntent_MatchesLethalDamageProjection()
+        {
+            BattleSimulation simulation = CreateAdjacentCombatSimulation(enemyHpOverride: 7);
+
+            BattleIntentPreview preview = simulation.PreviewAttackIntent("player-1", "enemy-1");
+
+            Assert.NotNull(preview);
+            Assert.Equal(BattleIntentActionKind.Attack, preview.ActionKind);
+            Assert.True(preview.CanCommit);
+            Assert.Equal("enemy-1", preview.PrimaryTargetId);
+            Assert.Equal(7, preview.PredictedDamage);
+            Assert.Contains("enemy-1", preview.LethalTargetIds);
+            Assert.Equal(0, preview.ThreatAfterAction.ThreateningEnemyCount);
+        }
+
+        [Fact]
+        public void PreviewQuickAttackIntent_UsesProjectedDestinationAndDamage()
+        {
+            BattleSimulation simulation = CreateSimulation();
+
+            BattleIntentPreview preview = simulation.PreviewQuickAttackIntent("player-1", "enemy-1");
+
+            Assert.NotNull(preview);
+            Assert.Equal(BattleIntentActionKind.QuickAttack, preview.ActionKind);
+            Assert.True(preview.CanCommit);
+            Assert.Equal("enemy-1", preview.PrimaryTargetId);
+            Assert.Equal(new GridPosition(1, 1), preview.Destination);
+            Assert.Equal(7, preview.PredictedDamage);
+            Assert.Equal(
+                new[]
+                {
+                    new GridPosition(0, 0),
+                    new GridPosition(0, 1),
+                    new GridPosition(1, 1),
+                },
+                preview.Path);
+        }
+
+        [Fact]
+        public void PreviewSkillIntent_IncludesPredictedStatuses()
+        {
+            UnitDefinitionData archer = CreateDefinition("player-archer", "Archer", UnitFaction.Player, UnitRole.Ranger, PassiveSkillType.None, ActiveSkillType.PinningShot, attack: 10, attackRange: 2);
+            UnitDefinitionData enemy = CreateDefinition("enemy-1", "Bandit", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: 20, defense: 3);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Pinning Shot Stage",
+                "stage.pinning_shot_stage",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(archer, new GridPosition(0, 0)),
+                    new UnitSpawnData(enemy, new GridPosition(3, 0)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            BattleIntentPreview preview = simulation.PreviewSkillIntent("player-archer", "enemy-1");
+
+            Assert.NotNull(preview);
+            Assert.Equal(BattleIntentActionKind.Skill, preview.ActionKind);
+            Assert.True(preview.CanCommit);
+            Assert.Equal(ActiveSkillRules.GetManaCost(ActiveSkillType.PinningShot), preview.ManaCost);
+            Assert.Contains(preview.PredictedStatuses, status => status.Type == StatusEffectType.Rooted);
+            Assert.True(preview.PredictedDamage > 0);
+        }
+
+        [Fact]
         public void UndoMove_ReturnsUnitToOriginalCell()
         {
             BattleSimulation simulation = CreateSimulation();
@@ -343,6 +480,191 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void EnemyAi_SupportAvoidsLowValueVolleyAgainstSingleTarget()
+        {
+            UnitDefinitionData player = CreateDefinition(
+                "player-isolated",
+                "Isolated",
+                UnitFaction.Player,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 22,
+                defense: 4);
+            UnitDefinitionData enemy = CreateDefinition(
+                "enemy-support",
+                "Enemy Support",
+                UnitFaction.Enemy,
+                UnitRole.Ranger,
+                PassiveSkillType.LongShot,
+                ActiveSkillType.Volley,
+                attack: 10,
+                attackRange: 1,
+                aiProfile: AiProfileType.Support);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Single Target Volley",
+                "stage.single_target_volley",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(player, new GridPosition(2, 2)),
+                    new UnitSpawnData(enemy, new GridPosition(4, 2)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.EndCurrentTurn();
+
+            AiDecision decision = simulation.BuildEnemyDecision("enemy-support");
+
+            Assert.NotEqual(AiActionType.Skill, decision.ActionType);
+        }
+
+        [Fact]
+        public void EnemyAi_ProtectorMovesToJiangxiaBridgeHeadInsteadOfDrifting()
+        {
+            UnitDefinitionData player = CreateDefinition(
+                "player-front",
+                "Front",
+                UnitFaction.Player,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None);
+            UnitDefinitionData enemyProtector = CreateDefinition(
+                "enemy-bridge-guard",
+                "Bridge Guard",
+                UnitFaction.Enemy,
+                UnitRole.Guardian,
+                PassiveSkillType.ShieldWall,
+                ActiveSkillType.None,
+                moveRange: 3,
+                aiProfile: AiProfileType.Protector);
+            UnitDefinitionData enemySupport = CreateDefinition(
+                "enemy-bridge-bow",
+                "Bridge Bow",
+                UnitFaction.Enemy,
+                UnitRole.Ranger,
+                PassiveSkillType.LongShot,
+                ActiveSkillType.Volley,
+                attackRange: 2,
+                aiProfile: AiProfileType.Support);
+
+            List<GridPosition> blockedCells = new List<GridPosition>();
+            for (int x = 7; x <= 10; x++)
+            {
+                for (int y = 0; y < 14; y++)
+                {
+                    if (y == 2 || y == 6 || y == 7 || y == 11)
+                    {
+                        continue;
+                    }
+
+                    blockedCells.Add(new GridPosition(x, y));
+                }
+            }
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Jiangxia Test",
+                "stage.jiangxia_ferry",
+                18,
+                14,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(player, new GridPosition(4, 6)),
+                    new UnitSpawnData(enemyProtector, new GridPosition(14, 6)),
+                    new UnitSpawnData(enemySupport, new GridPosition(14, 5)),
+                },
+                blockedCells);
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.EndCurrentTurn();
+
+            AiDecision decision = simulation.BuildEnemyDecision("enemy-bridge-guard");
+
+            Assert.Equal(AiActionType.None, decision.ActionType);
+            Assert.Equal(new GridPosition(11, 6), decision.Destination);
+        }
+
+        [Fact]
+        public void EnemyAi_AggressorCoordinatesOnSharedFocusTarget()
+        {
+            UnitDefinitionData healthyTarget = CreateDefinition(
+                "player-healthy",
+                "Healthy",
+                UnitFaction.Player,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 24,
+                defense: 5);
+            UnitDefinitionData woundedTarget = CreateDefinition(
+                "player-wounded",
+                "Wounded",
+                UnitFaction.Player,
+                UnitRole.Commander,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 20,
+                defense: 3);
+            UnitDefinitionData enemyAggressor = CreateDefinition(
+                "enemy-aggressor",
+                "Enemy Aggressor",
+                UnitFaction.Enemy,
+                UnitRole.Raider,
+                PassiveSkillType.RapidMarch,
+                ActiveSkillType.PowerStrike,
+                attack: 10,
+                moveRange: 4,
+                aiProfile: AiProfileType.Aggressor);
+            UnitDefinitionData enemySupport = CreateDefinition(
+                "enemy-cover",
+                "Enemy Cover",
+                UnitFaction.Enemy,
+                UnitRole.Ranger,
+                PassiveSkillType.LongShot,
+                ActiveSkillType.Volley,
+                attackRange: 2,
+                aiProfile: AiProfileType.Support);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Focus Fire",
+                "stage.focus_fire",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(healthyTarget, new GridPosition(2, 3)),
+                    new UnitSpawnData(woundedTarget, new GridPosition(2, 5)),
+                    new UnitSpawnData(enemyAggressor, new GridPosition(6, 4)),
+                    new UnitSpawnData(enemySupport, new GridPosition(7, 5)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.Context.GetUnit("player-wounded").ApplyDamage(9);
+            simulation.EndCurrentTurn();
+
+            AiDecision decision = simulation.BuildEnemyDecision("enemy-aggressor");
+
+            Assert.Equal("player-wounded", decision.TargetUnitId);
+            Assert.NotEqual(AiActionType.None, decision.ActionType);
+        }
+
+        [Fact]
+        public void EnemyAi_BossHoldsGuangzongInnerLineBeforeReinforcements()
+        {
+            BattleScenarioData scenario = BattleScenarioCatalog.CreateGuangzong();
+            BattleSimulation simulation = new BattleSimulation(scenario.Stage);
+            simulation.EndCurrentTurn();
+
+            AiDecision decision = simulation.BuildEnemyDecision("enemy-zhang-bao");
+
+            Assert.True(decision.Destination.X >= 12, $"Expected Zhang Bao to hold the inner line, but moved to {decision.Destination}.");
+        }
+
+        [Fact]
         public void TurnSwitch_ResetsActedFlagForNextSide()
         {
             BattleSimulation simulation = CreateSimulation();
@@ -405,6 +727,21 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal(6, threatSummary.MaxProjectedDamage);
             Assert.Contains("enemy-raider", threatSummary.ThreateningUnitIds);
             Assert.Contains("enemy-archer", threatSummary.ThreateningUnitIds);
+        }
+
+        [Fact]
+        public void BattleThreatAnalyzer_ProjectedThreatChangesWithDestination()
+        {
+            BattleSimulation simulation = CreateSimulation();
+            UnitRuntimeState focus = simulation.Context.GetUnit("player-1");
+
+            BattleThreatProjection originThreat = BattleThreatAnalyzer.AnalyzeProjected(simulation.Context, focus, focus.Position);
+            BattleThreatProjection advancedThreat = BattleThreatAnalyzer.AnalyzeProjected(simulation.Context, focus, new GridPosition(1, 1));
+
+            Assert.NotNull(originThreat);
+            Assert.NotNull(advancedThreat);
+            Assert.True(advancedThreat.ThreateningEnemyCount >= originThreat.ThreateningEnemyCount);
+            Assert.True(advancedThreat.MaxProjectedDamage >= originThreat.MaxProjectedDamage);
         }
 
         [Fact]
@@ -1284,9 +1621,9 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.False(secondResult.BattlefieldChanged);
             Assert.True(director.HasFlag(BattleScenarioCatalog.JiangxiaBridgesCutFlag));
             Assert.Equal("objective.jiangxia.final", director.CurrentObjective.PrimaryObjectiveKey);
-            Assert.Equal(TerrainType.Hazard, simulation.Context.GetTerrainAt(new GridPosition(5, 2)));
-            Assert.True(simulation.Context.GetCell(new GridPosition(5, 2)).IsBlocked);
-            Assert.True(simulation.Context.GetCell(new GridPosition(6, 8)).IsBlocked);
+            Assert.Equal(TerrainType.Hazard, simulation.Context.GetTerrainAt(new GridPosition(7, 2)));
+            Assert.True(simulation.Context.GetCell(new GridPosition(7, 2)).IsBlocked);
+            Assert.True(simulation.Context.GetCell(new GridPosition(10, 11)).IsBlocked);
             Assert.NotNull(simulation.Context.GetUnit("enemy-jiangxia-ferry-captain"));
         }
 
@@ -1330,9 +1667,9 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.False(secondResult.BattlefieldChanged);
             Assert.True(director.HasFlag(BattleScenarioCatalog.LuochengGateBreachedFlag));
             Assert.Equal("objective.luocheng.final", director.CurrentObjective.PrimaryObjectiveKey);
-            Assert.False(simulation.Context.GetCell(new GridPosition(5, 6)).IsBlocked);
-            Assert.Equal(TerrainType.Plain, simulation.Context.GetTerrainAt(new GridPosition(5, 6)));
-            Assert.Equal(TerrainType.Hazard, simulation.Context.GetTerrainAt(new GridPosition(5, 8)));
+            Assert.False(simulation.Context.GetCell(new GridPosition(8, 8)).IsBlocked);
+            Assert.Equal(TerrainType.Plain, simulation.Context.GetTerrainAt(new GridPosition(8, 8)));
+            Assert.Equal(TerrainType.Hazard, simulation.Context.GetTerrainAt(new GridPosition(8, 10)));
             Assert.NotNull(simulation.Context.GetUnit("enemy-luocheng-commandant"));
         }
 
@@ -1385,12 +1722,12 @@ namespace PhalanxChronicle.Headless.Tests
         [Fact]
         public void ScenarioCatalog_UsesExpectedAdaptiveBoardSizes()
         {
-            Assert.Equal((10, 10), (BattleScenarioCatalog.CreateGuangzong().Stage.Width, BattleScenarioCatalog.CreateGuangzong().Stage.Height));
+            Assert.Equal((16, 14), (BattleScenarioCatalog.CreateGuangzong().Stage.Width, BattleScenarioCatalog.CreateGuangzong().Stage.Height));
             Assert.Equal((12, 10), (BattleScenarioCatalog.CreateBowangpo().Stage.Width, BattleScenarioCatalog.CreateBowangpo().Stage.Height));
             Assert.Equal((12, 10), (BattleScenarioCatalog.CreateChangbanRearguard().Stage.Width, BattleScenarioCatalog.CreateChangbanRearguard().Stage.Height));
-            Assert.Equal((12, 10), (BattleScenarioCatalog.CreateJiangxiaFerry().Stage.Width, BattleScenarioCatalog.CreateJiangxiaFerry().Stage.Height));
+            Assert.Equal((18, 14), (BattleScenarioCatalog.CreateJiangxiaFerry().Stage.Width, BattleScenarioCatalog.CreateJiangxiaFerry().Stage.Height));
             Assert.Equal((10, 14), (BattleScenarioCatalog.CreateJiamengPass().Stage.Width, BattleScenarioCatalog.CreateJiamengPass().Stage.Height));
-            Assert.Equal((12, 12), (BattleScenarioCatalog.CreateLuochengSiege().Stage.Width, BattleScenarioCatalog.CreateLuochengSiege().Stage.Height));
+            Assert.Equal((18, 16), (BattleScenarioCatalog.CreateLuochengSiege().Stage.Width, BattleScenarioCatalog.CreateLuochengSiege().Stage.Height));
             Assert.Equal((12, 12), (BattleScenarioCatalog.CreateYangpingPass().Stage.Width, BattleScenarioCatalog.CreateYangpingPass().Stage.Height));
             Assert.Equal((14, 10), (BattleScenarioCatalog.CreateHanshui().Stage.Width, BattleScenarioCatalog.CreateHanshui().Stage.Height));
             Assert.Equal((12, 12), (BattleScenarioCatalog.CreateDingjunMountain().Stage.Width, BattleScenarioCatalog.CreateDingjunMountain().Stage.Height));
@@ -1862,6 +2199,7 @@ namespace PhalanxChronicle.Headless.Tests
             int startingLevel = 1,
             string classId = null,
             string growthProfileId = null,
+            AiProfileType aiProfile = AiProfileType.Default,
             bool progressionResolved = false)
         {
             return new UnitDefinitionData(
@@ -1885,7 +2223,7 @@ namespace PhalanxChronicle.Headless.Tests
                 maxMana,
                 classId,
                 growthProfileId,
-                AiProfileType.Default,
+                aiProfile,
                 null,
                 startingLevel,
                 0,

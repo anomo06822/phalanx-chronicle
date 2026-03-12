@@ -190,10 +190,18 @@ namespace PhalanxChronicle.Presentation
 
         public static Sprite GetTerrainBaseSprite(TerrainType terrainType, bool blocked)
         {
-            string key = "base:" + GetTerrainResourceKey(terrainType, blocked);
+            return GetTerrainBaseSprite(string.Empty, terrainType, blocked);
+        }
+
+        public static Sprite GetTerrainBaseSprite(string resourcePath, TerrainType terrainType, bool blocked)
+        {
+            string normalizedPath = string.IsNullOrWhiteSpace(resourcePath) ? GetTerrainResourceKey(terrainType, blocked) : resourcePath;
+            string key = "base:" + normalizedPath;
             if (!terrainBaseSprites.TryGetValue(key, out Sprite sprite))
             {
-                sprite = TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_base") ?? CreateTerrainBaseSprite(terrainType, blocked);
+                sprite = TryLoadSpriteResource(resourcePath)
+                    ?? TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_base")
+                    ?? CreateTerrainBaseSprite(terrainType, blocked);
                 terrainBaseSprites[key] = sprite;
             }
 
@@ -202,10 +210,18 @@ namespace PhalanxChronicle.Presentation
 
         public static Sprite GetTerrainOverlaySprite(TerrainType terrainType, bool blocked)
         {
-            string key = "overlay:" + GetTerrainResourceKey(terrainType, blocked);
+            return GetTerrainOverlaySprite(string.Empty, terrainType, blocked);
+        }
+
+        public static Sprite GetTerrainOverlaySprite(string resourcePath, TerrainType terrainType, bool blocked)
+        {
+            string normalizedPath = string.IsNullOrWhiteSpace(resourcePath) ? GetTerrainResourceKey(terrainType, blocked) : resourcePath;
+            string key = "overlay:" + normalizedPath;
             if (!terrainOverlaySprites.TryGetValue(key, out Sprite sprite))
             {
-                sprite = TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_overlay") ?? CreateTerrainOverlaySprite(terrainType, blocked);
+                sprite = TryLoadSpriteResource(resourcePath)
+                    ?? TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_overlay")
+                    ?? CreateTerrainOverlaySprite(terrainType, blocked);
                 terrainOverlaySprites[key] = sprite;
             }
 
@@ -214,10 +230,18 @@ namespace PhalanxChronicle.Presentation
 
         public static Sprite GetTerrainPropSprite(TerrainType terrainType, bool blocked)
         {
-            string key = "prop:" + GetTerrainResourceKey(terrainType, blocked);
+            return GetTerrainPropSprite(string.Empty, terrainType, blocked);
+        }
+
+        public static Sprite GetTerrainPropSprite(string resourcePath, TerrainType terrainType, bool blocked)
+        {
+            string normalizedPath = string.IsNullOrWhiteSpace(resourcePath) ? GetTerrainResourceKey(terrainType, blocked) : resourcePath;
+            string key = "prop:" + normalizedPath;
             if (!terrainPropSprites.TryGetValue(key, out Sprite sprite))
             {
-                sprite = TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_prop") ?? CreateTerrainPropSprite(terrainType, blocked);
+                sprite = TryLoadSpriteResource(resourcePath)
+                    ?? TryLoadSpriteResource("Terrain/" + GetTerrainResourceKey(terrainType, blocked) + "_prop")
+                    ?? CreateTerrainPropSprite(terrainType, blocked);
                 terrainPropSprites[key] = sprite;
             }
 
@@ -857,34 +881,34 @@ namespace PhalanxChronicle.Presentation
         {
             Texture2D texture = CreateTexture(32, 32);
             Color32 bright = new Color32(255, 255, 255, 255);
-            Color32 strong = new Color32(255, 255, 255, 212);
-            Color32 soft = new Color32(255, 255, 255, 72);
+            Color32 strong = new Color32(255, 255, 255, 188);
+            Color32 soft = new Color32(255, 255, 255, 28);
             switch (kind)
             {
                 case GridOverlayKind.Move:
-                    FillDiamond(texture, 16, 16, 11, soft);
+                    FillDiamond(texture, 16, 16, 10, soft);
                     DrawDiamondFrame(texture, 16, 16, 12, bright);
                     DrawDiamondFrame(texture, 16, 16, 8, strong);
-                    FillCircle(texture, 16, 16, 2, bright);
+                    FillCircle(texture, 16, 16, 1, bright);
                     break;
                 case GridOverlayKind.Attack:
-                    FillDiamond(texture, 16, 16, 11, soft);
+                    FillDiamond(texture, 16, 16, 10, soft);
                     DrawDiamondFrame(texture, 16, 16, 12, bright);
                     DrawLine(texture, 16, 5, 16, 27, strong, 1);
                     DrawLine(texture, 5, 16, 27, 16, strong, 1);
-                    FillRect(texture, 14, 14, 18, 18, bright);
+                    FillRect(texture, 15, 15, 17, 17, bright);
                     break;
                 case GridOverlayKind.Skill:
-                    FillCircle(texture, 16, 16, 10, soft);
+                    FillCircle(texture, 16, 16, 9, soft);
                     DrawDiamondFrame(texture, 16, 16, 12, bright);
                     DrawLine(texture, 16, 5, 16, 27, strong, 1);
                     DrawLine(texture, 5, 16, 27, 16, strong, 1);
                     DrawLine(texture, 8, 8, 24, 24, strong, 1);
                     DrawLine(texture, 8, 24, 24, 8, strong, 1);
-                    FillCircle(texture, 16, 16, 2, bright);
+                    FillCircle(texture, 16, 16, 1, bright);
                     break;
                 default:
-                    FillDiamond(texture, 16, 16, 12, soft);
+                    FillDiamond(texture, 16, 16, 11, soft);
                     DrawDiamondFrame(texture, 16, 16, 13, bright);
                     DrawDiamondFrame(texture, 16, 16, 10, strong);
                     FillRect(texture, 14, 2, 18, 5, bright);
@@ -900,7 +924,7 @@ namespace PhalanxChronicle.Presentation
 
         private static Sprite CreateUnitSprite(UnitVisualProfile profile)
         {
-            Texture2D source = CreateTexture(48, 48, FilterMode.Bilinear);
+            Texture2D source = CreateTexture(48, 48, FilterMode.Point);
             uint hash = StableHash(profile.UnitId ?? profile.Archetype.ToString());
             int variant = (int)(hash % 3u);
 
@@ -924,8 +948,8 @@ namespace PhalanxChronicle.Presentation
             DrawFieldSignature(source, profile.Archetype, accent, metal, secondary, outline);
             source.Apply();
 
-            Texture2D texture = CreateTexture(64, 64, FilterMode.Bilinear);
-            FillCircle(texture, 32, 23, 13, new Color32(accent.r, accent.g, accent.b, 24));
+            Texture2D texture = CreateTexture(64, 64, FilterMode.Point);
+            FillCircle(texture, 32, 23, 11, new Color32(accent.r, accent.g, accent.b, 14));
             BlitTexture(source, texture, 8, 8);
             DrawLine(texture, 11, 47, 25, 57, new Color32(255, 255, 255, 16), 1);
             DrawLine(texture, 39, 56, 51, 47, new Color32(255, 255, 255, 16), 1);

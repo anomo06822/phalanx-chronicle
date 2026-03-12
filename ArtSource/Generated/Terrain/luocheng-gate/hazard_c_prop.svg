@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <rect width="64" height="64" fill="#000000" fill-opacity="0" />
+  <rect x="14" y="40" width="10" height="6" fill="#8A5936" fill-opacity="0.820" /><polygon points="16,40 19,26 24,38" fill="#D89964" fill-opacity="0.820" /><rect x="40" y="47" width="10" height="6" fill="#8A5936" fill-opacity="0.720" /><polygon points="42,47 45,35 50,45" fill="#D89964" fill-opacity="0.720" />
+</svg>

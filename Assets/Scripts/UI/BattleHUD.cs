@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using PhalanxChronicle.Battle;
 using PhalanxChronicle.Core;
 using PhalanxChronicle.Localization;
 using PhalanxChronicle.Presentation;
@@ -12,174 +14,82 @@ namespace PhalanxChronicle.UI
     {
         private const int FeedLimit = 8;
 
-        private readonly List<RosterEntryView> alliedRosterViews = new List<RosterEntryView>();
-        private readonly List<RosterEntryView> enemyRosterViews = new List<RosterEntryView>();
         private readonly List<string> feedEntries = new List<string>();
-        private readonly List<Text> feedLabels = new List<Text>();
 
+        private BattleHudModelBuilder hudModelBuilder;
         private BattleOverviewModel currentOverview = new BattleOverviewModel();
         private BattleForecastModel currentForecast;
-        private Action<string> rosterSelectionHandler;
+        private BattleContextRibbonView contextRibbonView;
+        private BattleSelectedUnitView selectedUnitView;
+        private BattleRosterSidebarView rosterSidebarView;
+        private CampaignOverlayView campaignOverlayView;
 
-        private Text stageLabel;
-        private Text seedLabel;
-        private Text phaseLabel;
-        private Text turnLabel;
-        private Text playerAliveLabel;
-        private Text enemyAliveLabel;
-        private Text readyLabel;
-        private Text skillReadyLabel;
-        private Text objectivePrimaryLabel;
-        private Text objectiveFailureLabel;
-        private Text instructionLabel;
-
-        private Image selectedPortraitImage;
-        private Image selectedPortraitBacking;
-        private Image selectedHpFill;
-        private Image selectedManaFill;
-        private GameObject selectedTerrainInfoRoot;
-        private Image selectedWeaponIconImage;
-        private Image selectedWeaponIconBacking;
-        private Image selectedWeaponAccentImage;
         private Text selectedNameLabel;
-        private Text selectedRoleLabel;
-        private Text selectedPositionLabel;
-        private Text selectedTerrainNameLabel;
-        private Text selectedTerrainEffectLabel;
-        private Text selectedHpLabel;
-        private Text selectedManaLabel;
-        private Text selectedWeaponTypeLabel;
-        private Text selectedWeaponNameLabel;
-        private Text selectedWeaponDescriptionLabel;
-        private Text selectedStatsLabel;
-        private Text selectedActionLabel;
-        private Text selectedCooldownLabel;
-        private Text selectedStatusLabel;
-        private Text selectedThreatSummaryLabel;
-        private Text selectedThreatDetailLabel;
-        private Text selectedPassiveNameLabel;
-        private Text selectedPassiveDescriptionLabel;
-        private Text selectedActiveNameLabel;
-        private Text selectedActiveDescriptionLabel;
-        private GameObject selectedDetailSectionsRoot;
+        private Text campaignBodyLabel;
+        private Button campaignPrimaryButton;
 
-        private Transform alliedRosterRoot;
-        private Transform enemyRosterRoot;
-
-        private Text forecastHeaderLabel;
-        private Text forecastTitleLabel;
-        private Text forecastSummaryLabel;
-        private Text forecastDetailLabel;
-        private Text forecastFooterLabel;
-        private Image forecastAccentImage;
-
-        private Text resultLabel;
+        private Text resultTitleLabel;
+        private Text resultSummaryLabel;
+        private Text resultRewardLabel;
+        private Text resultUnitsLabel;
         private Text resultContinueLabel;
         private Text dialogueSpeakerLabel;
         private Text dialogueBodyLabel;
         private Text dialogueContinueLabel;
-        private Text campaignTitleLabel;
-        private Text campaignBodyLabel;
+        private Text onboardingProgressLabel;
+        private Text onboardingTitleLabel;
+        private Text onboardingBodyLabel;
+        private Text onboardingHintLabel;
 
-        private Button endTurnButton;
-        private Button rerollButton;
         private Button resultAdvanceButton;
         private Button dialogueAdvanceButton;
-        private Button campaignPrimaryButton;
-        private Button campaignSecondaryButton;
-        private GameObject rerollButtonObject;
+        private Button onboardingSkipButton;
         private GameObject resultPanel;
         private GameObject dialogueOverlay;
-        private GameObject campaignOverlay;
-        private Transform campaignContentRoot;
-
-        private Action<int> campaignStageSelectionHandler;
-        private Action<string> campaignOptionSelectionHandler;
-        private Action campaignPrimaryHandler;
-        private Action campaignSecondaryHandler;
+        private GameObject onboardingPanel;
 
         public bool IsDialogueVisible => dialogueOverlay != null && dialogueOverlay.activeSelf;
 
-        public bool IsRerollVisible => rerollButtonObject != null && rerollButtonObject.activeSelf;
+        public bool IsRerollVisible => rosterSidebarView != null && rosterSidebarView.IsRerollVisible;
 
         public bool IsResultVisible => resultPanel != null && resultPanel.activeSelf;
 
-        public bool IsCampaignOverlayVisible => campaignOverlay != null && campaignOverlay.activeSelf;
+        public bool IsCampaignOverlayVisible => campaignOverlayView != null && campaignOverlayView.IsVisible;
 
-        public string CurrentObjectiveText => objectivePrimaryLabel != null ? objectivePrimaryLabel.text : string.Empty;
+        public bool IsOnboardingVisible => onboardingPanel != null && onboardingPanel.activeSelf;
 
-        public void Initialize(Transform canvasRoot, Action onEndTurn, Action onReroll, Action onDialogueAdvance, Action onResultAdvance)
+        public string CurrentObjectiveText => rosterSidebarView != null ? rosterSidebarView.CurrentObjectiveText : string.Empty;
+
+        public void Initialize(
+            Transform canvasRoot,
+            Action onEndTurn,
+            Action onReroll,
+            Action onDialogueAdvance,
+            Action onResultAdvance,
+            Action onOnboardingSkip,
+            BattleHudModelBuilder modelBuilder = null)
         {
-            GameObject leftPanel = CreatePanel(
-                "SelectedUnitPanel",
-                canvasRoot,
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f),
-                new Vector2(18f, 0f),
-                new Vector2(284f, 860f),
-                BattleUiTheme.PanelSurface);
-            RectTransform leftRect = leftPanel.GetComponent<RectTransform>();
-            leftRect.pivot = new Vector2(0f, 0.5f);
-            BuildSelectedUnitPanel(leftPanel.transform);
+            hudModelBuilder = modelBuilder ?? new BattleHudModelBuilder();
 
-            GameObject rightPanel = CreatePanel(
-                "OverviewPanel",
-                canvasRoot,
-                new Vector2(1f, 0.5f),
-                new Vector2(1f, 0.5f),
-                new Vector2(-18f, 0f),
-                new Vector2(300f, 860f),
-                BattleUiTheme.PanelSurface);
-            RectTransform rightRect = rightPanel.GetComponent<RectTransform>();
-            rightRect.pivot = new Vector2(1f, 0.5f);
-            BuildOverviewPanel(rightPanel.transform, onEndTurn, onReroll);
+            selectedUnitView = new BattleSelectedUnitView();
+            selectedUnitView.Initialize(canvasRoot);
+            selectedNameLabel = selectedUnitView.NameLabel;
 
-            GameObject forecastPanel = CreatePanel(
-                "ForecastPanel",
-                canvasRoot,
-                new Vector2(0.5f, 1f),
-                new Vector2(0.5f, 1f),
-                new Vector2(0f, -8f),
-                new Vector2(460f, 92f),
-                BattleUiTheme.PanelForecast);
-            BuildForecastPanel(forecastPanel.transform);
+            rosterSidebarView = new BattleRosterSidebarView();
+            rosterSidebarView.Initialize(canvasRoot, onEndTurn, onReroll, FeedLimit);
 
-            resultPanel = CreatePanel(
-                "ResultPanel",
-                canvasRoot,
-                new Vector2(0.5f, 0f),
-                new Vector2(0.5f, 0f),
-                new Vector2(0f, 24f),
-                new Vector2(620f, 252f),
-                new Color(0.06f, 0.07f, 0.1f, 0.9f));
-            resultAdvanceButton = resultPanel.AddComponent<Button>();
-            resultAdvanceButton.transition = Selectable.Transition.ColorTint;
-            ColorBlock resultColors = resultAdvanceButton.colors;
-            resultColors.normalColor = new Color(1f, 1f, 1f, 0f);
-            resultColors.highlightedColor = new Color(1f, 1f, 1f, 0.03f);
-            resultColors.pressedColor = new Color(1f, 1f, 1f, 0.06f);
-            resultColors.disabledColor = new Color(1f, 1f, 1f, 0f);
-            resultAdvanceButton.colors = resultColors;
-            resultAdvanceButton.onClick.AddListener(() => onResultAdvance?.Invoke());
-            resultLabel = CreateText(resultPanel.transform, string.Empty, 24, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            RectTransform resultRect = resultLabel.GetComponent<RectTransform>();
-            resultRect.anchorMin = Vector2.zero;
-            resultRect.anchorMax = Vector2.one;
-            resultRect.offsetMin = new Vector2(20f, 38f);
-            resultRect.offsetMax = new Vector2(-20f, -18f);
-            resultContinueLabel = CreateAbsoluteText(
-                resultPanel.transform,
-                new Vector2(20f, 10f),
-                new Vector2(-20f, 24f),
-                LocalizationService.Text("ui.result.continue", "Click to continue"),
-                12,
-                FontStyle.Italic,
-                TextAnchor.LowerRight,
-                BattleUiTheme.TextMuted);
-            resultPanel.SetActive(false);
+            contextRibbonView = new BattleContextRibbonView();
+            contextRibbonView.Initialize(canvasRoot);
 
+            BuildResultPanel(canvasRoot, onResultAdvance);
             BuildDialogueOverlay(canvasRoot, onDialogueAdvance);
-            BuildCampaignOverlay(canvasRoot);
+            BuildOnboardingPanel(canvasRoot, onOnboardingSkip);
+
+            campaignOverlayView = new CampaignOverlayView();
+            campaignOverlayView.Initialize(canvasRoot);
+            campaignBodyLabel = campaignOverlayView.BodyLabel;
+            campaignPrimaryButton = campaignOverlayView.PrimaryButton;
+
             BindOverview(new BattleOverviewModel());
             BindSelectedUnit(new BattleSelectedUnitModel());
             BindForecast(null);
@@ -188,132 +98,13 @@ namespace PhalanxChronicle.UI
         public void BindOverview(BattleOverviewModel model)
         {
             currentOverview = model ?? new BattleOverviewModel();
-            stageLabel.text = currentOverview.StageLabel;
-            seedLabel.text = currentOverview.SeedLabel;
-            phaseLabel.text = currentOverview.PhaseLabel;
-            turnLabel.text = currentOverview.TurnLabel;
-            playerAliveLabel.text = currentOverview.PlayerAliveLabel;
-            enemyAliveLabel.text = currentOverview.EnemyAliveLabel;
-            readyLabel.text = currentOverview.ReadyLabel;
-            skillReadyLabel.text = currentOverview.SkillReadyLabel;
-            objectivePrimaryLabel.text = currentOverview.ObjectivePrimary;
-            objectiveFailureLabel.text = currentOverview.ObjectiveFailure;
-            instructionLabel.text = currentOverview.InstructionText;
-
-            if (currentForecast == null)
-            {
-                ApplyForecastModel(BuildNeutralForecastModel());
-            }
+            rosterSidebarView?.BindOverview(currentOverview);
+            ApplyContextRibbon();
         }
 
         public void BindSelectedUnit(BattleSelectedUnitModel model)
         {
-            BattleSelectedUnitModel selected = model ?? new BattleSelectedUnitModel();
-            if (!selected.HasSelection)
-            {
-                if (selectedDetailSectionsRoot != null)
-                {
-                    selectedDetailSectionsRoot.SetActive(false);
-                }
-
-                selectedPortraitImage.sprite = null;
-                selectedPortraitImage.enabled = false;
-                selectedPortraitBacking.color = new Color(0.18f, 0.17f, 0.16f, 1f);
-                selectedWeaponIconImage.sprite = null;
-                selectedWeaponIconImage.enabled = false;
-                selectedWeaponIconBacking.color = new Color(0.17f, 0.16f, 0.15f, 1f);
-                selectedWeaponAccentImage.color = BattleUiTheme.TextMuted;
-                if (selectedTerrainInfoRoot != null)
-                {
-                    selectedTerrainInfoRoot.SetActive(false);
-                }
-                selectedHpFill.fillAmount = 0f;
-                selectedNameLabel.text = LocalizationService.Text("ui.selected.card_none_title", "No Unit Selected");
-                selectedRoleLabel.text = string.Empty;
-                selectedPositionLabel.text = LocalizationService.Text("ui.selected.card_none_body", "Choose a player unit to inspect battlefield details.");
-                selectedTerrainNameLabel.text = string.Empty;
-                selectedTerrainEffectLabel.text = string.Empty;
-                selectedHpLabel.text = string.Empty;
-                selectedManaLabel.text = string.Empty;
-                selectedManaFill.fillAmount = 0f;
-                selectedWeaponTypeLabel.text = string.Empty;
-                selectedWeaponNameLabel.text = string.Empty;
-                selectedWeaponDescriptionLabel.text = string.Empty;
-                selectedStatsLabel.text = string.Empty;
-                selectedActionLabel.text = string.Empty;
-                selectedCooldownLabel.text = string.Empty;
-                selectedStatusLabel.text = string.Empty;
-                selectedThreatSummaryLabel.text = string.Empty;
-                selectedThreatDetailLabel.text = string.Empty;
-                selectedPassiveNameLabel.text = string.Empty;
-                selectedPassiveDescriptionLabel.text = string.Empty;
-                selectedActiveNameLabel.text = string.Empty;
-                selectedActiveDescriptionLabel.text = string.Empty;
-                return;
-            }
-
-            if (selectedDetailSectionsRoot != null)
-            {
-                selectedDetailSectionsRoot.SetActive(true);
-            }
-
-            UnitVisualProfile visualProfile = UnitVisualCatalog.GetProfile(selected.UnitId, selected.Faction, selected.Role);
-            selectedPortraitImage.enabled = true;
-            selectedPortraitImage.sprite = RuntimeSpriteLibrary.GetPortraitSprite(visualProfile);
-            selectedPortraitBacking.color = visualProfile.PortraitBackdropColor;
-            selectedWeaponIconImage.enabled = true;
-            selectedWeaponIconImage.sprite = RuntimeSpriteLibrary.GetWeaponSprite(visualProfile);
-            selectedWeaponIconBacking.color = Color.Lerp(visualProfile.SecondaryColor, Color.black, 0.52f);
-            selectedWeaponAccentImage.color = Color.Lerp(selected.WeaponAccentColor, visualProfile.AccentColor, 0.32f);
-            selectedHpFill.fillAmount = selected.MaxHp <= 0 ? 0f : (float)selected.CurrentHp / selected.MaxHp;
-            selectedHpFill.color = selectedHpFill.fillAmount > 0.55f
-                ? new Color(0.39f, 0.81f, 0.42f, 1f)
-                : selectedHpFill.fillAmount > 0.3f
-                    ? new Color(0.91f, 0.74f, 0.22f, 1f)
-                    : new Color(0.88f, 0.35f, 0.28f, 1f);
-            selectedManaFill.fillAmount = selected.MaxMana <= 0 ? 0f : (float)selected.CurrentMana / selected.MaxMana;
-            selectedManaFill.color = selectedManaFill.fillAmount > 0.55f
-                ? new Color(0.38f, 0.78f, 0.95f, 1f)
-                : selectedManaFill.fillAmount > 0.3f
-                    ? new Color(0.46f, 0.66f, 0.98f, 1f)
-                    : new Color(0.52f, 0.42f, 0.85f, 1f);
-            selectedNameLabel.text = selected.DisplayName;
-            selectedRoleLabel.text = selected.RoleLabel;
-            selectedPositionLabel.text = selected.PositionLabel;
-            if (selectedTerrainInfoRoot != null)
-            {
-                selectedTerrainInfoRoot.SetActive(true);
-            }
-
-            selectedTerrainNameLabel.text = selected.TerrainName;
-            selectedTerrainEffectLabel.text = selected.TerrainEffectSummary;
-            selectedHpLabel.text = LocalizationService.Format("ui.label.hp_value", "HP {0}/{1}", selected.CurrentHp, selected.MaxHp);
-            selectedManaLabel.text = LocalizationService.Format("ui.label.mana_value", "Mana {0}/{1}", selected.CurrentMana, selected.MaxMana);
-            selectedWeaponTypeLabel.text = selected.WeaponTypeLabel;
-            selectedWeaponNameLabel.text = selected.WeaponName;
-            selectedWeaponDescriptionLabel.text = string.IsNullOrWhiteSpace(selected.ArmorSummary)
-                ? selected.WeaponDescription
-                : selected.WeaponDescription + "\n" + selected.ArmorSummary;
-            selectedStatsLabel.text = LocalizationService.Format(
-                "ui.selected.stats",
-                "ATK {0}  DEF {1}  MOVE {2}  RANGE {3}  MP {4}/{5}  EXP {6}/{7}",
-                selected.Attack,
-                selected.Defense,
-                selected.MoveRange,
-                selected.AttackRange,
-                selected.CurrentMana,
-                selected.MaxMana,
-                selected.CurrentExp,
-                selected.NextLevelExp);
-            selectedActionLabel.text = selected.ActionSummary;
-            selectedCooldownLabel.text = selected.CooldownLabel;
-            selectedStatusLabel.text = selected.StatusSummary;
-            selectedThreatSummaryLabel.text = selected.ThreatSummary;
-            selectedThreatDetailLabel.text = selected.ThreatDetail;
-            selectedPassiveNameLabel.text = selected.PassiveName;
-            selectedPassiveDescriptionLabel.text = selected.PassiveDescription;
-            selectedActiveNameLabel.text = selected.ActiveName;
-            selectedActiveDescriptionLabel.text = selected.ActiveDescription;
+            selectedUnitView?.Bind(model ?? new BattleSelectedUnitModel());
         }
 
         public void BindRoster(
@@ -321,21 +112,19 @@ namespace PhalanxChronicle.UI
             IReadOnlyList<BattleRosterEntryModel> enemyRoster,
             Action<string> onRosterSelected)
         {
-            rosterSelectionHandler = onRosterSelected;
-            BindRosterGroup(alliedRosterRoot, alliedRosterViews, alliedRoster);
-            BindRosterGroup(enemyRosterRoot, enemyRosterViews, enemyRoster);
+            rosterSidebarView?.BindRoster(alliedRoster, enemyRoster, onRosterSelected);
         }
 
         public void BindForecast(BattleForecastModel model)
         {
             currentForecast = model;
-            ApplyForecastModel(model ?? BuildNeutralForecastModel());
+            ApplyContextRibbon();
         }
 
         public void ClearForecast()
         {
             currentForecast = null;
-            ApplyForecastModel(BuildNeutralForecastModel());
+            ApplyContextRibbon();
         }
 
         public void PushFeedEntry(string text)
@@ -351,43 +140,46 @@ namespace PhalanxChronicle.UI
                 feedEntries.RemoveAt(feedEntries.Count - 1);
             }
 
-            RefreshFeed();
-            if (currentForecast == null)
-            {
-                ApplyForecastModel(BuildNeutralForecastModel());
-            }
+            rosterSidebarView?.BindFeed(feedEntries);
+            ApplyContextRibbon();
         }
 
         public void SetEndTurnEnabled(bool enabled)
         {
-            endTurnButton.interactable = enabled;
+            rosterSidebarView?.SetEndTurnEnabled(enabled);
         }
 
         public void SetRerollEnabled(bool enabled)
         {
-            rerollButtonObject.SetActive(enabled);
-            rerollButton.interactable = enabled;
+            rosterSidebarView?.SetRerollEnabled(enabled);
         }
 
-        public void ShowResult(string text)
+        public void ShowResult(BattleResultModel model)
         {
             resultPanel.SetActive(true);
-            resultLabel.text = text;
-            resultLabel.alignment = text != null && text.Contains("\n")
-                ? TextAnchor.UpperLeft
-                : TextAnchor.MiddleCenter;
-            resultLabel.fontSize = text != null && text.Contains("\n") ? 18 : 26;
+            BattleResultModel battleResult = model ?? new BattleResultModel();
+            resultTitleLabel.text = battleResult.Title;
+            resultSummaryLabel.text = battleResult.Summary;
+            resultRewardLabel.text = battleResult.RewardLines != null && battleResult.RewardLines.Count > 0
+                ? string.Join("\n", battleResult.RewardLines)
+                : string.Empty;
+            resultUnitsLabel.text = battleResult.UnitLines != null && battleResult.UnitLines.Count > 0
+                ? string.Join("\n", battleResult.UnitLines)
+                : string.Empty;
         }
 
         public void HideResult()
         {
-            resultPanel.SetActive(false);
+            if (resultPanel != null)
+            {
+                resultPanel.SetActive(false);
+            }
         }
 
         public void ShowDialogue(string speaker, string body)
         {
-            dialogueSpeakerLabel.text = speaker;
-            dialogueBodyLabel.text = body;
+            dialogueSpeakerLabel.text = speaker ?? string.Empty;
+            dialogueBodyLabel.text = body ?? string.Empty;
             dialogueOverlay.SetActive(true);
         }
 
@@ -401,461 +193,118 @@ namespace PhalanxChronicle.UI
 
         public void ShowCampaignStageSelect(CampaignStageSelectModel model, Action<int> onStageSelected)
         {
-            campaignStageSelectionHandler = onStageSelected;
-            campaignOptionSelectionHandler = null;
-            campaignPrimaryHandler = null;
-            campaignSecondaryHandler = null;
-
-            CampaignStageSelectModel stageSelectModel = model ?? new CampaignStageSelectModel();
-            campaignTitleLabel.text = stageSelectModel.Title;
-            campaignBodyLabel.text = stageSelectModel.Body;
-            RebuildCampaignContent(root =>
-            {
-                IReadOnlyList<CampaignStageEntryModel> stages = stageSelectModel.Stages ?? Array.Empty<CampaignStageEntryModel>();
-                foreach (CampaignStageEntryModel entry in stages)
-                {
-                    CreateCampaignStageEntry(root, entry);
-                }
-            });
-
-            ConfigureCampaignButtons(null, null);
-            campaignOverlay.SetActive(true);
+            SetBattleShellVisible(false);
+            campaignOverlayView?.ShowCampaignStageSelect(model, onStageSelected);
         }
 
         public void ShowCampaignInterlude(CampaignInterludeModel model, Action onPrimary, Action onSecondary = null)
         {
-            campaignStageSelectionHandler = null;
-            campaignOptionSelectionHandler = null;
-            campaignPrimaryHandler = onPrimary;
-            campaignSecondaryHandler = onSecondary;
-
-            CampaignInterludeModel interludeModel = model ?? new CampaignInterludeModel();
-            campaignTitleLabel.text = interludeModel.Title;
-            campaignBodyLabel.text = string.Empty;
-            RebuildCampaignContent(root =>
-            {
-                GameObject narrativePanel = CreateInsetPanel("CampaignNarrativePanel", root, 304f, new Color(0.14f, 0.12f, 0.1f, 0.94f));
-                Transform narrativeRoot = CreateInsetContentRoot(narrativePanel.transform, 20f);
-                VerticalLayoutGroup narrativeLayout = narrativeRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-                narrativeLayout.spacing = 12f;
-                narrativeLayout.childControlHeight = true;
-                narrativeLayout.childControlWidth = true;
-                narrativeLayout.childForceExpandHeight = false;
-
-                Text narrativeBody = CreateText(narrativeRoot, interludeModel.Body, 19, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-                bool hasDetails = (interludeModel.DetailLines != null && interludeModel.DetailLines.Count > 0) ||
-                                  !string.IsNullOrWhiteSpace(interludeModel.HighlightLine);
-                narrativeBody.GetComponent<LayoutElement>().preferredHeight = hasDetails ? 128f : 220f;
-
-                int detailLineCount = interludeModel.DetailLines != null ? interludeModel.DetailLines.Count : 0;
-                if (hasDetails)
-                {
-                    float detailPanelHeight = Mathf.Max(88f, 18f + detailLineCount * 26f + (!string.IsNullOrWhiteSpace(interludeModel.HighlightLine) ? 34f : 0f));
-                    GameObject detailPanel = CreateInsetPanel("CampaignBriefPanel", narrativeRoot, detailPanelHeight, new Color(0.16f, 0.13f, 0.1f, 0.9f));
-                    Transform detailRoot = CreateInsetContentRoot(detailPanel.transform, 14f);
-                    VerticalLayoutGroup detailLayout = detailRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-                    detailLayout.spacing = 8f;
-                    detailLayout.childControlHeight = true;
-                    detailLayout.childControlWidth = true;
-                    detailLayout.childForceExpandHeight = false;
-
-                    if (interludeModel.DetailLines != null)
-                    {
-                        foreach (string line in interludeModel.DetailLines)
-                        {
-                            if (string.IsNullOrWhiteSpace(line))
-                            {
-                                continue;
-                            }
-
-                            Text detailLabel = CreateText(detailRoot, line, 15, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-                            detailLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
-                        }
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(interludeModel.HighlightLine))
-                    {
-                        Text highlightLabel = CreateText(detailRoot, interludeModel.HighlightLine, 16, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
-                        highlightLabel.GetComponent<LayoutElement>().preferredHeight = 26f;
-                    }
-                }
-            });
-
-            ConfigureCampaignButtons(interludeModel.PrimaryActionLabel, interludeModel.SecondaryActionLabel);
-            campaignOverlay.SetActive(true);
+            SetBattleShellVisible(false);
+            campaignOverlayView?.ShowCampaignInterlude(model, onPrimary, onSecondary);
         }
 
         public void ShowCampaignOptionList(CampaignOptionListModel model, Action<string> onOptionSelected, Action onPrimary, Action onSecondary = null)
         {
-            campaignStageSelectionHandler = null;
-            campaignOptionSelectionHandler = onOptionSelected;
-            campaignPrimaryHandler = onPrimary;
-            campaignSecondaryHandler = onSecondary;
-
-            CampaignOptionListModel optionListModel = model ?? new CampaignOptionListModel();
-            campaignTitleLabel.text = optionListModel.Title;
-            campaignBodyLabel.text = optionListModel.Body;
-            RebuildCampaignContent(root =>
-            {
-                IReadOnlyList<CampaignOptionEntryModel> options = optionListModel.Options ?? Array.Empty<CampaignOptionEntryModel>();
-                foreach (CampaignOptionEntryModel entry in options)
-                {
-                    CreateCampaignOptionEntry(root, entry);
-                }
-            });
-
-            ConfigureCampaignButtons(optionListModel.PrimaryActionLabel, optionListModel.SecondaryActionLabel);
-            campaignOverlay.SetActive(true);
+            SetBattleShellVisible(false);
+            campaignOverlayView?.ShowCampaignOptionList(model, onOptionSelected, onPrimary, onSecondary);
         }
 
         public void HideCampaignOverlay()
         {
-            campaignStageSelectionHandler = null;
-            campaignOptionSelectionHandler = null;
-            campaignPrimaryHandler = null;
-            campaignSecondaryHandler = null;
-            if (campaignOverlay != null)
+            campaignOverlayView?.Hide();
+            SetBattleShellVisible(true);
+        }
+
+        public void ShowOnboarding(BattleOnboardingModel model)
+        {
+            if (onboardingPanel == null)
             {
-                campaignOverlay.SetActive(false);
+                return;
+            }
+
+            BattleOnboardingModel onboardingModel = model ?? new BattleOnboardingModel();
+            onboardingProgressLabel.text = onboardingModel.ProgressLabel;
+            onboardingTitleLabel.text = onboardingModel.Title;
+            onboardingBodyLabel.text = onboardingModel.Body;
+            onboardingHintLabel.text = onboardingModel.HintText;
+            onboardingHintLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(onboardingModel.HintText));
+            onboardingSkipButton.gameObject.SetActive(onboardingModel.CanSkip);
+            if (onboardingModel.CanSkip)
+            {
+                BattleHudFactory.SetButtonLabel(
+                    onboardingSkipButton,
+                    string.IsNullOrWhiteSpace(onboardingModel.SkipLabel)
+                        ? LocalizationService.Text("ui.button.skip", "略過")
+                        : onboardingModel.SkipLabel);
+            }
+
+            onboardingPanel.SetActive(true);
+        }
+
+        public void HideOnboarding()
+        {
+            if (onboardingPanel != null)
+            {
+                onboardingPanel.SetActive(false);
             }
         }
 
-        private void BuildSelectedUnitPanel(Transform parent)
+        private void ApplyContextRibbon()
         {
-            VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 6f;
-            layout.padding = new RectOffset(18, 18, 18, 18);
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-
-            CreateSectionHeader(parent, LocalizationService.Text("ui.panel.selected", "Character Dossier"));
-
-            GameObject identityPanel = CreateInsetPanel("IdentityPanel", parent, 200f);
-            HorizontalLayoutGroup identityLayout = identityPanel.AddComponent<HorizontalLayoutGroup>();
-            identityLayout.spacing = 16f;
-            identityLayout.padding = new RectOffset(16, 16, 16, 16);
-            identityLayout.childAlignment = TextAnchor.MiddleLeft;
-            identityLayout.childForceExpandHeight = false;
-            identityLayout.childForceExpandWidth = false;
-
-            GameObject portraitFrame = CreatePanel(
-                "PortraitFrame",
-                identityPanel.transform,
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f),
-                Vector2.zero,
-                new Vector2(128f, 128f),
-                new Color(0.16f, 0.16f, 0.15f, 1f));
-            selectedPortraitBacking = portraitFrame.GetComponent<Image>();
-            LayoutElement portraitLayout = portraitFrame.AddComponent<LayoutElement>();
-            portraitLayout.preferredWidth = 128f;
-            portraitLayout.preferredHeight = 128f;
-
-            GameObject portraitObject = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
-            portraitObject.transform.SetParent(portraitFrame.transform, false);
-            RectTransform portraitRect = portraitObject.GetComponent<RectTransform>();
-            portraitRect.anchorMin = new Vector2(0.04f, 0.04f);
-            portraitRect.anchorMax = new Vector2(0.96f, 0.96f);
-            portraitRect.offsetMin = Vector2.zero;
-            portraitRect.offsetMax = Vector2.zero;
-            selectedPortraitImage = portraitObject.GetComponent<Image>();
-            selectedPortraitImage.preserveAspect = true;
-
-            GameObject identityTextRoot = new GameObject("IdentityTextRoot", typeof(RectTransform));
-            identityTextRoot.transform.SetParent(identityPanel.transform, false);
-            VerticalLayoutGroup identityTextLayout = identityTextRoot.AddComponent<VerticalLayoutGroup>();
-            identityTextLayout.spacing = 5f;
-            identityTextLayout.childControlHeight = true;
-            identityTextLayout.childControlWidth = true;
-            identityTextLayout.childForceExpandHeight = false;
-            identityTextRoot.AddComponent<LayoutElement>().flexibleWidth = 1f;
-
-            selectedNameLabel = CreateText(identityTextRoot.transform, string.Empty, 24, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            EnableBestFit(selectedNameLabel, 16, 24, true);
-            selectedRoleLabel = CreateText(identityTextRoot.transform, string.Empty, 16, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            EnableBestFit(selectedRoleLabel, 12, 16, true);
-            selectedPositionLabel = CreateText(identityTextRoot.transform, string.Empty, 14, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextMuted);
-            selectedPositionLabel.GetComponent<LayoutElement>().preferredHeight = 32f;
-
-            selectedTerrainInfoRoot = CreateInsetPanel("TerrainInfoPanel", identityTextRoot.transform, 44f, new Color(0.16f, 0.14f, 0.11f, 0.92f));
-            Transform terrainInfoRoot = CreateInsetContentRoot(selectedTerrainInfoRoot.transform, 10f);
-            HorizontalLayoutGroup terrainLayout = terrainInfoRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
-            terrainLayout.spacing = 10f;
-            terrainLayout.childAlignment = TextAnchor.MiddleLeft;
-            terrainLayout.childControlHeight = true;
-            terrainLayout.childControlWidth = true;
-            terrainLayout.childForceExpandHeight = false;
-            terrainLayout.childForceExpandWidth = false;
-
-            selectedTerrainNameLabel = CreateText(terrainInfoRoot, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            LayoutElement terrainNameLayout = selectedTerrainNameLabel.GetComponent<LayoutElement>();
-            terrainNameLayout.preferredWidth = 78f;
-            terrainNameLayout.preferredHeight = 24f;
-            EnableBestFit(selectedTerrainNameLabel, 11, 12, true);
-
-            selectedTerrainEffectLabel = CreateText(terrainInfoRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            LayoutElement terrainEffectLayout = selectedTerrainEffectLabel.GetComponent<LayoutElement>();
-            terrainEffectLayout.flexibleWidth = 1f;
-            terrainEffectLayout.preferredHeight = 28f;
-            EnableBestFit(selectedTerrainEffectLabel, 11, 12, false);
-            selectedTerrainInfoRoot.SetActive(false);
-
-            selectedActionLabel = CreateText(identityTextRoot.transform, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.96f, 0.92f, 0.82f, 1f));
-
-            selectedDetailSectionsRoot = new GameObject("SelectedDetails", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
-            selectedDetailSectionsRoot.transform.SetParent(parent, false);
-            VerticalLayoutGroup detailsLayout = selectedDetailSectionsRoot.GetComponent<VerticalLayoutGroup>();
-            detailsLayout.spacing = 6f;
-            detailsLayout.childControlHeight = true;
-            detailsLayout.childControlWidth = true;
-            detailsLayout.childForceExpandHeight = false;
-            selectedDetailSectionsRoot.GetComponent<LayoutElement>().flexibleHeight = 1f;
-
-            GameObject hpPanel = CreateInsetPanel("SelectedHpPanel", selectedDetailSectionsRoot.transform, 58f);
-            selectedHpLabel = CreateText(hpPanel.transform, string.Empty, 18, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            RectTransform hpLabelRect = selectedHpLabel.GetComponent<RectTransform>();
-            hpLabelRect.anchorMin = new Vector2(0f, 1f);
-            hpLabelRect.anchorMax = new Vector2(1f, 1f);
-            hpLabelRect.offsetMin = new Vector2(14f, -30f);
-            hpLabelRect.offsetMax = new Vector2(-14f, -8f);
-
-            CreateUiBar(hpPanel.transform, new Vector2(14f, 14f), new Vector2(-14f, 30f), out selectedHpFill);
-
-            GameObject manaPanel = CreateInsetPanel("SelectedManaPanel", selectedDetailSectionsRoot.transform, 58f);
-            selectedManaLabel = CreateText(manaPanel.transform, string.Empty, 18, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            RectTransform manaLabelRect = selectedManaLabel.GetComponent<RectTransform>();
-            manaLabelRect.anchorMin = new Vector2(0f, 1f);
-            manaLabelRect.anchorMax = new Vector2(1f, 1f);
-            manaLabelRect.offsetMin = new Vector2(14f, -30f);
-            manaLabelRect.offsetMax = new Vector2(-14f, -8f);
-            CreateUiBar(manaPanel.transform, new Vector2(14f, 14f), new Vector2(-14f, 30f), out selectedManaFill);
-
-            CreateSectionHeader(selectedDetailSectionsRoot.transform, LocalizationService.Text("ui.label.weapon", "Armory"));
-            GameObject weaponPanel = CreateInsetPanel("WeaponPanel", selectedDetailSectionsRoot.transform, 120f, new Color(0.16f, 0.14f, 0.11f, 0.94f));
-            Transform weaponRoot = CreateInsetContentRoot(weaponPanel.transform, 12f);
-            GameObject weaponAccent = new GameObject("WeaponAccent", typeof(RectTransform), typeof(Image));
-            weaponAccent.transform.SetParent(weaponRoot, false);
-            RectTransform weaponAccentRect = weaponAccent.GetComponent<RectTransform>();
-            weaponAccentRect.anchorMin = new Vector2(0f, 0f);
-            weaponAccentRect.anchorMax = new Vector2(0f, 1f);
-            weaponAccentRect.sizeDelta = new Vector2(5f, 0f);
-            weaponAccentRect.anchoredPosition = Vector2.zero;
-            selectedWeaponAccentImage = weaponAccent.GetComponent<Image>();
-            selectedWeaponAccentImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
-
-            GameObject weaponLayoutRoot = new GameObject("WeaponLayout", typeof(RectTransform));
-            weaponLayoutRoot.transform.SetParent(weaponRoot, false);
-            RectTransform weaponLayoutRect = weaponLayoutRoot.GetComponent<RectTransform>();
-            weaponLayoutRect.anchorMin = Vector2.zero;
-            weaponLayoutRect.anchorMax = Vector2.one;
-            weaponLayoutRect.offsetMin = new Vector2(12f, 0f);
-            weaponLayoutRect.offsetMax = Vector2.zero;
-            HorizontalLayoutGroup weaponLayout = weaponLayoutRoot.AddComponent<HorizontalLayoutGroup>();
-            weaponLayout.spacing = 12f;
-            weaponLayout.childAlignment = TextAnchor.MiddleLeft;
-            weaponLayout.childControlHeight = true;
-            weaponLayout.childControlWidth = true;
-            weaponLayout.childForceExpandHeight = false;
-            weaponLayout.childForceExpandWidth = false;
-
-            GameObject weaponIconFrame = CreatePanel(
-                "WeaponIconFrame",
-                weaponLayoutRoot.transform,
-                new Vector2(0f, 0.5f),
-                new Vector2(0f, 0.5f),
-                Vector2.zero,
-                new Vector2(82f, 82f),
-                new Color(0.17f, 0.16f, 0.15f, 1f));
-            selectedWeaponIconBacking = weaponIconFrame.GetComponent<Image>();
-            LayoutElement weaponIconLayout = weaponIconFrame.AddComponent<LayoutElement>();
-            weaponIconLayout.preferredWidth = 82f;
-            weaponIconLayout.preferredHeight = 82f;
-
-            GameObject weaponIcon = new GameObject("WeaponIcon", typeof(RectTransform), typeof(Image));
-            weaponIcon.transform.SetParent(weaponIconFrame.transform, false);
-            RectTransform weaponIconRect = weaponIcon.GetComponent<RectTransform>();
-            weaponIconRect.anchorMin = new Vector2(0.16f, 0.16f);
-            weaponIconRect.anchorMax = new Vector2(0.84f, 0.84f);
-            weaponIconRect.offsetMin = Vector2.zero;
-            weaponIconRect.offsetMax = Vector2.zero;
-            selectedWeaponIconImage = weaponIcon.GetComponent<Image>();
-            selectedWeaponIconImage.preserveAspect = true;
-
-            GameObject weaponTextRoot = new GameObject("WeaponTextRoot", typeof(RectTransform));
-            weaponTextRoot.transform.SetParent(weaponLayoutRoot.transform, false);
-            weaponTextRoot.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            VerticalLayoutGroup weaponTextLayout = weaponTextRoot.AddComponent<VerticalLayoutGroup>();
-            weaponTextLayout.spacing = 2f;
-            weaponTextLayout.childControlHeight = true;
-            weaponTextLayout.childControlWidth = true;
-            weaponTextLayout.childForceExpandHeight = false;
-            weaponTextLayout.childForceExpandWidth = true;
-
-            selectedWeaponTypeLabel = CreateText(weaponTextRoot.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            selectedWeaponNameLabel = CreateText(weaponTextRoot.transform, string.Empty, 18, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            EnableBestFit(selectedWeaponNameLabel, 12, 18, true);
-            selectedWeaponDescriptionLabel = CreateText(weaponTextRoot.transform, string.Empty, 13, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            selectedWeaponDescriptionLabel.GetComponent<LayoutElement>().preferredHeight = 78f;
-
-            GameObject statusPanel = CreateInsetPanel("SelectedStatusPanel", selectedDetailSectionsRoot.transform, 132f);
-            Transform statusRoot = CreateInsetContentRoot(statusPanel.transform, 14f);
-            VerticalLayoutGroup statusLayout = statusRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            statusLayout.spacing = 4f;
-            statusLayout.childControlHeight = true;
-            statusLayout.childControlWidth = true;
-            statusLayout.childForceExpandHeight = false;
-
-            selectedStatsLabel = CreateText(statusRoot, string.Empty, 16, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            selectedCooldownLabel = CreateText(statusRoot, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.78f, 0.92f, 0.98f, 1f));
-            selectedStatusLabel = CreateText(statusRoot, string.Empty, 15, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.94f, 0.88f, 0.72f, 1f));
-            selectedThreatSummaryLabel = CreateText(statusRoot, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextThreat);
-            selectedThreatDetailLabel = CreateText(statusRoot, string.Empty, 14, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.93f, 0.82f, 0.76f, 1f));
-            selectedThreatDetailLabel.GetComponent<LayoutElement>().preferredHeight = 34f;
-
-            CreateSectionHeader(selectedDetailSectionsRoot.transform, LocalizationService.Text("ui.label.passive", "Passive"));
-            GameObject passivePanel = CreateInsetPanel("PassivePanel", selectedDetailSectionsRoot.transform, 78f);
-            Transform passiveRoot = CreateInsetContentRoot(passivePanel.transform, 14f);
-            VerticalLayoutGroup passiveLayout = passiveRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            passiveLayout.spacing = 4f;
-            passiveLayout.childControlHeight = true;
-            passiveLayout.childControlWidth = true;
-            passiveLayout.childForceExpandHeight = false;
-            selectedPassiveNameLabel = CreateText(passiveRoot, string.Empty, 17, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            EnableBestFit(selectedPassiveNameLabel, 13, 17, true);
-            selectedPassiveDescriptionLabel = CreateText(passiveRoot, string.Empty, 15, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            selectedPassiveDescriptionLabel.GetComponent<LayoutElement>().preferredHeight = 34f;
-
-            CreateSectionHeader(selectedDetailSectionsRoot.transform, LocalizationService.Text("ui.label.active", "Active"));
-            GameObject activePanel = CreateInsetPanel("ActivePanel", selectedDetailSectionsRoot.transform, 108f);
-            Transform activeRoot = CreateInsetContentRoot(activePanel.transform, 14f);
-            VerticalLayoutGroup activeLayout = activeRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            activeLayout.spacing = 4f;
-            activeLayout.childControlHeight = true;
-            activeLayout.childControlWidth = true;
-            activeLayout.childForceExpandHeight = false;
-            selectedActiveNameLabel = CreateText(activeRoot, string.Empty, 17, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            EnableBestFit(selectedActiveNameLabel, 13, 17, true);
-            selectedActiveDescriptionLabel = CreateText(activeRoot, string.Empty, 15, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            selectedActiveDescriptionLabel.GetComponent<LayoutElement>().preferredHeight = 56f;
-        }
-
-        private void BuildOverviewPanel(Transform parent, Action onEndTurn, Action onReroll)
-        {
-            VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 6f;
-            layout.padding = new RectOffset(18, 18, 18, 18);
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-
-            CreateSectionHeader(parent, LocalizationService.Text("ui.panel.overview", "War Overview"));
-            GameObject summaryPanel = CreateInsetPanel("OverviewSummaryPanel", parent, 112f);
-            Transform summaryRoot = CreateInsetContentRoot(summaryPanel.transform, 10f);
-            VerticalLayoutGroup summaryLayout = summaryRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            summaryLayout.spacing = 2f;
-            summaryLayout.childControlHeight = true;
-            summaryLayout.childControlWidth = true;
-            summaryLayout.childForceExpandHeight = false;
-
-            stageLabel = CreateText(summaryRoot, string.Empty, 18, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            EnableBestFit(stageLabel, 13, 18, true);
-            seedLabel = CreateText(summaryRoot, string.Empty, 13, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextMuted);
-            phaseLabel = CreateText(summaryRoot, string.Empty, 16, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            turnLabel = CreateText(summaryRoot, string.Empty, 14, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            playerAliveLabel = CreateText(summaryRoot, string.Empty, 13, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.62f, 0.8f, 1f, 1f));
-            enemyAliveLabel = CreateText(summaryRoot, string.Empty, 13, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(1f, 0.66f, 0.58f, 1f));
-            readyLabel = CreateText(summaryRoot, string.Empty, 13, FontStyle.Normal, TextAnchor.MiddleLeft, new Color(0.93f, 0.95f, 0.87f, 1f));
-            skillReadyLabel = CreateText(summaryRoot, string.Empty, 13, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            stageLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
-            seedLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
-            phaseLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
-            turnLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
-            playerAliveLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
-            enemyAliveLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
-            readyLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
-            skillReadyLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
-
-            CreateSectionHeader(parent, LocalizationService.Text("ui.objective.header", "Objective"));
-            GameObject objectivePanel = CreateInsetPanel("ObjectivePanel", parent, 76f, BattleUiTheme.PanelCommand);
-            Transform objectiveRoot = CreateInsetContentRoot(objectivePanel.transform, 12f);
-            VerticalLayoutGroup objectiveLayout = objectiveRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            objectiveLayout.spacing = 4f;
-            objectiveLayout.childControlHeight = true;
-            objectiveLayout.childControlWidth = true;
-            objectiveLayout.childForceExpandHeight = false;
-            objectivePrimaryLabel = CreateText(objectiveRoot, string.Empty, 15, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            objectiveFailureLabel = CreateText(objectiveRoot, string.Empty, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
-            objectivePrimaryLabel.GetComponent<LayoutElement>().preferredHeight = 34f;
-            objectiveFailureLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
-
-            GameObject buttonRow = new GameObject("OverviewButtons", typeof(RectTransform));
-            buttonRow.transform.SetParent(parent, false);
-            HorizontalLayoutGroup buttonLayout = buttonRow.AddComponent<HorizontalLayoutGroup>();
-            buttonLayout.spacing = 8f;
-            buttonLayout.childForceExpandHeight = true;
-            buttonLayout.childForceExpandWidth = true;
-            buttonRow.AddComponent<LayoutElement>().preferredHeight = 42f;
-
-            endTurnButton = CreateActionButton(buttonRow.transform, LocalizationService.Text("ui.button.end_turn", "End Turn"));
-            endTurnButton.onClick.AddListener(() => onEndTurn?.Invoke());
-            rerollButton = CreateActionButton(buttonRow.transform, LocalizationService.Text("ui.button.reroll", "Reroll"));
-            rerollButton.onClick.AddListener(() => onReroll?.Invoke());
-            rerollButtonObject = rerollButton.gameObject;
-
-            CreateSectionHeader(parent, LocalizationService.Text("ui.panel.allies", "Allied Ledger"));
-            GameObject alliesPanel = CreateInsetPanel("AlliedRosterPanel", parent, 148f);
-            alliedRosterRoot = CreateRosterRoot(CreateScrollContentRoot(alliesPanel.transform, 6f));
-            CreateSectionHeader(parent, LocalizationService.Text("ui.panel.enemies", "Enemy Ledger"));
-            GameObject enemiesPanel = CreateInsetPanel("EnemyRosterPanel", parent, 228f);
-            enemyRosterRoot = CreateRosterRoot(CreateScrollContentRoot(enemiesPanel.transform, 6f));
-
-            CreateSectionHeader(parent, LocalizationService.Text("ui.panel.feed", "War Feed"));
-            GameObject feedPanel = CreateInsetPanel("FeedPanel", parent, 78f);
-            Transform feedRoot = CreateScrollContentRoot(feedPanel.transform, 8f);
-            VerticalLayoutGroup feedLayout = feedRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            feedLayout.spacing = 4f;
-            feedLayout.childControlHeight = true;
-            feedLayout.childControlWidth = true;
-            feedLayout.childForceExpandHeight = false;
-            for (int index = 0; index < FeedLimit; index++)
+            if (contextRibbonView == null || hudModelBuilder == null)
             {
-                Text feedLabel = CreateText(feedRoot, string.Empty, 12, index == 0 ? FontStyle.Bold : FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-                feedLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
-                feedLabels.Add(feedLabel);
+                return;
             }
 
-            instructionLabel = CreateText(feedRoot, string.Empty, 14, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.95f, 0.91f, 0.79f, 1f));
-            instructionLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
-            RefreshFeed();
+            BattleForecastModel model = currentForecast ?? hudModelBuilder.BuildNeutralForecastModel(currentOverview, feedEntries);
+            contextRibbonView.Bind(model);
         }
 
-        private void BuildForecastPanel(Transform parent)
+        private void SetBattleShellVisible(bool visible)
         {
-            GameObject accentObject = new GameObject("Accent", typeof(RectTransform), typeof(Image));
-            accentObject.transform.SetParent(parent, false);
-            RectTransform accentRect = accentObject.GetComponent<RectTransform>();
-            accentRect.anchorMin = new Vector2(0f, 0f);
-            accentRect.anchorMax = new Vector2(0f, 1f);
-            accentRect.pivot = new Vector2(0f, 0.5f);
-            accentRect.sizeDelta = new Vector2(6f, 0f);
-            accentRect.anchoredPosition = Vector2.zero;
-            forecastAccentImage = accentObject.GetComponent<Image>();
-            forecastAccentImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            contextRibbonView?.SetVisible(visible);
+            selectedUnitView?.SetVisible(visible);
+            rosterSidebarView?.SetVisible(visible);
+        }
 
-            forecastHeaderLabel = CreateAbsoluteText(parent, new Vector2(18f, -12f), new Vector2(-14f, -6f), string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
-            forecastTitleLabel = CreateAbsoluteText(parent, new Vector2(18f, -28f), new Vector2(-14f, -20f), string.Empty, 18, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            forecastSummaryLabel = CreateAbsoluteText(parent, new Vector2(18f, -46f), new Vector2(-14f, -36f), string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            forecastDetailLabel = CreateAbsoluteText(parent, new Vector2(18f, 24f), new Vector2(-14f, 32f), string.Empty, 11, FontStyle.Normal, TextAnchor.LowerLeft, BattleUiTheme.TextSecondary);
-            forecastFooterLabel = CreateAbsoluteText(parent, new Vector2(18f, 10f), new Vector2(-14f, 18f), string.Empty, 10, FontStyle.Italic, TextAnchor.LowerLeft, new Color(0.95f, 0.86f, 0.72f, 1f));
-            EnableBestFit(forecastHeaderLabel, 10, 12, true);
-            EnableBestFit(forecastTitleLabel, 14, 18, true);
-            EnableBestFit(forecastSummaryLabel, 10, 12, true);
+        private void BuildResultPanel(Transform canvasRoot, Action onResultAdvance)
+        {
+            resultPanel = BattleHudFactory.CreatePanel(
+                "ResultPanel",
+                canvasRoot,
+                new Vector2(0.5f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0f, 24f),
+                new Vector2(720f, 340f),
+                new Color(0.06f, 0.07f, 0.1f, 0.9f));
+            resultAdvanceButton = resultPanel.AddComponent<Button>();
+            resultAdvanceButton.transition = Selectable.Transition.ColorTint;
+            ColorBlock resultColors = resultAdvanceButton.colors;
+            resultColors.normalColor = new Color(1f, 1f, 1f, 0f);
+            resultColors.highlightedColor = new Color(1f, 1f, 1f, 0.03f);
+            resultColors.pressedColor = new Color(1f, 1f, 1f, 0.06f);
+            resultColors.disabledColor = new Color(1f, 1f, 1f, 0f);
+            resultAdvanceButton.colors = resultColors;
+            resultAdvanceButton.onClick.AddListener(() => onResultAdvance?.Invoke());
+            resultTitleLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 282f), new Vector2(-20f, -20f), string.Empty, 30, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+            resultSummaryLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 214f), new Vector2(-20f, -78f), string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            resultRewardLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 136f), new Vector2(-20f, -148f), string.Empty, 14, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            resultUnitsLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 34f), new Vector2(-20f, -224f), string.Empty, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            resultContinueLabel = BattleHudFactory.CreateAbsoluteText(
+                resultPanel.transform,
+                new Vector2(20f, 10f),
+                new Vector2(-20f, 24f),
+                LocalizationService.Text("ui.result.continue", "點擊任意處繼續"),
+                12,
+                FontStyle.Italic,
+                TextAnchor.LowerRight,
+                BattleUiTheme.TextMuted);
+            resultPanel.SetActive(false);
         }
 
         private void BuildDialogueOverlay(Transform canvasRoot, Action onDialogueAdvance)
         {
-            dialogueOverlay = CreateStretchPanel("DialogueOverlay", canvasRoot, BattleUiTheme.PanelOverlay);
+            dialogueOverlay = BattleHudFactory.CreateStretchPanel("DialogueOverlay", canvasRoot, BattleUiTheme.PanelOverlay);
             dialogueAdvanceButton = dialogueOverlay.AddComponent<Button>();
             dialogueAdvanceButton.transition = Selectable.Transition.ColorTint;
             ColorBlock dialogueColors = dialogueAdvanceButton.colors;
@@ -866,7 +315,7 @@ namespace PhalanxChronicle.UI
             dialogueAdvanceButton.colors = dialogueColors;
             dialogueAdvanceButton.onClick.AddListener(() => onDialogueAdvance?.Invoke());
 
-            GameObject dialogueBox = CreatePanel(
+            GameObject dialogueBox = BattleHudFactory.CreatePanel(
                 "DialogueBox",
                 dialogueOverlay.transform,
                 new Vector2(0.5f, 0f),
@@ -875,204 +324,884 @@ namespace PhalanxChronicle.UI
                 new Vector2(980f, 226f),
                 BattleUiTheme.PanelBackdrop);
 
-            dialogueSpeakerLabel = CreateAbsoluteText(dialogueBox.transform, new Vector2(28f, -24f), new Vector2(-28f, -18f), string.Empty, 20, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
-            dialogueBodyLabel = CreateAbsoluteText(dialogueBox.transform, new Vector2(28f, 48f), new Vector2(-28f, -64f), string.Empty, 22, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            dialogueContinueLabel = CreateAbsoluteText(dialogueBox.transform, new Vector2(28f, 16f), new Vector2(-28f, 32f), LocalizationService.Text("ui.dialogue.continue", "Click to continue"), 14, FontStyle.Italic, TextAnchor.LowerRight, BattleUiTheme.TextMuted);
+            dialogueSpeakerLabel = BattleHudFactory.CreateAbsoluteText(dialogueBox.transform, new Vector2(28f, -24f), new Vector2(-28f, -18f), string.Empty, 20, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+            dialogueBodyLabel = BattleHudFactory.CreateAbsoluteText(dialogueBox.transform, new Vector2(28f, 48f), new Vector2(-28f, -64f), string.Empty, 22, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            dialogueContinueLabel = BattleHudFactory.CreateAbsoluteText(dialogueBox.transform, new Vector2(28f, 16f), new Vector2(-28f, 32f), LocalizationService.Text("ui.dialogue.continue", "點擊任意處繼續"), 14, FontStyle.Italic, TextAnchor.LowerRight, BattleUiTheme.TextMuted);
             dialogueOverlay.SetActive(false);
         }
 
-        private void BuildCampaignOverlay(Transform canvasRoot)
+        private void BuildOnboardingPanel(Transform canvasRoot, Action onOnboardingSkip)
         {
-            campaignOverlay = CreateStretchPanel("CampaignOverlay", canvasRoot, BattleUiTheme.PanelOverlay);
-            GameObject campaignBox = CreatePanel(
-                "CampaignBox",
-                campaignOverlay.transform,
+            onboardingPanel = BattleHudFactory.CreatePanel(
+                "OnboardingPanel",
+                canvasRoot,
                 new Vector2(0.5f, 0.5f),
                 new Vector2(0.5f, 0.5f),
                 Vector2.zero,
-                new Vector2(1068f, 724f),
-                BattleUiTheme.PanelBackdrop);
-
-            VerticalLayoutGroup layout = campaignBox.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 16f;
-            layout.padding = new RectOffset(28, 28, 28, 28);
+                new Vector2(620f, 280f),
+                BattleUiTheme.PanelSurface);
+            VerticalLayoutGroup layout = onboardingPanel.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 12f;
+            layout.padding = new RectOffset(20, 20, 18, 18);
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
 
-            campaignTitleLabel = CreateText(campaignBox.transform, string.Empty, 32, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            campaignTitleLabel.GetComponent<LayoutElement>().preferredHeight = 44f;
-            campaignBodyLabel = CreateText(campaignBox.transform, string.Empty, 18, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            campaignBodyLabel.GetComponent<LayoutElement>().preferredHeight = 112f;
+            onboardingProgressLabel = BattleHudFactory.CreateText(onboardingPanel.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            onboardingProgressLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
 
-            GameObject contentPanel = CreateInsetPanel("CampaignContentPanel", campaignBox.transform, 492f, new Color(0.12f, 0.11f, 0.1f, 0.95f));
-            campaignContentRoot = CreateScrollContentRoot(contentPanel.transform, 10f);
-            VerticalLayoutGroup contentLayout = campaignContentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            contentLayout.spacing = 14f;
+            onboardingTitleLabel = BattleHudFactory.CreateText(onboardingPanel.transform, string.Empty, 22, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            onboardingTitleLabel.GetComponent<LayoutElement>().preferredHeight = 28f;
+
+            onboardingBodyLabel = BattleHudFactory.CreateText(onboardingPanel.transform, string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            onboardingBodyLabel.GetComponent<LayoutElement>().preferredHeight = 120f;
+
+            onboardingHintLabel = BattleHudFactory.CreateText(onboardingPanel.transform, string.Empty, 13, FontStyle.Italic, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            onboardingHintLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
+
+            onboardingSkipButton = BattleHudFactory.CreateButton(onboardingPanel.transform, LocalizationService.Text("ui.button.skip", "略過"), false);
+            onboardingSkipButton.onClick.AddListener(() => onOnboardingSkip?.Invoke());
+            onboardingPanel.SetActive(false);
+        }
+    }
+
+    internal sealed class BattleContextRibbonView
+    {
+        private GameObject rootObject;
+        private Image accentImage;
+        private Text headerLabel;
+        private Text titleLabel;
+        private Transform factRoot;
+        private Text primaryLineLabel;
+        private Text secondaryLineLabel;
+        private Transform chipRoot;
+
+        public void Initialize(Transform canvasRoot)
+        {
+            rootObject = BattleHudFactory.CreatePanel(
+                "BattleContextRibbon",
+                canvasRoot,
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f),
+                new Vector2(0f, -12f),
+                new Vector2(792f, 118f),
+                BattleUiTheme.PanelForecast);
+            HorizontalLayoutGroup shellLayout = rootObject.AddComponent<HorizontalLayoutGroup>();
+            shellLayout.spacing = 0f;
+            shellLayout.padding = new RectOffset(0, 0, 0, 0);
+            shellLayout.childControlHeight = true;
+            shellLayout.childControlWidth = true;
+            shellLayout.childForceExpandHeight = true;
+            shellLayout.childForceExpandWidth = false;
+
+            GameObject accentPanel = new GameObject("Accent", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+            accentPanel.transform.SetParent(rootObject.transform, false);
+            accentPanel.GetComponent<LayoutElement>().preferredWidth = 6f;
+            accentImage = accentPanel.GetComponent<Image>();
+            accentImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+
+            GameObject content = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            content.transform.SetParent(rootObject.transform, false);
+            content.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            VerticalLayoutGroup contentLayout = content.GetComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 4f;
+            contentLayout.padding = new RectOffset(14, 14, 10, 10);
             contentLayout.childControlHeight = true;
             contentLayout.childControlWidth = true;
             contentLayout.childForceExpandHeight = false;
 
-            GameObject buttonRow = new GameObject("CampaignButtons", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
-            buttonRow.transform.SetParent(campaignBox.transform, false);
-            buttonRow.GetComponent<LayoutElement>().preferredHeight = 58f;
-            HorizontalLayoutGroup buttonLayout = buttonRow.GetComponent<HorizontalLayoutGroup>();
-            buttonLayout.spacing = 16f;
-            buttonLayout.padding = new RectOffset(4, 4, 0, 0);
-            buttonLayout.childAlignment = TextAnchor.MiddleCenter;
-            buttonLayout.childForceExpandHeight = true;
-            buttonLayout.childForceExpandWidth = true;
+            headerLabel = BattleHudFactory.CreateText(content.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            headerLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
+            headerLabel.verticalOverflow = VerticalWrapMode.Truncate;
 
-            campaignPrimaryButton = CreateActionButton(buttonRow.transform, LocalizationService.Text("ui.button.continue", "Continue"));
-            campaignPrimaryButton.onClick.AddListener(() => campaignPrimaryHandler?.Invoke());
-            campaignSecondaryButton = CreateActionButton(buttonRow.transform, LocalizationService.Text("ui.button.back", "Back"));
-            campaignSecondaryButton.onClick.AddListener(() => campaignSecondaryHandler?.Invoke());
-            campaignOverlay.SetActive(false);
+            titleLabel = BattleHudFactory.CreateText(content.transform, string.Empty, 19, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            titleLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
+            titleLabel.verticalOverflow = VerticalWrapMode.Truncate;
+
+            GameObject factsRow = new GameObject("FactsRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            factsRow.transform.SetParent(content.transform, false);
+            factsRow.GetComponent<LayoutElement>().preferredHeight = 24f;
+            HorizontalLayoutGroup factsLayout = factsRow.GetComponent<HorizontalLayoutGroup>();
+            factsLayout.spacing = 6f;
+            factsLayout.childControlHeight = true;
+            factsLayout.childControlWidth = false;
+            factsLayout.childForceExpandHeight = false;
+            factsLayout.childForceExpandWidth = false;
+            factRoot = factsRow.transform;
+
+            primaryLineLabel = BattleHudFactory.CreateText(content.transform, string.Empty, 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            primaryLineLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            primaryLineLabel.verticalOverflow = VerticalWrapMode.Truncate;
+
+            secondaryLineLabel = BattleHudFactory.CreateText(content.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            secondaryLineLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            secondaryLineLabel.verticalOverflow = VerticalWrapMode.Truncate;
+
+            GameObject chipRow = new GameObject("ChipRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            chipRow.transform.SetParent(content.transform, false);
+            chipRow.GetComponent<LayoutElement>().preferredHeight = 22f;
+            HorizontalLayoutGroup chipLayout = chipRow.GetComponent<HorizontalLayoutGroup>();
+            chipLayout.spacing = 6f;
+            chipLayout.childControlHeight = true;
+            chipLayout.childControlWidth = false;
+            chipLayout.childForceExpandHeight = false;
+            chipLayout.childForceExpandWidth = false;
+            chipRoot = chipRow.transform;
         }
 
-        private void RebuildCampaignContent(Action<Transform> builder)
+        public void SetVisible(bool visible)
         {
-            for (int index = campaignContentRoot.childCount - 1; index >= 0; index--)
+            if (rootObject != null)
             {
-                Transform child = campaignContentRoot.GetChild(index);
-                child.SetParent(null, false);
-                Destroy(child.gameObject);
+                rootObject.SetActive(visible);
+            }
+        }
+
+        public void Bind(BattleForecastModel model)
+        {
+            BattleForecastModel ribbonModel = model ?? new BattleForecastModel();
+            headerLabel.text = ribbonModel.Header;
+            titleLabel.text = ribbonModel.Title;
+            primaryLineLabel.text = ribbonModel.PrimaryLine;
+            secondaryLineLabel.text = string.Join(
+                " · ",
+                (ribbonModel.SecondaryLines ?? Array.Empty<string>())
+                    .Where(line => !string.IsNullOrWhiteSpace(line))
+                    .Take(2));
+            secondaryLineLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(secondaryLineLabel.text));
+            accentImage.color = ribbonModel.AccentColor;
+            RebuildFacts(ribbonModel.OutcomeFacts);
+            RebuildChips(ribbonModel.RiskChip, ribbonModel.CommitChip);
+        }
+
+        private void RebuildFacts(IReadOnlyList<HudFactModel> facts)
+        {
+            BattleHudFactory.DestroyChildren(factRoot);
+            if (facts == null)
+            {
+                return;
             }
 
-            builder?.Invoke(campaignContentRoot);
+            foreach (HudFactModel fact in facts.Where(fact => fact != null && !string.IsNullOrWhiteSpace(fact.Value)).Take(2))
+            {
+                BattleHudFactory.CreateFactCard(factRoot, fact, 96f, 22f);
+            }
         }
 
-        private void CreateCampaignStageEntry(Transform parent, CampaignStageEntryModel model)
+        private void RebuildChips(HudChipModel riskChip, HudChipModel commitChip)
         {
-            GameObject root = CreateInsetPanel(
-                "CampaignStageEntry",
-                parent,
-                112f,
-                model.IsUnlocked
-                    ? (model.IsCleared ? new Color(0.14f, 0.18f, 0.14f, 0.94f) : new Color(0.16f, 0.14f, 0.11f, 0.95f))
-                    : new Color(0.12f, 0.11f, 0.11f, 0.88f));
-            Button button = root.AddComponent<Button>();
-            ColorBlock colors = button.colors;
-            colors.highlightedColor = new Color(1f, 1f, 1f, 0.05f);
-            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
-            colors.disabledColor = BattleUiTheme.ButtonDisabled;
-            button.colors = colors;
-            button.interactable = model.IsUnlocked;
-            button.onClick.AddListener(() => campaignStageSelectionHandler?.Invoke(model.StageIndex));
+            BattleHudFactory.DestroyChildren(chipRoot);
+            if (riskChip != null && !string.IsNullOrWhiteSpace(riskChip.Text))
+            {
+                BattleHudFactory.CreateAdaptiveChip(chipRoot, riskChip, 24f);
+            }
 
-            Transform contentRoot = CreateInsetContentRoot(root.transform, 14f);
-            VerticalLayoutGroup layout = contentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 4f;
+            if (commitChip != null && !string.IsNullOrWhiteSpace(commitChip.Text))
+            {
+                BattleHudFactory.CreateAdaptiveChip(chipRoot, commitChip, 24f);
+            }
+        }
+    }
+
+    internal sealed class BattleSelectedUnitView
+    {
+        private GameObject rootObject;
+        private Image portraitImage;
+        private Image portraitBacking;
+        private Image hpFill;
+        private Image manaFill;
+        private Text nameLabel;
+        private Text roleLabel;
+        private Text positionLabel;
+        private Text hpLabel;
+        private Text manaLabel;
+        private Transform identityFactsRoot;
+        private Transform primaryFactsRoot;
+        private Transform chipRoot;
+        private Transform threatChipRoot;
+        private Text threatLineLabel;
+        private Text equipmentSummaryLabel;
+        private Text detailHeaderLabel;
+        private Text detailToggleLabel;
+        private Transform detailLinesRoot;
+        private GameObject detailContent;
+        private Button detailToggleButton;
+        private bool detailsExpanded;
+        private string lastBoundUnitId = string.Empty;
+
+        public Text NameLabel => nameLabel;
+
+        public void Initialize(Transform canvasRoot)
+        {
+            rootObject = BattleHudFactory.CreatePanel(
+                "SelectedUnitPanel",
+                canvasRoot,
+                new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f),
+                new Vector2(18f, 0f),
+                new Vector2(292f, 836f),
+                BattleUiTheme.PanelSurface);
+            RectTransform rootRect = rootObject.GetComponent<RectTransform>();
+            rootRect.pivot = new Vector2(0f, 0.5f);
+
+            VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 8f;
+            layout.padding = new RectOffset(16, 16, 16, 16);
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
 
-            Text titleLabel = CreateText(contentRoot, model.Title, 18, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            titleLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
-            Text statusLabel = CreateText(
-                contentRoot,
-                model.Status,
-                13,
-                FontStyle.Bold,
-                TextAnchor.MiddleLeft,
-                model.IsUnlocked
-                    ? (model.IsRecommended ? new Color(0.99f, 0.84f, 0.34f, 1f) : new Color(0.72f, 0.92f, 0.78f, 1f))
-                    : BattleUiTheme.TextMuted);
-            statusLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
-            Text descriptionLabel = CreateText(
-                contentRoot,
-                model.Description,
-                14,
-                FontStyle.Normal,
-                TextAnchor.UpperLeft,
-                model.IsUnlocked ? BattleUiTheme.TextSecondary : new Color(0.62f, 0.59f, 0.54f, 1f));
-            descriptionLabel.GetComponent<LayoutElement>().preferredHeight = 48f;
+            BattleHudFactory.CreateSectionHeader(rootObject.transform, LocalizationService.Text("ui.panel.selected", "角色戰報"));
+
+            GameObject identityPanel = BattleHudFactory.CreateInsetPanel("IdentityPanel", rootObject.transform, 176f, BattleUiTheme.PanelSelected);
+            HorizontalLayoutGroup identityLayout = identityPanel.AddComponent<HorizontalLayoutGroup>();
+            identityLayout.spacing = 12f;
+            identityLayout.padding = new RectOffset(14, 14, 14, 14);
+            identityLayout.childAlignment = TextAnchor.MiddleLeft;
+            identityLayout.childControlHeight = true;
+            identityLayout.childControlWidth = false;
+            identityLayout.childForceExpandHeight = false;
+            identityLayout.childForceExpandWidth = false;
+
+            GameObject portraitFrame = BattleHudFactory.CreatePanel(
+                "PortraitFrame",
+                identityPanel.transform,
+                new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f),
+                Vector2.zero,
+                new Vector2(104f, 104f),
+                new Color(0.16f, 0.16f, 0.15f, 1f));
+            portraitBacking = portraitFrame.GetComponent<Image>();
+            LayoutElement portraitLayout = portraitFrame.AddComponent<LayoutElement>();
+            portraitLayout.preferredWidth = 104f;
+            portraitLayout.preferredHeight = 104f;
+
+            GameObject portraitObject = new GameObject("Portrait", typeof(RectTransform), typeof(Image));
+            portraitObject.transform.SetParent(portraitFrame.transform, false);
+            RectTransform portraitRect = portraitObject.GetComponent<RectTransform>();
+            portraitRect.anchorMin = new Vector2(0.06f, 0.06f);
+            portraitRect.anchorMax = new Vector2(0.94f, 0.94f);
+            portraitRect.offsetMin = Vector2.zero;
+            portraitRect.offsetMax = Vector2.zero;
+            portraitImage = portraitObject.GetComponent<Image>();
+            portraitImage.preserveAspect = true;
+
+            GameObject textRoot = new GameObject("IdentityTextRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            textRoot.transform.SetParent(identityPanel.transform, false);
+            textRoot.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            VerticalLayoutGroup textLayout = textRoot.GetComponent<VerticalLayoutGroup>();
+            textLayout.spacing = 4f;
+            textLayout.childControlHeight = true;
+            textLayout.childControlWidth = true;
+            textLayout.childForceExpandHeight = false;
+
+            nameLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 22, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            nameLabel.GetComponent<LayoutElement>().preferredHeight = 26f;
+            BattleHudFactory.EnableBestFit(nameLabel, 16, 22, true);
+            roleLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            roleLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
+            positionLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextMuted);
+            positionLabel.GetComponent<LayoutElement>().preferredHeight = 38f;
+
+            GameObject identityFacts = new GameObject("IdentityFacts", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            identityFacts.transform.SetParent(textRoot.transform, false);
+            identityFacts.GetComponent<LayoutElement>().preferredHeight = 24f;
+            HorizontalLayoutGroup identityFactsLayout = identityFacts.GetComponent<HorizontalLayoutGroup>();
+            identityFactsLayout.spacing = 6f;
+            identityFactsLayout.childControlHeight = true;
+            identityFactsLayout.childControlWidth = false;
+            identityFactsLayout.childForceExpandHeight = false;
+            identityFactsLayout.childForceExpandWidth = false;
+            identityFactsRoot = identityFacts.transform;
+
+            GameObject vitalPanel = BattleHudFactory.CreateInsetPanel("VitalsPanel", rootObject.transform, 116f, new Color(0.16f, 0.13f, 0.1f, 0.96f));
+            Transform vitalRoot = BattleHudFactory.CreateInsetContentRoot(vitalPanel.transform, 12f);
+            VerticalLayoutGroup vitalLayout = vitalRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            vitalLayout.spacing = 6f;
+            vitalLayout.childControlHeight = true;
+            vitalLayout.childControlWidth = true;
+            vitalLayout.childForceExpandHeight = false;
+
+            hpLabel = BattleHudFactory.CreateText(vitalRoot, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            hpLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
+            GameObject hpBarRoot = new GameObject("HpBarRoot", typeof(RectTransform), typeof(LayoutElement));
+            hpBarRoot.transform.SetParent(vitalRoot, false);
+            hpBarRoot.GetComponent<LayoutElement>().preferredHeight = 14f;
+            BattleHudFactory.CreateStretchUiBar(hpBarRoot.transform, out hpFill);
+
+            manaLabel = BattleHudFactory.CreateText(vitalRoot, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            manaLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+            GameObject manaBarRoot = new GameObject("ManaBarRoot", typeof(RectTransform), typeof(LayoutElement));
+            manaBarRoot.transform.SetParent(vitalRoot, false);
+            manaBarRoot.GetComponent<LayoutElement>().preferredHeight = 12f;
+            BattleHudFactory.CreateStretchUiBar(manaBarRoot.transform, out manaFill);
+
+            GameObject primaryFactsPanel = BattleHudFactory.CreateInsetPanel("PrimaryFactsPanel", rootObject.transform, 138f, new Color(0.15f, 0.13f, 0.11f, 0.96f));
+            Transform factsContent = BattleHudFactory.CreateInsetContentRoot(primaryFactsPanel.transform, 12f);
+            VerticalLayoutGroup factLayout = factsContent.gameObject.AddComponent<VerticalLayoutGroup>();
+            factLayout.spacing = 8f;
+            factLayout.childControlHeight = true;
+            factLayout.childControlWidth = true;
+            factLayout.childForceExpandHeight = false;
+
+            Text primaryHeader = BattleHudFactory.CreateText(factsContent, LocalizationService.Text("ui.selected.primary_header", "首屏決策"), 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            primaryHeader.GetComponent<LayoutElement>().preferredHeight = 18f;
+
+            GameObject factsGrid = new GameObject("FactsGrid", typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
+            factsGrid.transform.SetParent(factsContent, false);
+            factsGrid.GetComponent<LayoutElement>().preferredHeight = 58f;
+            GridLayoutGroup gridLayout = factsGrid.GetComponent<GridLayoutGroup>();
+            gridLayout.cellSize = new Vector2(118f, 24f);
+            gridLayout.spacing = new Vector2(8f, 8f);
+            gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            gridLayout.constraintCount = 2;
+            primaryFactsRoot = factsGrid.transform;
+
+            GameObject chipRow = new GameObject("PrimaryChipRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            chipRow.transform.SetParent(factsContent, false);
+            chipRow.GetComponent<LayoutElement>().preferredHeight = 24f;
+            HorizontalLayoutGroup chipLayout = chipRow.GetComponent<HorizontalLayoutGroup>();
+            chipLayout.spacing = 6f;
+            chipLayout.childControlHeight = true;
+            chipLayout.childControlWidth = false;
+            chipLayout.childForceExpandHeight = false;
+            chipLayout.childForceExpandWidth = false;
+            chipRoot = chipRow.transform;
+
+            GameObject threatPanel = BattleHudFactory.CreateInsetPanel("ThreatPanel", rootObject.transform, 136f, BattleUiTheme.PanelCommand);
+            Transform threatRoot = BattleHudFactory.CreateInsetContentRoot(threatPanel.transform, 12f);
+            VerticalLayoutGroup threatLayout = threatRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            threatLayout.spacing = 6f;
+            threatLayout.childControlHeight = true;
+            threatLayout.childControlWidth = true;
+            threatLayout.childForceExpandHeight = false;
+
+            GameObject threatChipRow = new GameObject("ThreatChipRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            threatChipRow.transform.SetParent(threatRoot, false);
+            threatChipRow.GetComponent<LayoutElement>().preferredHeight = 24f;
+            HorizontalLayoutGroup threatChipLayout = threatChipRow.GetComponent<HorizontalLayoutGroup>();
+            threatChipLayout.spacing = 6f;
+            threatChipLayout.childControlHeight = true;
+            threatChipLayout.childControlWidth = false;
+            threatChipLayout.childForceExpandHeight = false;
+            threatChipLayout.childForceExpandWidth = false;
+            threatChipRoot = threatChipRow.transform;
+
+            threatLineLabel = BattleHudFactory.CreateText(threatRoot, string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextThreat);
+            threatLineLabel.GetComponent<LayoutElement>().preferredHeight = 42f;
+
+            equipmentSummaryLabel = BattleHudFactory.CreateText(threatRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            equipmentSummaryLabel.GetComponent<LayoutElement>().preferredHeight = 42f;
+
+            GameObject detailPanel = BattleHudFactory.CreateInsetPanel("DetailPanel", rootObject.transform, 174f, BattleUiTheme.PanelInsetStrong);
+            Transform detailRoot = BattleHudFactory.CreateInsetContentRoot(detailPanel.transform, 12f);
+            VerticalLayoutGroup detailLayout = detailRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            detailLayout.spacing = 8f;
+            detailLayout.childControlHeight = true;
+            detailLayout.childControlWidth = true;
+            detailLayout.childForceExpandHeight = false;
+
+            GameObject detailHeaderRow = new GameObject("DetailHeaderRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            detailHeaderRow.transform.SetParent(detailRoot, false);
+            detailHeaderRow.GetComponent<LayoutElement>().preferredHeight = 24f;
+            HorizontalLayoutGroup detailHeaderLayout = detailHeaderRow.GetComponent<HorizontalLayoutGroup>();
+            detailHeaderLayout.spacing = 8f;
+            detailHeaderLayout.childControlHeight = true;
+            detailHeaderLayout.childControlWidth = true;
+            detailHeaderLayout.childForceExpandHeight = false;
+            detailHeaderLayout.childForceExpandWidth = false;
+
+            detailHeaderLabel = BattleHudFactory.CreateText(detailHeaderRow.transform, string.Empty, 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            detailHeaderLabel.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            detailHeaderLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
+            detailToggleButton = BattleHudFactory.CreateButton(detailHeaderRow.transform, LocalizationService.Text("ui.selected.details_expand", "展開"), false);
+            detailToggleButton.GetComponent<LayoutElement>().preferredWidth = 92f;
+            detailToggleButton.GetComponent<LayoutElement>().preferredHeight = 28f;
+            detailToggleButton.onClick.AddListener(ToggleDetails);
+            detailToggleLabel = detailToggleButton.GetComponentInChildren<Text>();
+
+            detailContent = new GameObject("DetailContent", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            detailContent.transform.SetParent(detailRoot, false);
+            detailContent.GetComponent<LayoutElement>().preferredHeight = 126f;
+            VerticalLayoutGroup detailContentLayout = detailContent.GetComponent<VerticalLayoutGroup>();
+            detailContentLayout.spacing = 6f;
+            detailContentLayout.childControlHeight = true;
+            detailContentLayout.childControlWidth = true;
+            detailContentLayout.childForceExpandHeight = false;
+            detailLinesRoot = detailContent.transform;
+
+            SetDetailsExpanded(false);
+            Bind(new BattleSelectedUnitModel());
         }
 
-        private void CreateCampaignOptionEntry(Transform parent, CampaignOptionEntryModel model)
+        public void SetVisible(bool visible)
         {
-            GameObject root = CreateInsetPanel(
-                "CampaignOptionEntry",
-                parent,
-                model.IsPromotionOption ? 148f : 124f,
-                model.IsEnabled
-                    ? (model.IsPromotionOption
-                        ? new Color(0.15f, 0.19f, 0.12f, 0.97f)
-                        : model.IsEmphasized
-                            ? new Color(0.15f, 0.17f, 0.12f, 0.95f)
-                            : new Color(0.16f, 0.14f, 0.11f, 0.95f))
-                    : new Color(0.12f, 0.11f, 0.11f, 0.88f));
-            Button button = root.AddComponent<Button>();
-            ColorBlock colors = button.colors;
-            colors.highlightedColor = new Color(1f, 1f, 1f, 0.05f);
-            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
-            colors.disabledColor = BattleUiTheme.ButtonDisabled;
-            button.colors = colors;
-            button.interactable = model.IsEnabled && campaignOptionSelectionHandler != null;
-            button.onClick.AddListener(() => campaignOptionSelectionHandler?.Invoke(model.OptionId));
-
-            if (model.IsPromotionOption)
+            if (rootObject != null)
             {
-                GameObject accent = new GameObject("PromotionAccent", typeof(RectTransform), typeof(Image));
-                accent.transform.SetParent(root.transform, false);
-                RectTransform accentRect = accent.GetComponent<RectTransform>();
-                accentRect.anchorMin = new Vector2(0f, 0f);
-                accentRect.anchorMax = new Vector2(0f, 1f);
-                accentRect.sizeDelta = new Vector2(8f, 0f);
-                accentRect.anchoredPosition = Vector2.zero;
-                Image accentImage = accent.GetComponent<Image>();
-                accentImage.color = new Color(0.95f, 0.78f, 0.28f, 0.98f);
+                rootObject.SetActive(visible);
+            }
+        }
+
+        public void Bind(BattleSelectedUnitModel model)
+        {
+            BattleSelectedUnitModel selected = model ?? new BattleSelectedUnitModel();
+            if (!selected.HasSelection)
+            {
+                lastBoundUnitId = string.Empty;
+                SetDetailsExpanded(false);
+                portraitImage.sprite = null;
+                portraitImage.enabled = false;
+                portraitBacking.color = new Color(0.18f, 0.17f, 0.16f, 1f);
+                hpFill.fillAmount = 0f;
+                manaFill.fillAmount = 0f;
+                nameLabel.text = LocalizationService.Text("ui.selected.card_none_title", "未選擇單位");
+                roleLabel.text = string.Empty;
+                positionLabel.text = LocalizationService.Text("ui.selected.card_none_body", "請點選我方單位查看戰場檔案。");
+                hpLabel.text = string.Empty;
+                manaLabel.text = string.Empty;
+                threatLineLabel.text = string.Empty;
+                equipmentSummaryLabel.text = string.Empty;
+                detailHeaderLabel.text = LocalizationService.Text("ui.selected.details_header", "武裝與技能");
+                BattleHudFactory.DestroyChildren(identityFactsRoot);
+                BattleHudFactory.DestroyChildren(primaryFactsRoot);
+                BattleHudFactory.DestroyChildren(chipRoot);
+                BattleHudFactory.DestroyChildren(threatChipRoot);
+                BattleHudFactory.DestroyChildren(detailLinesRoot);
+                return;
             }
 
-            Transform contentRoot = CreateInsetContentRoot(root.transform, model.IsPromotionOption ? 18f : 14f);
-            VerticalLayoutGroup layout = contentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = model.IsPromotionOption ? 6f : 4f;
+            if (!string.Equals(lastBoundUnitId, selected.UnitId, StringComparison.Ordinal))
+            {
+                lastBoundUnitId = selected.UnitId;
+                SetDetailsExpanded(false);
+            }
+
+            UnitVisualProfile visualProfile = UnitVisualCatalog.GetProfile(selected.UnitId, selected.Faction, selected.Role);
+            portraitImage.enabled = true;
+            portraitImage.sprite = RuntimeSpriteLibrary.GetPortraitSprite(visualProfile);
+            portraitBacking.color = visualProfile.PortraitBackdropColor;
+            nameLabel.text = selected.DisplayName;
+            roleLabel.text = selected.RoleLabel;
+            positionLabel.text = string.Join(
+                "\n",
+                new[] { selected.PositionLabel, selected.TerrainName }
+                    .Where(line => !string.IsNullOrWhiteSpace(line)));
+            hpLabel.text = LocalizationService.Format("ui.label.hp_value", "HP {0}/{1}", selected.CurrentHp, selected.MaxHp);
+            hpFill.fillAmount = selected.MaxHp <= 0 ? 0f : (float)selected.CurrentHp / selected.MaxHp;
+            hpFill.color = hpFill.fillAmount > 0.55f
+                ? new Color(0.39f, 0.81f, 0.42f, 1f)
+                : hpFill.fillAmount > 0.3f
+                    ? new Color(0.91f, 0.74f, 0.22f, 1f)
+                    : new Color(0.88f, 0.35f, 0.28f, 1f);
+            manaLabel.text = LocalizationService.Format("ui.label.mana_value", "士氣 {0}/{1}", selected.CurrentMana, selected.MaxMana);
+            manaFill.fillAmount = selected.MaxMana <= 0 ? 0f : (float)selected.CurrentMana / selected.MaxMana;
+            manaFill.color = manaFill.fillAmount > 0.55f
+                ? new Color(0.38f, 0.78f, 0.95f, 1f)
+                : manaFill.fillAmount > 0.3f
+                    ? new Color(0.46f, 0.66f, 0.98f, 1f)
+                    : new Color(0.52f, 0.42f, 0.85f, 1f);
+            threatLineLabel.text = selected.ThreatLine;
+            equipmentSummaryLabel.text = selected.EquipmentSummary;
+            detailHeaderLabel.text = string.IsNullOrWhiteSpace(selected.DetailHeader)
+                ? LocalizationService.Text("ui.selected.details_header", "武裝與技能")
+                : selected.DetailHeader;
+
+            RebuildFacts(identityFactsRoot, selected.IdentityFacts, 106f, 22f);
+            RebuildFacts(primaryFactsRoot, selected.PrimaryFacts.Count > 0 ? selected.PrimaryFacts : selected.CombatFacts, 116f, 24f);
+            RebuildChips(chipRoot, selected.PrimaryChips.Count > 0 ? selected.PrimaryChips : selected.StatusPills, 22f);
+            BattleHudFactory.DestroyChildren(threatChipRoot);
+            if (selected.ThreatChip != null && !string.IsNullOrWhiteSpace(selected.ThreatChip.Text))
+            {
+                BattleHudFactory.CreateAdaptiveChip(threatChipRoot, selected.ThreatChip, 24f);
+            }
+
+            BattleHudFactory.DestroyChildren(detailLinesRoot);
+            foreach (string line in (selected.DetailLines ?? Array.Empty<string>()).Where(line => !string.IsNullOrWhiteSpace(line)))
+            {
+                Text detailLabel = BattleHudFactory.CreateText(detailLinesRoot, line, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+                detailLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
+            }
+        }
+
+        private void RebuildFacts(Transform root, IReadOnlyList<HudFactModel> facts, float width, float height)
+        {
+            BattleHudFactory.DestroyChildren(root);
+            if (facts == null)
+            {
+                return;
+            }
+
+            foreach (HudFactModel fact in facts.Where(fact => fact != null && !string.IsNullOrWhiteSpace(fact.Value)).Take(4))
+            {
+                BattleHudFactory.CreateFactCard(root, fact, width, height);
+            }
+        }
+
+        private void RebuildChips(Transform root, IReadOnlyList<HudChipModel> chips, float height)
+        {
+            BattleHudFactory.DestroyChildren(root);
+            if (chips == null)
+            {
+                return;
+            }
+
+            foreach (HudChipModel chip in chips.Where(chip => chip != null && !string.IsNullOrWhiteSpace(chip.Text)).Take(4))
+            {
+                BattleHudFactory.CreateAdaptiveChip(root, chip, height);
+            }
+        }
+
+        private void ToggleDetails()
+        {
+            SetDetailsExpanded(!detailsExpanded);
+        }
+
+        private void SetDetailsExpanded(bool expanded)
+        {
+            detailsExpanded = expanded;
+            if (detailContent != null)
+            {
+                detailContent.SetActive(expanded);
+            }
+
+            if (detailToggleLabel != null)
+            {
+                detailToggleLabel.text = expanded
+                    ? LocalizationService.Text("ui.selected.details_collapse", "收合")
+                    : LocalizationService.Text("ui.selected.details_expand", "展開");
+            }
+        }
+    }
+
+    internal sealed class BattleRosterSidebarView
+    {
+        private readonly List<RosterEntryView> alliedRosterViews = new List<RosterEntryView>();
+        private readonly List<RosterEntryView> enemyRosterViews = new List<RosterEntryView>();
+        private readonly List<Text> feedLabels = new List<Text>();
+
+        private GameObject rootObject;
+        private Action<string> rosterSelectionHandler;
+        private Text stageLabel;
+        private Text seedLabel;
+        private Text phaseLabel;
+        private Text turnLabel;
+        private Text playerAliveLabel;
+        private Text enemyAliveLabel;
+        private Text readyLabel;
+        private Text skillReadyLabel;
+        private Text objectivePrimaryLabel;
+        private Text objectiveFailureLabel;
+        private Text instructionLabel;
+        private Text secondaryInstructionLabel;
+        private Button endTurnButton;
+        private Button rerollButton;
+        private GameObject rerollButtonObject;
+        private Transform alliedRosterRoot;
+        private Transform enemyRosterRoot;
+        private TabButtonView alliedTabView;
+        private TabButtonView enemyTabView;
+        private TabButtonView feedTabView;
+        private GameObject alliedTabContent;
+        private GameObject enemyTabContent;
+        private GameObject feedTabContent;
+        private string activeOverviewTab = "allies";
+        private int feedLimit;
+
+        public bool IsRerollVisible => rerollButtonObject != null && rerollButtonObject.activeSelf;
+
+        public string CurrentObjectiveText => objectivePrimaryLabel != null ? objectivePrimaryLabel.text : string.Empty;
+
+        public void Initialize(Transform canvasRoot, Action onEndTurn, Action onReroll, int feedLimit)
+        {
+            this.feedLimit = Mathf.Max(1, feedLimit);
+
+            rootObject = BattleHudFactory.CreatePanel(
+                "OverviewPanel",
+                canvasRoot,
+                new Vector2(1f, 0.5f),
+                new Vector2(1f, 0.5f),
+                new Vector2(-18f, 0f),
+                new Vector2(318f, 836f),
+                BattleUiTheme.PanelSurface);
+            RectTransform rightRect = rootObject.GetComponent<RectTransform>();
+            rightRect.pivot = new Vector2(1f, 0.5f);
+
+            VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 8f;
+            layout.padding = new RectOffset(16, 16, 16, 16);
             layout.childControlHeight = true;
             layout.childControlWidth = true;
             layout.childForceExpandHeight = false;
 
-            Text titleLabel = CreateText(contentRoot, model.Title, model.IsPromotionOption ? 22 : 19, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            titleLabel.GetComponent<LayoutElement>().preferredHeight = model.IsPromotionOption ? 30f : 26f;
-            Text statusLabel = CreateText(
-                contentRoot,
-                model.Status,
-                model.IsPromotionOption ? 16 : 14,
-                FontStyle.Bold,
-                TextAnchor.MiddleLeft,
-                model.IsEnabled
-                    ? (model.IsPromotionOption
-                        ? new Color(0.99f, 0.84f, 0.34f, 1f)
-                        : model.IsEmphasized
-                            ? new Color(0.99f, 0.84f, 0.34f, 1f)
-                            : new Color(0.72f, 0.92f, 0.78f, 1f))
-                    : BattleUiTheme.TextMuted);
-            statusLabel.GetComponent<LayoutElement>().preferredHeight = model.IsPromotionOption ? 22f : 18f;
-            Text descriptionLabel = CreateText(
-                contentRoot,
-                model.Description,
-                model.IsPromotionOption ? 16 : 15,
-                FontStyle.Normal,
-                TextAnchor.UpperLeft,
-                model.IsEnabled ? BattleUiTheme.TextPrimary : new Color(0.62f, 0.59f, 0.54f, 1f));
-            descriptionLabel.GetComponent<LayoutElement>().preferredHeight = model.IsPromotionOption ? 74f : 56f;
+            BattleHudFactory.CreateSectionHeader(rootObject.transform, LocalizationService.Text("ui.panel.overview", "戰況總覽"));
+
+            GameObject summaryPanel = BattleHudFactory.CreateInsetPanel("OverviewSummaryPanel", rootObject.transform, 142f, BattleUiTheme.PanelInsetStrong);
+            Transform summaryRoot = BattleHudFactory.CreateInsetContentRoot(summaryPanel.transform, 10f);
+            VerticalLayoutGroup summaryLayout = summaryRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            summaryLayout.spacing = 4f;
+            summaryLayout.childControlHeight = true;
+            summaryLayout.childControlWidth = true;
+            summaryLayout.childForceExpandHeight = false;
+
+            stageLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 20, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            stageLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
+            stageLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            seedLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            seedLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            seedLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            phaseLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            phaseLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
+            phaseLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            turnLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 13, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
+            turnLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+            turnLabel.verticalOverflow = VerticalWrapMode.Truncate;
+
+            GameObject factGrid = new GameObject("FactGrid", typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
+            factGrid.transform.SetParent(summaryRoot, false);
+            factGrid.GetComponent<LayoutElement>().preferredHeight = 52f;
+            GridLayoutGroup factLayout = factGrid.GetComponent<GridLayoutGroup>();
+            factLayout.cellSize = new Vector2(128f, 22f);
+            factLayout.spacing = new Vector2(6f, 6f);
+            factLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            factLayout.constraintCount = 2;
+            playerAliveLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.62f, 0.8f, 1f, 1f));
+            enemyAliveLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.66f, 0.58f, 1f));
+            readyLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.93f, 0.95f, 0.87f, 1f));
+            skillReadyLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            playerAliveLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            enemyAliveLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            readyLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            skillReadyLabel.verticalOverflow = VerticalWrapMode.Truncate;
+
+            GameObject objectivePanel = BattleHudFactory.CreateInsetPanel("ObjectivePanel", rootObject.transform, 112f, BattleUiTheme.PanelCommand);
+            Transform objectiveRoot = BattleHudFactory.CreateInsetContentRoot(objectivePanel.transform, 12f);
+            VerticalLayoutGroup objectiveLayout = objectiveRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            objectiveLayout.spacing = 5f;
+            objectiveLayout.childControlHeight = true;
+            objectiveLayout.childControlWidth = true;
+            objectiveLayout.childForceExpandHeight = false;
+            objectivePrimaryLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 14, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            objectivePrimaryLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
+            objectivePrimaryLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            objectiveFailureLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
+            objectiveFailureLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+            objectiveFailureLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            instructionLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            instructionLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
+            instructionLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            secondaryInstructionLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.78f, 0.88f, 0.98f, 1f));
+            secondaryInstructionLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            secondaryInstructionLabel.verticalOverflow = VerticalWrapMode.Truncate;
+
+            GameObject commandRow = new GameObject("CommandRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            commandRow.transform.SetParent(rootObject.transform, false);
+            commandRow.GetComponent<LayoutElement>().preferredHeight = 46f;
+            HorizontalLayoutGroup commandLayout = commandRow.GetComponent<HorizontalLayoutGroup>();
+            commandLayout.spacing = 10f;
+            commandLayout.childAlignment = TextAnchor.MiddleRight;
+            commandLayout.childControlHeight = true;
+            commandLayout.childControlWidth = true;
+            commandLayout.childForceExpandHeight = true;
+            commandLayout.childForceExpandWidth = false;
+            endTurnButton = BattleHudFactory.CreateButton(commandRow.transform, LocalizationService.Text("ui.button.end_turn", "結束回合"), true);
+            endTurnButton.onClick.AddListener(() => onEndTurn?.Invoke());
+            LayoutElement endTurnLayout = endTurnButton.GetComponent<LayoutElement>();
+            endTurnLayout.preferredWidth = 138f;
+            endTurnLayout.flexibleWidth = 0f;
+            rerollButton = BattleHudFactory.CreateButton(commandRow.transform, LocalizationService.Text("ui.button.reroll", "重擲"), false);
+            rerollButtonObject = rerollButton.gameObject;
+            rerollButton.onClick.AddListener(() => onReroll?.Invoke());
+            LayoutElement rerollLayout = rerollButton.GetComponent<LayoutElement>();
+            rerollLayout.preferredWidth = 112f;
+            rerollLayout.flexibleWidth = 0f;
+
+            GameObject contentPanel = BattleHudFactory.CreateInsetPanel("OverviewContentPanel", rootObject.transform, 0f, new Color(0.11f, 0.12f, 0.14f, 0.92f));
+            LayoutElement contentPanelLayout = contentPanel.GetComponent<LayoutElement>();
+            contentPanelLayout.flexibleHeight = 1f;
+            Transform contentRoot = BattleHudFactory.CreateInsetContentRoot(contentPanel.transform, 10f);
+            VerticalLayoutGroup contentLayout = contentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 8f;
+            contentLayout.childControlHeight = true;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+
+            GameObject tabRow = new GameObject("TabRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            tabRow.transform.SetParent(contentRoot, false);
+            tabRow.GetComponent<LayoutElement>().preferredHeight = 28f;
+            HorizontalLayoutGroup tabLayout = tabRow.GetComponent<HorizontalLayoutGroup>();
+            tabLayout.spacing = 8f;
+            tabLayout.childControlHeight = true;
+            tabLayout.childControlWidth = true;
+            tabLayout.childForceExpandHeight = false;
+            tabLayout.childForceExpandWidth = true;
+            alliedTabView = BattleHudFactory.CreateTabButton(tabRow.transform, LocalizationService.Text("ui.panel.allies.count", "友軍"));
+            enemyTabView = BattleHudFactory.CreateTabButton(tabRow.transform, LocalizationService.Text("ui.panel.enemies.count", "敵軍"));
+            feedTabView = BattleHudFactory.CreateTabButton(tabRow.transform, LocalizationService.Text("ui.panel.feed", "戰報"));
+            alliedTabView.Button.onClick.AddListener(() => SetOverviewTab("allies"));
+            enemyTabView.Button.onClick.AddListener(() => SetOverviewTab("enemies"));
+            feedTabView.Button.onClick.AddListener(() => SetOverviewTab("feed"));
+
+            alliedTabContent = BuildTabContent(contentRoot, "AlliedRosterPanel", out alliedRosterRoot);
+            enemyTabContent = BuildTabContent(contentRoot, "EnemyRosterPanel", out enemyRosterRoot);
+            feedTabContent = BuildTabContent(contentRoot, "FeedPanel", out Transform feedRoot);
+            for (int index = 0; index < this.feedLimit; index++)
+            {
+                Text feedLabel = BattleHudFactory.CreateText(feedRoot, index == 0 ? LocalizationService.Text("ui.feed.empty", "目前還沒有新的戰場紀錄。") : string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+                feedLabel.GetComponent<LayoutElement>().preferredHeight = 28f;
+                feedLabel.verticalOverflow = VerticalWrapMode.Truncate;
+                feedLabels.Add(feedLabel);
+            }
+
+            SetOverviewTab("allies");
         }
 
-        private void ConfigureCampaignButtons(string primaryLabel, string secondaryLabel)
+        public void SetVisible(bool visible)
         {
-            bool hasPrimary = !string.IsNullOrWhiteSpace(primaryLabel);
-            bool hasSecondary = !string.IsNullOrWhiteSpace(secondaryLabel);
-            campaignPrimaryButton.gameObject.SetActive(hasPrimary);
-            campaignSecondaryButton.gameObject.SetActive(hasSecondary);
-
-            if (hasPrimary)
+            if (rootObject != null)
             {
-                SetButtonLabel(campaignPrimaryButton, primaryLabel);
+                rootObject.SetActive(visible);
+            }
+        }
+
+        public void BindOverview(BattleOverviewModel model)
+        {
+            BattleOverviewModel overview = model ?? new BattleOverviewModel();
+            stageLabel.text = overview.StageLabel;
+            seedLabel.text = overview.SeedLabel;
+            phaseLabel.text = overview.PhaseLabel;
+            turnLabel.text = overview.TurnLabel;
+            playerAliveLabel.text = overview.PlayerAliveLabel;
+            enemyAliveLabel.text = overview.EnemyAliveLabel;
+            readyLabel.text = overview.ReadyLabel;
+            skillReadyLabel.text = overview.SkillReadyLabel;
+            objectivePrimaryLabel.text = overview.ObjectivePrimary;
+            objectiveFailureLabel.text = overview.ObjectiveFailure;
+            instructionLabel.text = overview.InstructionText;
+            secondaryInstructionLabel.text = overview.SecondaryInstructionText;
+            secondaryInstructionLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(overview.SecondaryInstructionText));
+        }
+
+        public void BindRoster(IReadOnlyList<BattleRosterEntryModel> alliedRoster, IReadOnlyList<BattleRosterEntryModel> enemyRoster, Action<string> onRosterSelected)
+        {
+            rosterSelectionHandler = onRosterSelected;
+            BindRosterGroup(alliedRosterRoot, alliedRosterViews, alliedRoster);
+            BindRosterGroup(enemyRosterRoot, enemyRosterViews, enemyRoster);
+            UpdateOverviewTabLabels(alliedRoster != null ? alliedRoster.Count : 0, enemyRoster != null ? enemyRoster.Count : 0);
+        }
+
+        public void BindFeed(IReadOnlyList<string> entries)
+        {
+            for (int index = 0; index < feedLabels.Count; index++)
+            {
+                feedLabels[index].text = entries != null && index < entries.Count
+                    ? entries[index]
+                    : index == 0
+                        ? LocalizationService.Text("ui.feed.empty", "目前還沒有新的戰場紀錄。")
+                        : string.Empty;
+            }
+        }
+
+        public void SetEndTurnEnabled(bool enabled)
+        {
+            if (endTurnButton != null)
+            {
+                endTurnButton.interactable = enabled;
+            }
+        }
+
+        public void SetRerollEnabled(bool enabled)
+        {
+            if (rerollButtonObject != null)
+            {
+                rerollButtonObject.SetActive(enabled);
             }
 
-            if (hasSecondary)
+            if (rerollButton != null)
             {
-                SetButtonLabel(campaignSecondaryButton, secondaryLabel);
+                rerollButton.interactable = enabled;
             }
+        }
+
+        private static GameObject BuildTabContent(Transform parent, string name, out Transform contentRoot)
+        {
+            GameObject root = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(ScrollRect), typeof(LayoutElement));
+            root.transform.SetParent(parent, false);
+            LayoutElement layout = root.GetComponent<LayoutElement>();
+            layout.flexibleHeight = 1f;
+            Image rootImage = root.GetComponent<Image>();
+            rootImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            rootImage.color = new Color(1f, 1f, 1f, 0.02f);
+
+            ScrollRect scrollRect = root.GetComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.scrollSensitivity = 24f;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+
+            GameObject viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            viewport.transform.SetParent(root.transform, false);
+            RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = Vector2.zero;
+            viewportRect.offsetMax = Vector2.zero;
+            Image viewportImage = viewport.GetComponent<Image>();
+            viewportImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            viewportImage.color = new Color(1f, 1f, 1f, 0.01f);
+            viewport.GetComponent<Mask>().showMaskGraphic = false;
+
+            GameObject content = new GameObject("ContentRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            content.transform.SetParent(viewport.transform, false);
+            RectTransform contentRect = content.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.offsetMin = Vector2.zero;
+            contentRect.offsetMax = Vector2.zero;
+            VerticalLayoutGroup verticalLayout = content.GetComponent<VerticalLayoutGroup>();
+            verticalLayout.spacing = 6f;
+            verticalLayout.childControlHeight = true;
+            verticalLayout.childControlWidth = true;
+            verticalLayout.childForceExpandHeight = false;
+            verticalLayout.childForceExpandWidth = true;
+            ContentSizeFitter fitter = content.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scrollRect.viewport = viewportRect;
+            scrollRect.content = contentRect;
+            contentRoot = content.transform;
+            return root;
+        }
+
+        private void SetOverviewTab(string tabId)
+        {
+            activeOverviewTab = string.IsNullOrWhiteSpace(tabId) ? "allies" : tabId;
+            alliedTabContent.SetActive(string.Equals(activeOverviewTab, "allies", StringComparison.Ordinal));
+            enemyTabContent.SetActive(string.Equals(activeOverviewTab, "enemies", StringComparison.Ordinal));
+            feedTabContent.SetActive(string.Equals(activeOverviewTab, "feed", StringComparison.Ordinal));
+            RefreshTabView(alliedTabView, string.Equals(activeOverviewTab, "allies", StringComparison.Ordinal));
+            RefreshTabView(enemyTabView, string.Equals(activeOverviewTab, "enemies", StringComparison.Ordinal));
+            RefreshTabView(feedTabView, string.Equals(activeOverviewTab, "feed", StringComparison.Ordinal));
+        }
+
+        private void UpdateOverviewTabLabels(int alliedCount, int enemyCount)
+        {
+            alliedTabView.Label.text = LocalizationService.Format("ui.panel.allies.count", "友軍 {0}", alliedCount);
+            enemyTabView.Label.text = LocalizationService.Format("ui.panel.enemies.count", "敵軍 {0}", enemyCount);
+            feedTabView.Label.text = LocalizationService.Text("ui.panel.feed", "戰報");
+        }
+
+        private static void RefreshTabView(TabButtonView view, bool isActive)
+        {
+            if (view == null)
+            {
+                return;
+            }
+
+            view.Background.color = isActive ? BattleUiTheme.TabActive : BattleUiTheme.TabIdle;
+            view.Label.color = isActive ? BattleUiTheme.TabActiveText : BattleUiTheme.TabIdleText;
+            view.Outline.effectColor = isActive ? BattleUiTheme.Divider : BattleUiTheme.DividerSoft;
         }
 
         private void BindRosterGroup(Transform root, List<RosterEntryView> views, IReadOnlyList<BattleRosterEntryModel> models)
@@ -1092,8 +1221,7 @@ namespace PhalanxChronicle.UI
                     continue;
                 }
 
-                BattleRosterEntryModel model = models[index];
-                BindRosterEntry(views[index], model);
+                BindRosterEntry(views[index], models[index]);
             }
         }
 
@@ -1103,11 +1231,9 @@ namespace PhalanxChronicle.UI
             view.NameLabel.text = model.DisplayName;
             view.RoleLabel.text = model.RoleShortLabel;
             view.PositionLabel.text = model.PositionLabel;
-            view.StateLabel.text = model.StatusLabel;
-            view.SkillLabel.text = model.SkillLabel;
             view.HpLabel.text = model.IsAlive
                 ? LocalizationService.Format("ui.label.hp_value", "HP {0}/{1}", model.CurrentHp, model.MaxHp)
-                : LocalizationService.Text("ui.roster.defeated", "Defeated");
+                : LocalizationService.Text("ui.roster.defeated", "已擊破");
             view.HpFill.fillAmount = model.IsAlive && model.MaxHp > 0 ? (float)model.CurrentHp / model.MaxHp : 0f;
             view.HpFill.color = model.IsAlive
                 ? (view.HpFill.fillAmount > 0.55f
@@ -1116,34 +1242,31 @@ namespace PhalanxChronicle.UI
                         ? new Color(0.91f, 0.74f, 0.22f, 1f)
                         : new Color(0.88f, 0.35f, 0.28f, 1f))
                 : new Color(0.42f, 0.42f, 0.45f, 1f);
-
             view.RoleLabel.color = model.Faction == UnitFaction.Player
                 ? new Color(0.95f, 0.88f, 0.62f, 1f)
                 : new Color(0.99f, 0.78f, 0.58f, 1f);
-            view.PositionLabel.color = model.IsAlive
-                ? new Color(0.82f, 0.84f, 0.88f, 1f)
-                : BattleUiTheme.TextMuted;
-            view.StateLabel.color = !model.IsAlive
-                ? BattleUiTheme.TextMuted
-                : model.HasActed
-                    ? new Color(0.86f, 0.82f, 0.72f, 1f)
-                    : new Color(0.76f, 0.94f, 0.8f, 1f);
-            view.SkillLabel.color = !model.IsAlive
-                ? BattleUiTheme.TextMuted
-                : model.CanUseSkill
-                    ? new Color(0.81f, 0.9f, 1f, 1f)
-                    : new Color(0.72f, 0.74f, 0.8f, 1f);
-            view.Accent.color = model.IsSelected
+            view.PositionLabel.color = model.IsAlive ? new Color(0.82f, 0.84f, 0.88f, 1f) : BattleUiTheme.TextMuted;
+
+            Color accentColor = model.IsSelected
                 ? new Color(0.98f, 0.86f, 0.4f, 0.98f)
                 : model.IsThreateningSelection
                     ? new Color(0.95f, 0.52f, 0.38f, 0.95f)
-                    : model.Faction == UnitFaction.Player
-                        ? new Color(0.43f, 0.69f, 0.98f, 0.95f)
-                        : new Color(0.95f, 0.44f, 0.35f, 0.95f);
+                    : model.IsExposed
+                        ? new Color(0.96f, 0.62f, 0.34f, 0.95f)
+                        : model.IsLowHp
+                            ? new Color(0.94f, 0.42f, 0.32f, 0.95f)
+                            : model.Faction == UnitFaction.Player
+                                ? new Color(0.43f, 0.69f, 0.98f, 0.95f)
+                                : new Color(0.95f, 0.44f, 0.35f, 0.95f);
+            view.Accent.color = accentColor;
 
             Color baseColor = model.Faction == UnitFaction.Player
                 ? new Color(0.1f, 0.16f, 0.25f, model.IsAlive ? 0.95f : 0.68f)
                 : new Color(0.24f, 0.1f, 0.1f, model.IsAlive ? 0.95f : 0.68f);
+            if (model.IsExposed && model.IsAlive)
+            {
+                baseColor = Color.Lerp(baseColor, new Color(0.36f, 0.16f, 0.1f, baseColor.a), 0.5f);
+            }
             if (model.HasActed && model.IsAlive)
             {
                 baseColor *= new Color(0.82f, 0.82f, 0.82f, 1f);
@@ -1155,131 +1278,134 @@ namespace PhalanxChronicle.UI
                 : model.IsThreateningSelection
                     ? new Color(0.95f, 0.52f, 0.38f, 0.9f)
                     : new Color(0.38f, 0.31f, 0.24f, 0.75f);
+            BindTagChip(view.PrimaryTagView, model.PrimaryTag);
+            BindTagChip(view.SecondaryTagView, model.SecondaryTag);
+
             view.Button.interactable = model.IsAlive;
             view.Button.onClick.RemoveAllListeners();
             view.Button.onClick.AddListener(() => rosterSelectionHandler?.Invoke(view.UnitId));
         }
 
-        private void RefreshFeed()
+        private static void BindTagChip(TagChipView view, BattleRosterTag? tag)
         {
-            for (int index = 0; index < feedLabels.Count; index++)
+            if (view == null)
             {
-                feedLabels[index].text = index < feedEntries.Count
-                    ? feedEntries[index]
-                    : index == 0
-                        ? LocalizationService.Text("ui.feed.empty", "No battle events yet.")
-                        : string.Empty;
+                return;
+            }
+
+            if (!tag.HasValue)
+            {
+                view.Root.SetActive(false);
+                return;
+            }
+
+            view.Root.SetActive(true);
+            view.Label.text = GetRosterTagText(tag.Value);
+            switch (tag.Value)
+            {
+                case BattleRosterTag.Exposed:
+                    view.Background.color = BattleUiTheme.ChipWarning;
+                    view.Label.color = BattleUiTheme.TextPrimary;
+                    break;
+                case BattleRosterTag.Threatening:
+                    view.Background.color = new Color(0.31f, 0.18f, 0.14f, 0.96f);
+                    view.Label.color = new Color(1f, 0.88f, 0.74f, 1f);
+                    break;
+                case BattleRosterTag.SkillReady:
+                    view.Background.color = BattleUiTheme.ChipInfo;
+                    view.Label.color = BattleUiTheme.TextPrimary;
+                    break;
+                case BattleRosterTag.LowHp:
+                    view.Background.color = new Color(0.26f, 0.18f, 0.12f, 0.96f);
+                    view.Label.color = BattleUiTheme.TextPrimary;
+                    break;
+                case BattleRosterTag.Done:
+                    view.Background.color = BattleUiTheme.ChipNeutral;
+                    view.Label.color = BattleUiTheme.TextMuted;
+                    break;
+                default:
+                    view.Background.color = BattleUiTheme.ChipPositive;
+                    view.Label.color = BattleUiTheme.TextPrimary;
+                    break;
             }
         }
 
-        private BattleForecastModel BuildNeutralForecastModel()
+        private static string GetRosterTagText(BattleRosterTag tag)
         {
-            string latestFeed = feedEntries.Count > 0
-                ? feedEntries[0]
-                : LocalizationService.Text("ui.feed.empty", "No battle events yet.");
-            string detail = string.IsNullOrEmpty(currentOverview.ObjectivePrimary)
-                ? latestFeed
-                : currentOverview.ObjectivePrimary;
-            string footer = string.IsNullOrEmpty(currentOverview.InstructionText)
-                ? latestFeed
-                : currentOverview.InstructionText;
-
-            return new BattleForecastModel
+            switch (tag)
             {
-                Header = string.IsNullOrEmpty(currentOverview.StageLabel)
-                    ? LocalizationService.Text("ui.panel.forecast", "Battle Forecast")
-                    : currentOverview.StageLabel,
-                Title = string.IsNullOrEmpty(currentOverview.PhaseLabel)
-                    ? LocalizationService.Text("ui.forecast.neutral.title", "Awaiting Orders")
-                    : currentOverview.PhaseLabel,
-                Summary = string.IsNullOrEmpty(currentOverview.TurnLabel)
-                    ? LocalizationService.Text("ui.forecast.neutral.summary", "Review the field and choose your next move.")
-                    : currentOverview.TurnLabel,
-                Detail = detail,
-                Footer = footer,
-                AccentColor = new Color(0.78f, 0.62f, 0.28f, 1f),
-            };
-        }
-
-        private void ApplyForecastModel(BattleForecastModel model)
-        {
-            forecastHeaderLabel.text = model.Header;
-            forecastTitleLabel.text = model.Title;
-            forecastSummaryLabel.text = model.Summary;
-            forecastDetailLabel.text = model.Detail;
-            forecastFooterLabel.text = model.Footer;
-            forecastAccentImage.color = model.AccentColor;
-        }
-
-        private static Transform CreateRosterRoot(Transform parent)
-        {
-            parent.gameObject.name = "RosterContent";
-            VerticalLayoutGroup layout = parent.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 8f;
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            return parent;
+                case BattleRosterTag.Ready:
+                    return LocalizationService.Text("ui.roster.ready", "可動");
+                case BattleRosterTag.Done:
+                    return LocalizationService.Text("ui.roster.done", "已動");
+                case BattleRosterTag.SkillReady:
+                    return LocalizationService.Text("ui.roster.skill_ready", "技能可用");
+                case BattleRosterTag.Threatening:
+                    return LocalizationService.Text("ui.roster.threatening", "威脅");
+                case BattleRosterTag.LowHp:
+                    return LocalizationService.Text("ui.roster.low_hp", "危急");
+                case BattleRosterTag.Exposed:
+                    return LocalizationService.Text("ui.threat.exposed_short", "暴露");
+                default:
+                    return tag.ToString();
+            }
         }
 
         private static RosterEntryView CreateRosterEntryView(Transform parent)
         {
-            GameObject rootObject = CreatePanel(
+            GameObject rootObject = BattleHudFactory.CreatePanel(
                 "RosterEntry",
                 parent,
-                new Vector2(0f, 0.5f),
-                new Vector2(1f, 0.5f),
                 Vector2.zero,
-                new Vector2(0f, 70f),
-                new Color(0.11f, 0.17f, 0.27f, 0.95f));
-            RectTransform rootRect = rootObject.GetComponent<RectTransform>();
-            rootRect.pivot = new Vector2(0.5f, 0.5f);
-            rootObject.AddComponent<LayoutElement>().preferredHeight = 70f;
-
-            Image background = rootObject.GetComponent<Image>();
-            background.sprite = RuntimeSpriteLibrary.WhiteSprite;
-            Outline outline = rootObject.AddComponent<Outline>();
-            outline.effectDistance = new Vector2(1.5f, -1.5f);
-            outline.effectColor = new Color(0.38f, 0.31f, 0.24f, 0.75f);
+                Vector2.one,
+                Vector2.zero,
+                new Vector2(0f, 76f),
+                new Color(0.14f, 0.16f, 0.2f, 0.94f));
+            LayoutElement rootLayout = rootObject.AddComponent<LayoutElement>();
+            rootLayout.preferredHeight = 76f;
 
             Button button = rootObject.AddComponent<Button>();
             ColorBlock colors = button.colors;
-            colors.highlightedColor = new Color(1f, 1f, 1f, 0.06f);
-            colors.pressedColor = new Color(1f, 1f, 1f, 0.1f);
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.04f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
+            colors.disabledColor = new Color(0.65f, 0.65f, 0.68f, 0.85f);
             button.colors = colors;
+
+            Image background = rootObject.GetComponent<Image>();
+            Outline outline = rootObject.AddComponent<Outline>();
+            outline.effectDistance = new Vector2(1f, -1f);
+            outline.effectColor = BattleUiTheme.DividerSoft;
 
             GameObject accentObject = new GameObject("Accent", typeof(RectTransform), typeof(Image));
             accentObject.transform.SetParent(rootObject.transform, false);
             RectTransform accentRect = accentObject.GetComponent<RectTransform>();
             accentRect.anchorMin = new Vector2(0f, 0f);
             accentRect.anchorMax = new Vector2(0f, 1f);
-            accentRect.sizeDelta = new Vector2(6f, 0f);
+            accentRect.sizeDelta = new Vector2(4f, 0f);
             accentRect.anchoredPosition = Vector2.zero;
-            Image accent = accentObject.GetComponent<Image>();
-            accent.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            Image accentImage = accentObject.GetComponent<Image>();
+            accentImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
 
             GameObject contentRoot = new GameObject("Content", typeof(RectTransform), typeof(HorizontalLayoutGroup));
             contentRoot.transform.SetParent(rootObject.transform, false);
             RectTransform contentRect = contentRoot.GetComponent<RectTransform>();
             contentRect.anchorMin = Vector2.zero;
             contentRect.anchorMax = Vector2.one;
-            contentRect.offsetMin = new Vector2(14f, 7f);
-            contentRect.offsetMax = new Vector2(-12f, -7f);
-
+            contentRect.offsetMin = new Vector2(10f, 8f);
+            contentRect.offsetMax = new Vector2(-10f, -8f);
             HorizontalLayoutGroup contentLayout = contentRoot.GetComponent<HorizontalLayoutGroup>();
             contentLayout.spacing = 10f;
+            contentLayout.childAlignment = TextAnchor.MiddleLeft;
             contentLayout.childControlHeight = true;
             contentLayout.childControlWidth = true;
             contentLayout.childForceExpandHeight = false;
             contentLayout.childForceExpandWidth = false;
-            contentLayout.childAlignment = TextAnchor.MiddleLeft;
 
             GameObject textColumn = new GameObject("TextColumn", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
             textColumn.transform.SetParent(contentRoot.transform, false);
-            LayoutElement textLayoutElement = textColumn.GetComponent<LayoutElement>();
-            textLayoutElement.flexibleWidth = 1f;
+            textColumn.GetComponent<LayoutElement>().flexibleWidth = 1f;
             VerticalLayoutGroup textLayout = textColumn.GetComponent<VerticalLayoutGroup>();
-            textLayout.spacing = 2f;
+            textLayout.spacing = 3f;
             textLayout.childControlHeight = true;
             textLayout.childControlWidth = true;
             textLayout.childForceExpandHeight = false;
@@ -1294,198 +1420,628 @@ namespace PhalanxChronicle.UI
             topLayout.childForceExpandHeight = false;
             topLayout.childForceExpandWidth = false;
 
-            Text nameLabel = CreateText(topRow.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            EnableBestFit(nameLabel, 12, 15, true);
+            Text nameLabel = BattleHudFactory.CreateText(topRow.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
             nameLabel.GetComponent<LayoutElement>().flexibleWidth = 1f;
-            nameLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
-            Text roleLabel = CreateText(topRow.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextGold);
-            EnableBestFit(roleLabel, 10, 12, true);
-            roleLabel.GetComponent<LayoutElement>().preferredWidth = 42f;
-            roleLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+            nameLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            Text roleLabel = BattleHudFactory.CreateText(topRow.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextGold);
+            roleLabel.GetComponent<LayoutElement>().preferredWidth = 56f;
+            roleLabel.verticalOverflow = VerticalWrapMode.Truncate;
 
-            Text positionLabel = CreateText(textColumn.transform, string.Empty, 11, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
-            EnableBestFit(positionLabel, 10, 11, true);
-            positionLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
+            Text positionLabel = BattleHudFactory.CreateText(textColumn.transform, string.Empty, 11, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
+            positionLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            positionLabel.verticalOverflow = VerticalWrapMode.Truncate;
 
             GameObject tagRow = new GameObject("TagRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             tagRow.transform.SetParent(textColumn.transform, false);
-            tagRow.GetComponent<LayoutElement>().preferredHeight = 16f;
+            tagRow.GetComponent<LayoutElement>().preferredHeight = 22f;
             HorizontalLayoutGroup tagLayout = tagRow.GetComponent<HorizontalLayoutGroup>();
-            tagLayout.spacing = 8f;
+            tagLayout.spacing = 6f;
             tagLayout.childControlHeight = true;
-            tagLayout.childControlWidth = true;
+            tagLayout.childControlWidth = false;
             tagLayout.childForceExpandHeight = false;
             tagLayout.childForceExpandWidth = false;
-
-            Text stateLabel = CreateText(tagRow.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.95f, 0.88f, 0.72f, 1f));
-            EnableBestFit(stateLabel, 10, 11, true);
-            stateLabel.GetComponent<LayoutElement>().flexibleWidth = 1f;
-            stateLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
-            Text skillLabel = CreateText(tagRow.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleRight, new Color(0.8f, 0.87f, 0.99f, 1f));
-            EnableBestFit(skillLabel, 10, 11, true);
-            skillLabel.GetComponent<LayoutElement>().preferredWidth = 108f;
-            skillLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            TagChipView primaryTagView = CreateTagChip(tagRow.transform);
+            TagChipView secondaryTagView = CreateTagChip(tagRow.transform);
 
             GameObject hpColumn = new GameObject("HpColumn", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
             hpColumn.transform.SetParent(contentRoot.transform, false);
-            LayoutElement hpLayoutElement = hpColumn.GetComponent<LayoutElement>();
-            hpLayoutElement.preferredWidth = 118f;
+            hpColumn.GetComponent<LayoutElement>().preferredWidth = 92f;
             VerticalLayoutGroup hpLayout = hpColumn.GetComponent<VerticalLayoutGroup>();
-            hpLayout.spacing = 5f;
+            hpLayout.spacing = 4f;
             hpLayout.childControlHeight = true;
             hpLayout.childControlWidth = true;
             hpLayout.childForceExpandHeight = false;
-            hpLayout.childAlignment = TextAnchor.UpperRight;
+            hpLayout.childForceExpandWidth = true;
 
-            Text hpLabel = CreateText(hpColumn.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextPrimary);
-            EnableBestFit(hpLabel, 10, 12, true);
+            Text hpLabel = BattleHudFactory.CreateText(hpColumn.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextPrimary);
             hpLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
-
-            GameObject hpBarRoot = new GameObject("HpBar", typeof(RectTransform), typeof(LayoutElement));
+            hpLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            GameObject hpBarRoot = new GameObject("HpBarRoot", typeof(RectTransform), typeof(LayoutElement));
             hpBarRoot.transform.SetParent(hpColumn.transform, false);
-            hpBarRoot.GetComponent<LayoutElement>().preferredHeight = 14f;
+            hpBarRoot.GetComponent<LayoutElement>().preferredHeight = 12f;
+            BattleHudFactory.CreateStretchUiBar(hpBarRoot.transform, out Image hpFill);
 
-            Image hpFill;
-            CreateStretchUiBar(hpBarRoot.transform, out hpFill);
-
-            return new RosterEntryView(rootObject, button, background, outline, accent, nameLabel, roleLabel, positionLabel, stateLabel, skillLabel, hpLabel, hpFill);
+            return new RosterEntryView(rootObject, button, background, outline, accentImage, nameLabel, roleLabel, positionLabel, primaryTagView, secondaryTagView, hpLabel, hpFill);
         }
 
-        private static Transform CreateScrollContentRoot(Transform parent, float padding)
+        private static TagChipView CreateTagChip(Transform parent)
         {
-            ScrollRect scrollRect = parent.gameObject.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-            scrollRect.vertical = true;
-            scrollRect.inertia = true;
-            scrollRect.movementType = ScrollRect.MovementType.Clamped;
-            scrollRect.scrollSensitivity = 24f;
+            GameObject root = BattleHudFactory.CreateInsetPanel("TagChip", parent, 20f, BattleUiTheme.ChipNeutral);
+            LayoutElement layout = root.GetComponent<LayoutElement>();
+            layout.preferredWidth = 86f;
+            Text label = BattleHudFactory.CreateText(root.transform, string.Empty, 10, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextPrimary);
+            RectTransform textRect = label.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(6f, 2f);
+            textRect.offsetMax = new Vector2(-6f, -2f);
+            label.verticalOverflow = VerticalWrapMode.Truncate;
+            return new TagChipView(root, root.GetComponent<Image>(), label);
+        }
+    }
 
-            GameObject viewportObject = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
-            viewportObject.transform.SetParent(parent, false);
-            RectTransform viewportRect = viewportObject.GetComponent<RectTransform>();
+    internal sealed class CampaignOverlayView
+    {
+        private GameObject overlay;
+        private GameObject buttonRow;
+        private Text eyebrowLabel;
+        private Text titleLabel;
+        private Text bodyLabel;
+        private Text progressLabel;
+        private Text highlightLabel;
+        private Text deckTitleLabel;
+        private Text deckBodyLabel;
+        private Transform contentRoot;
+        private GameObject highlightPanel;
+        private Button primaryButton;
+        private Button secondaryButton;
+        private ScrollRect contentScrollRect;
+
+        private Action<int> stageSelectionHandler;
+        private Action<string> optionSelectionHandler;
+        private Action primaryHandler;
+        private Action secondaryHandler;
+
+        public bool IsVisible => overlay != null && overlay.activeSelf;
+
+        public Text BodyLabel => bodyLabel;
+
+        public Button PrimaryButton => primaryButton;
+
+        public void Initialize(Transform canvasRoot)
+        {
+            overlay = BattleHudFactory.CreateStretchPanel("CampaignOverlay", canvasRoot, BattleUiTheme.PanelOverlay);
+            GameObject campaignBox = BattleHudFactory.CreatePanel(
+                "CampaignBox",
+                overlay.transform,
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero,
+                new Vector2(1220f, 760f),
+                BattleUiTheme.ShellBackdrop);
+
+            HorizontalLayoutGroup shellLayout = campaignBox.AddComponent<HorizontalLayoutGroup>();
+            shellLayout.spacing = 18f;
+            shellLayout.padding = new RectOffset(22, 22, 22, 22);
+            shellLayout.childControlHeight = true;
+            shellLayout.childControlWidth = true;
+            shellLayout.childForceExpandHeight = true;
+            shellLayout.childForceExpandWidth = false;
+
+            GameObject leftRail = BattleHudFactory.CreateInsetPanel("CampaignLeftRail", campaignBox.transform, 0f, BattleUiTheme.PanelSurface);
+            LayoutElement leftRailLayout = leftRail.GetComponent<LayoutElement>();
+            leftRailLayout.preferredWidth = 336f;
+            leftRailLayout.flexibleHeight = 1f;
+            VerticalLayoutGroup leftLayout = leftRail.AddComponent<VerticalLayoutGroup>();
+            leftLayout.spacing = 10f;
+            leftLayout.padding = new RectOffset(18, 18, 18, 18);
+            leftLayout.childControlHeight = true;
+            leftLayout.childControlWidth = true;
+            leftLayout.childForceExpandHeight = false;
+
+            eyebrowLabel = BattleHudFactory.CreateText(leftRail.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            eyebrowLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+
+            titleLabel = BattleHudFactory.CreateText(leftRail.transform, string.Empty, 30, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            titleLabel.GetComponent<LayoutElement>().preferredHeight = 64f;
+            BattleHudFactory.EnableBestFit(titleLabel, 20, 30, true);
+
+            GameObject summaryPanel = BattleHudFactory.CreateInsetPanel("CampaignSummaryPanel", leftRail.transform, 0f, BattleUiTheme.PanelInsetStrong);
+            summaryPanel.GetComponent<LayoutElement>().flexibleHeight = 1f;
+            Transform summaryRoot = BattleHudFactory.CreateInsetContentRoot(summaryPanel.transform, 16f);
+            VerticalLayoutGroup summaryLayout = summaryRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            summaryLayout.spacing = 10f;
+            summaryLayout.childControlHeight = true;
+            summaryLayout.childControlWidth = true;
+            summaryLayout.childForceExpandHeight = false;
+
+            bodyLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            bodyLabel.GetComponent<LayoutElement>().preferredHeight = 162f;
+
+            progressLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            progressLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+
+            highlightPanel = BattleHudFactory.CreateInsetPanel("CampaignHighlightPanel", summaryRoot.transform, 76f, BattleUiTheme.PanelReward);
+            Transform highlightRoot = BattleHudFactory.CreateInsetContentRoot(highlightPanel.transform, 12f);
+            highlightLabel = BattleHudFactory.CreateText(highlightRoot, string.Empty, 14, FontStyle.Bold, TextAnchor.UpperLeft, new Color(0.16f, 0.1f, 0.04f, 1f));
+            highlightLabel.GetComponent<LayoutElement>().preferredHeight = 42f;
+
+            GameObject rightDeck = BattleHudFactory.CreateInsetPanel("CampaignRightDeck", campaignBox.transform, 0f, BattleUiTheme.PanelBackdrop);
+            LayoutElement rightDeckLayout = rightDeck.GetComponent<LayoutElement>();
+            rightDeckLayout.flexibleWidth = 1f;
+            rightDeckLayout.flexibleHeight = 1f;
+            VerticalLayoutGroup rightLayout = rightDeck.AddComponent<VerticalLayoutGroup>();
+            rightLayout.spacing = 10f;
+            rightLayout.padding = new RectOffset(18, 18, 18, 18);
+            rightLayout.childControlHeight = true;
+            rightLayout.childControlWidth = true;
+            rightLayout.childForceExpandHeight = false;
+
+            deckTitleLabel = BattleHudFactory.CreateText(rightDeck.transform, string.Empty, 22, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            deckTitleLabel.GetComponent<LayoutElement>().preferredHeight = 28f;
+            deckBodyLabel = BattleHudFactory.CreateText(rightDeck.transform, string.Empty, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            deckBodyLabel.GetComponent<LayoutElement>().preferredHeight = 48f;
+
+            GameObject contentPanel = BattleHudFactory.CreateInsetPanel("CampaignContentPanel", rightDeck.transform, 0f, new Color(0.12f, 0.11f, 0.1f, 0.95f));
+            LayoutElement contentLayout = contentPanel.GetComponent<LayoutElement>();
+            contentLayout.flexibleHeight = 1f;
+            contentScrollRect = contentPanel.AddComponent<ScrollRect>();
+            contentScrollRect.horizontal = false;
+            contentScrollRect.vertical = true;
+            contentScrollRect.movementType = ScrollRect.MovementType.Clamped;
+            contentScrollRect.scrollSensitivity = 28f;
+
+            GameObject viewport = new GameObject("CampaignViewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            viewport.transform.SetParent(contentPanel.transform, false);
+            RectTransform viewportRect = viewport.GetComponent<RectTransform>();
             viewportRect.anchorMin = Vector2.zero;
             viewportRect.anchorMax = Vector2.one;
-            viewportRect.offsetMin = new Vector2(padding, padding);
-            viewportRect.offsetMax = new Vector2(-(padding + 12f), -padding);
+            viewportRect.offsetMin = new Vector2(14f, 14f);
+            viewportRect.offsetMax = new Vector2(-14f, -14f);
+            Image viewportImage = viewport.GetComponent<Image>();
+            viewportImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            viewportImage.color = new Color(1f, 1f, 1f, 0.01f);
+            viewport.GetComponent<Mask>().showMaskGraphic = false;
 
-            Image viewportImage = viewportObject.GetComponent<Image>();
-            viewportImage.sprite = RuntimeSpriteLibrary.InkPanelSprite;
-            viewportImage.color = new Color(1f, 1f, 1f, 0.015f);
-            viewportObject.GetComponent<Mask>().showMaskGraphic = false;
-
-            GameObject contentObject = new GameObject("Content", typeof(RectTransform), typeof(ContentSizeFitter));
-            contentObject.transform.SetParent(viewportObject.transform, false);
+            GameObject contentObject = new GameObject("CampaignContent", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            contentObject.transform.SetParent(viewport.transform, false);
             RectTransform contentRect = contentObject.GetComponent<RectTransform>();
             contentRect.anchorMin = new Vector2(0f, 1f);
             contentRect.anchorMax = new Vector2(1f, 1f);
             contentRect.pivot = new Vector2(0.5f, 1f);
             contentRect.anchoredPosition = Vector2.zero;
-            contentRect.sizeDelta = Vector2.zero;
+            contentRect.offsetMin = new Vector2(0f, 0f);
+            contentRect.offsetMax = new Vector2(0f, 0f);
+            VerticalLayoutGroup contentGroup = contentObject.GetComponent<VerticalLayoutGroup>();
+            contentGroup.spacing = 10f;
+            contentGroup.childControlHeight = true;
+            contentGroup.childControlWidth = true;
+            contentGroup.childForceExpandHeight = false;
+            contentGroup.childForceExpandWidth = true;
+            ContentSizeFitter contentFitter = contentObject.GetComponent<ContentSizeFitter>();
+            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            contentRoot = contentObject.transform;
+            contentScrollRect.viewport = viewportRect;
+            contentScrollRect.content = contentRect;
 
-            ContentSizeFitter fitter = contentObject.GetComponent<ContentSizeFitter>();
-            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            buttonRow = new GameObject("CampaignButtons", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            buttonRow.transform.SetParent(rightDeck.transform, false);
+            LayoutElement buttonRowLayout = buttonRow.GetComponent<LayoutElement>();
+            buttonRowLayout.preferredHeight = 48f;
+            buttonRowLayout.flexibleHeight = 0f;
+            HorizontalLayoutGroup buttonLayout = buttonRow.GetComponent<HorizontalLayoutGroup>();
+            buttonLayout.spacing = 12f;
+            buttonLayout.childAlignment = TextAnchor.MiddleRight;
+            buttonLayout.childControlHeight = true;
+            buttonLayout.childControlWidth = true;
+            buttonLayout.childForceExpandHeight = true;
+            buttonLayout.childForceExpandWidth = false;
+            primaryButton = BattleHudFactory.CreateButton(buttonRow.transform, string.Empty, true);
+            LayoutElement primaryLayout = primaryButton.GetComponent<LayoutElement>();
+            primaryLayout.preferredWidth = 198f;
+            primaryLayout.flexibleWidth = 0f;
+            primaryButton.onClick.AddListener(() => primaryHandler?.Invoke());
+            secondaryButton = BattleHudFactory.CreateButton(buttonRow.transform, string.Empty, false);
+            LayoutElement secondaryLayout = secondaryButton.GetComponent<LayoutElement>();
+            secondaryLayout.preferredWidth = 176f;
+            secondaryLayout.flexibleWidth = 0f;
+            secondaryButton.onClick.AddListener(() => secondaryHandler?.Invoke());
 
-            Scrollbar scrollbar = CreateVerticalScrollbar(parent, padding);
-            scrollRect.viewport = viewportRect;
-            scrollRect.content = contentRect;
-            scrollRect.verticalScrollbar = scrollbar;
-            scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
-            scrollRect.verticalScrollbarSpacing = 4f;
-            return contentObject.transform;
+            overlay.SetActive(false);
         }
 
-        private static Scrollbar CreateVerticalScrollbar(Transform parent, float padding)
+        public void ShowCampaignStageSelect(CampaignStageSelectModel model, Action<int> onStageSelected)
         {
-            GameObject scrollbarObject = new GameObject("Scrollbar", typeof(RectTransform), typeof(Image), typeof(Scrollbar));
-            scrollbarObject.transform.SetParent(parent, false);
-            RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
-            scrollbarRect.anchorMin = new Vector2(1f, 0f);
-            scrollbarRect.anchorMax = new Vector2(1f, 1f);
-            scrollbarRect.offsetMin = new Vector2(-(padding + 10f), padding);
-            scrollbarRect.offsetMax = new Vector2(-padding, -padding);
+            stageSelectionHandler = onStageSelected;
+            optionSelectionHandler = null;
+            primaryHandler = null;
+            secondaryHandler = null;
 
-            Image trackImage = scrollbarObject.GetComponent<Image>();
-            trackImage.sprite = RuntimeSpriteLibrary.InkPanelSprite;
-            trackImage.color = new Color(0.18f, 0.15f, 0.11f, 0.9f);
-
-            GameObject handleObject = new GameObject("Handle", typeof(RectTransform), typeof(Image));
-            handleObject.transform.SetParent(scrollbarObject.transform, false);
-            RectTransform handleRect = handleObject.GetComponent<RectTransform>();
-            handleRect.anchorMin = Vector2.zero;
-            handleRect.anchorMax = Vector2.one;
-            handleRect.offsetMin = new Vector2(1f, 1f);
-            handleRect.offsetMax = new Vector2(-1f, -1f);
-
-            Image handleImage = handleObject.GetComponent<Image>();
-            handleImage.sprite = RuntimeSpriteLibrary.InkPanelSprite;
-            handleImage.color = BattleUiTheme.AccentGold;
-
-            Scrollbar scrollbar = scrollbarObject.GetComponent<Scrollbar>();
-            scrollbar.direction = Scrollbar.Direction.BottomToTop;
-            scrollbar.handleRect = handleRect;
-            scrollbar.targetGraphic = handleImage;
-            scrollbar.value = 1f;
-            return scrollbar;
+            CampaignStageSelectModel stageSelectModel = model ?? new CampaignStageSelectModel();
+            ApplyFrame(
+                stageSelectModel.Eyebrow,
+                stageSelectModel.Title,
+                stageSelectModel.Body,
+                stageSelectModel.ProgressLabel,
+                stageSelectModel.HighlightLabel,
+                stageSelectModel.DeckTitle,
+                LocalizationService.Text("campaign.deck.stage_select_body", "選擇下一條戰線，先看清楚地形定位、戰鬥長度與首通收益。"));
+            RebuildContent(root =>
+            {
+                foreach (CampaignStageEntryModel entry in (stageSelectModel.Stages ?? Array.Empty<CampaignStageEntryModel>())
+                    .OrderBy(stage => stage.SortWeight)
+                    .ThenBy(stage => stage.StageIndex))
+                {
+                    CreateStageEntry(root, entry);
+                }
+            });
+            ConfigureButtons(null, null);
+            ShowOverlay();
         }
 
-        private static void CreateUiBar(Transform parent, Vector2 offsetMin, Vector2 offsetMax, out Image fillImage)
+        public void ShowCampaignInterlude(CampaignInterludeModel model, Action onPrimary, Action onSecondary = null)
         {
-            GameObject backObject = new GameObject("BarBack", typeof(RectTransform), typeof(Image));
-            backObject.transform.SetParent(parent, false);
-            RectTransform backRect = backObject.GetComponent<RectTransform>();
-            backRect.anchorMin = new Vector2(0f, 0f);
-            backRect.anchorMax = new Vector2(1f, 0f);
-            backRect.offsetMin = offsetMin;
-            backRect.offsetMax = offsetMax;
-            Image backImage = backObject.GetComponent<Image>();
-            backImage.sprite = RuntimeSpriteLibrary.InkPanelSprite;
-            backImage.color = new Color(0.12f, 0.09f, 0.08f, 0.95f);
+            stageSelectionHandler = null;
+            optionSelectionHandler = null;
+            primaryHandler = onPrimary;
+            secondaryHandler = onSecondary;
 
-            GameObject fillObject = new GameObject("BarFill", typeof(RectTransform), typeof(Image));
-            fillObject.transform.SetParent(backObject.transform, false);
-            RectTransform fillRect = fillObject.GetComponent<RectTransform>();
-            fillRect.anchorMin = Vector2.zero;
-            fillRect.anchorMax = Vector2.one;
-            fillRect.offsetMin = new Vector2(2f, 2f);
-            fillRect.offsetMax = new Vector2(-2f, -2f);
-            fillImage = fillObject.GetComponent<Image>();
-            fillImage.sprite = RuntimeSpriteLibrary.InkPanelSprite;
-            fillImage.type = Image.Type.Filled;
-            fillImage.fillMethod = Image.FillMethod.Horizontal;
-            fillImage.fillOrigin = 0;
-            fillImage.fillAmount = 0f;
+            CampaignInterludeModel interludeModel = model ?? new CampaignInterludeModel();
+            ApplyFrame(
+                interludeModel.Eyebrow,
+                interludeModel.Title,
+                interludeModel.Body,
+                interludeModel.ProgressLabel,
+                interludeModel.HighlightLine,
+                interludeModel.DeckTitle,
+                string.IsNullOrWhiteSpace(interludeModel.DeckBody)
+                    ? interludeModel.RiskLabel
+                    : interludeModel.DeckBody);
+            RebuildContent(root =>
+            {
+                GameObject narrativePanel = BattleHudFactory.CreateInsetPanel("CampaignNarrativePanel", root, 0f, new Color(0.14f, 0.12f, 0.1f, 0.94f));
+                Transform narrativeRoot = BattleHudFactory.CreateInsetContentRoot(narrativePanel.transform, 18f);
+                VerticalLayoutGroup narrativeLayout = narrativeRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+                narrativeLayout.spacing = 10f;
+                narrativeLayout.childControlHeight = true;
+                narrativeLayout.childControlWidth = true;
+                narrativeLayout.childForceExpandHeight = false;
+
+                Text narrativeBody = BattleHudFactory.CreateText(narrativeRoot, interludeModel.Body, 18, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+                narrativeBody.GetComponent<LayoutElement>().preferredHeight = 120f;
+
+                foreach (string line in (interludeModel.DetailLines ?? Array.Empty<string>()).Where(line => !string.IsNullOrWhiteSpace(line)))
+                {
+                    Text detailLabel = BattleHudFactory.CreateText(narrativeRoot, line, 15, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+                    detailLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
+                }
+
+                if (!string.IsNullOrWhiteSpace(interludeModel.HighlightLine))
+                {
+                    Text highlight = BattleHudFactory.CreateText(narrativeRoot, interludeModel.HighlightLine, 16, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+                    highlight.GetComponent<LayoutElement>().preferredHeight = 24f;
+                }
+
+                if (!string.IsNullOrWhiteSpace(interludeModel.RiskLabel))
+                {
+                    Text risk = BattleHudFactory.CreateText(narrativeRoot, interludeModel.RiskLabel, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
+                    risk.GetComponent<LayoutElement>().preferredHeight = 22f;
+                }
+            });
+            ConfigureButtons(interludeModel.PrimaryActionLabel, interludeModel.SecondaryActionLabel);
+            ShowOverlay();
         }
 
-        private static void CreateStretchUiBar(Transform parent, out Image fillImage)
+        public void ShowCampaignOptionList(CampaignOptionListModel model, Action<string> onOptionSelected, Action onPrimary, Action onSecondary = null)
         {
-            GameObject backObject = new GameObject("BarBack", typeof(RectTransform), typeof(Image));
-            backObject.transform.SetParent(parent, false);
-            RectTransform backRect = backObject.GetComponent<RectTransform>();
-            backRect.anchorMin = Vector2.zero;
-            backRect.anchorMax = Vector2.one;
-            backRect.offsetMin = Vector2.zero;
-            backRect.offsetMax = Vector2.zero;
-            Image backImage = backObject.GetComponent<Image>();
-            backImage.sprite = RuntimeSpriteLibrary.InkPanelSprite;
-            backImage.color = new Color(0.12f, 0.09f, 0.08f, 0.95f);
+            stageSelectionHandler = null;
+            optionSelectionHandler = onOptionSelected;
+            primaryHandler = onPrimary;
+            secondaryHandler = onSecondary;
 
-            GameObject fillObject = new GameObject("BarFill", typeof(RectTransform), typeof(Image));
-            fillObject.transform.SetParent(backObject.transform, false);
-            RectTransform fillRect = fillObject.GetComponent<RectTransform>();
-            fillRect.anchorMin = Vector2.zero;
-            fillRect.anchorMax = Vector2.one;
-            fillRect.offsetMin = new Vector2(2f, 2f);
-            fillRect.offsetMax = new Vector2(-2f, -2f);
-            fillImage = fillObject.GetComponent<Image>();
-            fillImage.sprite = RuntimeSpriteLibrary.InkPanelSprite;
-            fillImage.type = Image.Type.Filled;
-            fillImage.fillMethod = Image.FillMethod.Horizontal;
-            fillImage.fillOrigin = 0;
-            fillImage.fillAmount = 0f;
+            CampaignOptionListModel optionListModel = model ?? new CampaignOptionListModel();
+            ApplyFrame(
+                optionListModel.Eyebrow,
+                optionListModel.Title,
+                optionListModel.Body,
+                optionListModel.ProgressLabel,
+                optionListModel.HighlightLabel,
+                optionListModel.DeckTitle,
+                LocalizationService.Text("campaign.deck.option_list_body", "主要操作、整備與獎勵資訊都集中在右側卡片列。"));
+            RebuildContent(root =>
+            {
+                string currentSection = null;
+                foreach (CampaignOptionEntryModel entry in (optionListModel.Options ?? Array.Empty<CampaignOptionEntryModel>())
+                    .OrderBy(option => option.SortWeight)
+                    .ThenBy(option => option.Title, StringComparer.Ordinal))
+                {
+                    if (!string.Equals(currentSection, entry.Section, StringComparison.Ordinal) &&
+                        !string.IsNullOrWhiteSpace(entry.Section))
+                    {
+                        currentSection = entry.Section;
+                        CreateListSectionHeader(root, currentSection);
+                    }
+
+                    CreateOptionEntry(root, entry);
+                }
+            });
+            ConfigureButtons(optionListModel.PrimaryActionLabel, optionListModel.SecondaryActionLabel);
+            ShowOverlay();
         }
 
-        private static GameObject CreatePanel(
+        public void Hide()
+        {
+            stageSelectionHandler = null;
+            optionSelectionHandler = null;
+            primaryHandler = null;
+            secondaryHandler = null;
+            if (overlay != null)
+            {
+                overlay.SetActive(false);
+            }
+        }
+
+        private void ApplyFrame(string eyebrow, string title, string body, string progress, string highlight, string deckTitle, string deckBody)
+        {
+            eyebrowLabel.text = eyebrow ?? string.Empty;
+            eyebrowLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(eyebrow));
+            titleLabel.text = title ?? string.Empty;
+            bodyLabel.text = body ?? string.Empty;
+            progressLabel.text = progress ?? string.Empty;
+            progressLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(progress));
+            deckTitleLabel.text = string.IsNullOrWhiteSpace(deckTitle)
+                ? LocalizationService.Text("campaign.deck.default", "作戰卡片")
+                : deckTitle;
+            deckBodyLabel.text = deckBody ?? string.Empty;
+            deckBodyLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(deckBody));
+            bool hasHighlight = !string.IsNullOrWhiteSpace(highlight);
+            highlightPanel.SetActive(hasHighlight);
+            if (hasHighlight)
+            {
+                highlightLabel.text = highlight;
+            }
+        }
+
+        private void ConfigureButtons(string primaryLabel, string secondaryLabel)
+        {
+            bool hasPrimary = !string.IsNullOrWhiteSpace(primaryLabel);
+            bool hasSecondary = !string.IsNullOrWhiteSpace(secondaryLabel);
+            if (buttonRow != null)
+            {
+                buttonRow.SetActive(hasPrimary || hasSecondary);
+            }
+
+            primaryButton.gameObject.SetActive(hasPrimary);
+            secondaryButton.gameObject.SetActive(hasSecondary);
+            if (hasPrimary)
+            {
+                BattleHudFactory.SetButtonLabel(primaryButton, primaryLabel);
+            }
+
+            if (hasSecondary)
+            {
+                BattleHudFactory.SetButtonLabel(secondaryButton, secondaryLabel);
+            }
+        }
+
+        private void RebuildContent(Action<Transform> buildAction)
+        {
+            BattleHudFactory.DestroyChildren(contentRoot);
+            buildAction?.Invoke(contentRoot);
+            Canvas.ForceUpdateCanvases();
+            if (contentScrollRect != null)
+            {
+                contentScrollRect.verticalNormalizedPosition = 1f;
+            }
+        }
+
+        private void CreateStageEntry(Transform parent, CampaignStageEntryModel model)
+        {
+            GameObject root = BattleHudFactory.CreateInsetPanel("CampaignStageEntry", parent, 0f, model.IsUnlocked ? BattleUiTheme.PanelInsetStrong : BattleUiTheme.PanelGhost);
+            LayoutElement rootLayout = root.GetComponent<LayoutElement>();
+            rootLayout.preferredHeight = !string.IsNullOrWhiteSpace(model.RecommendedReason) ? 134f : 114f;
+            rootLayout.flexibleHeight = 0f;
+            Button button = root.AddComponent<Button>();
+            button.interactable = model.IsUnlocked;
+            button.onClick.AddListener(() => stageSelectionHandler?.Invoke(model.StageIndex));
+            ColorBlock colors = button.colors;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.04f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
+            colors.disabledColor = new Color(0.7f, 0.7f, 0.72f, 0.8f);
+            button.colors = colors;
+
+            Transform content = BattleHudFactory.CreateInsetContentRoot(root.transform, 16f);
+            VerticalLayoutGroup layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 6f;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+
+            GameObject titleRow = new GameObject("TitleRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            titleRow.transform.SetParent(content, false);
+            titleRow.GetComponent<LayoutElement>().preferredHeight = 26f;
+            HorizontalLayoutGroup titleLayout = titleRow.GetComponent<HorizontalLayoutGroup>();
+            titleLayout.spacing = 8f;
+            titleLayout.childControlHeight = true;
+            titleLayout.childControlWidth = true;
+            titleLayout.childForceExpandHeight = false;
+            titleLayout.childForceExpandWidth = false;
+
+            Text title = BattleHudFactory.CreateText(titleRow.transform, model.Title, 19, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            title.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            ClampText(title, 22f, VerticalWrapMode.Truncate);
+            Text status = BattleHudFactory.CreateText(titleRow.transform, model.Status, 12, FontStyle.Bold, TextAnchor.MiddleRight, model.IsUnlocked ? BattleUiTheme.TextGold : BattleUiTheme.TextMuted);
+            status.GetComponent<LayoutElement>().preferredWidth = 108f;
+            ClampText(status, 18f, VerticalWrapMode.Truncate);
+
+            if (!string.IsNullOrWhiteSpace(model.Description))
+            {
+                Text description = BattleHudFactory.CreateText(content, model.Description, 14, FontStyle.Normal, TextAnchor.UpperLeft, model.IsUnlocked ? BattleUiTheme.TextSecondary : BattleUiTheme.TextMuted);
+                ClampText(description, 34f, VerticalWrapMode.Truncate);
+            }
+
+            string metrics = string.Join("  ", new[] { model.BattlefieldLabel, model.DurationLabel, model.RewardLabel }.Where(line => !string.IsNullOrWhiteSpace(line)));
+            if (!string.IsNullOrWhiteSpace(metrics))
+            {
+                Text metricLabel = BattleHudFactory.CreateText(content, metrics, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+                ClampText(metricLabel, 18f, VerticalWrapMode.Truncate);
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.RecommendedReason))
+            {
+                Text reason = BattleHudFactory.CreateText(content, model.RecommendedReason, 13, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.86f, 0.91f, 0.98f, 1f));
+                ClampText(reason, 24f, VerticalWrapMode.Truncate);
+            }
+        }
+
+        private void CreateOptionEntry(Transform parent, CampaignOptionEntryModel model)
+        {
+            GameObject root = BattleHudFactory.CreateInsetPanel("CampaignOptionEntry", parent, 0f, model.IsEnabled ? (model.IsEmphasized ? BattleUiTheme.PanelCommand : BattleUiTheme.PanelInset) : BattleUiTheme.PanelGhost);
+            LayoutElement rootLayout = root.GetComponent<LayoutElement>();
+            bool hasSupportingLine = !string.IsNullOrWhiteSpace(model.RecommendedReason) || !string.IsNullOrWhiteSpace(model.AvailabilityReason);
+            rootLayout.preferredHeight = hasSupportingLine || model.IsPromotionOption ? 124f : 98f;
+            rootLayout.flexibleHeight = 0f;
+            Button button = root.AddComponent<Button>();
+            button.interactable = model.IsEnabled;
+            button.onClick.AddListener(() => optionSelectionHandler?.Invoke(model.OptionId));
+            ColorBlock colors = button.colors;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.04f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
+            colors.disabledColor = new Color(0.7f, 0.7f, 0.72f, 0.8f);
+            button.colors = colors;
+
+            Transform content = BattleHudFactory.CreateInsetContentRoot(root.transform, 14f);
+            HorizontalLayoutGroup layout = content.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 12f;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = false;
+            layout.childAlignment = TextAnchor.UpperLeft;
+
+            GameObject glyphPanel = BattleHudFactory.CreateInsetPanel("GlyphPanel", content.transform, 56f, model.IsPromotionOption ? BattleUiTheme.PanelReward : BattleUiTheme.PanelGhost);
+            LayoutElement glyphLayout = glyphPanel.GetComponent<LayoutElement>();
+            glyphLayout.preferredWidth = 56f;
+            glyphLayout.preferredHeight = 56f;
+            glyphLayout.flexibleWidth = 0f;
+            glyphLayout.flexibleHeight = 0f;
+            Text glyph = BattleHudFactory.CreateAbsoluteText(glyphPanel.transform, Vector2.zero, Vector2.zero, model.IconGlyph, 22, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextGold);
+            glyph.resizeTextForBestFit = true;
+            glyph.resizeTextMinSize = 14;
+            glyph.resizeTextMaxSize = 22;
+            glyph.verticalOverflow = VerticalWrapMode.Truncate;
+
+            GameObject textColumn = new GameObject("TextColumn", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            textColumn.transform.SetParent(content, false);
+            LayoutElement textColumnLayout = textColumn.GetComponent<LayoutElement>();
+            textColumnLayout.flexibleWidth = 1f;
+            textColumnLayout.flexibleHeight = 0f;
+            VerticalLayoutGroup textLayout = textColumn.GetComponent<VerticalLayoutGroup>();
+            textLayout.spacing = 4f;
+            textLayout.childControlHeight = true;
+            textLayout.childControlWidth = true;
+            textLayout.childForceExpandHeight = false;
+
+            GameObject titleRow = new GameObject("TitleRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            titleRow.transform.SetParent(textColumn.transform, false);
+            titleRow.GetComponent<LayoutElement>().preferredHeight = 22f;
+            HorizontalLayoutGroup titleLayout = titleRow.GetComponent<HorizontalLayoutGroup>();
+            titleLayout.spacing = 8f;
+            titleLayout.childControlHeight = true;
+            titleLayout.childControlWidth = true;
+            titleLayout.childForceExpandHeight = false;
+            titleLayout.childForceExpandWidth = false;
+
+            Text title = BattleHudFactory.CreateText(titleRow.transform, model.Title, model.IsPromotionOption ? 21 : 18, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            title.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            ClampText(title, 22f, VerticalWrapMode.Truncate);
+            Text status = BattleHudFactory.CreateText(titleRow.transform, model.Status, 12, FontStyle.Bold, TextAnchor.MiddleRight, model.IsEnabled ? BattleUiTheme.TextGold : BattleUiTheme.TextMuted);
+            status.GetComponent<LayoutElement>().preferredWidth = 108f;
+            ClampText(status, 18f, VerticalWrapMode.Truncate);
+
+            if (!string.IsNullOrWhiteSpace(model.MetricLine))
+            {
+                Text metric = BattleHudFactory.CreateText(textColumn.transform, model.MetricLine, 12, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
+                ClampText(metric, 16f, VerticalWrapMode.Truncate);
+            }
+
+            Text description = BattleHudFactory.CreateText(textColumn.transform, model.Description, model.IsPromotionOption ? 15 : 14, FontStyle.Normal, TextAnchor.UpperLeft, model.IsEnabled ? BattleUiTheme.TextPrimary : new Color(0.62f, 0.59f, 0.54f, 1f));
+            ClampText(description, 36f, VerticalWrapMode.Truncate);
+
+            if (!string.IsNullOrWhiteSpace(model.RecommendedReason))
+            {
+                Text reason = BattleHudFactory.CreateText(textColumn.transform, model.RecommendedReason, 13, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.82f, 0.91f, 0.99f, 1f));
+                ClampText(reason, 18f, VerticalWrapMode.Truncate);
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.AvailabilityReason))
+            {
+                Text availability = BattleHudFactory.CreateText(textColumn.transform, model.AvailabilityReason, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
+                ClampText(availability, 18f, VerticalWrapMode.Truncate);
+            }
+        }
+
+        private void ShowOverlay()
+        {
+            if (overlay == null)
+            {
+                return;
+            }
+
+            overlay.transform.SetAsLastSibling();
+            overlay.SetActive(true);
+            Canvas.ForceUpdateCanvases();
+            if (contentScrollRect != null)
+            {
+                contentScrollRect.verticalNormalizedPosition = 1f;
+            }
+        }
+
+        private static void ClampText(Text text, float preferredHeight, VerticalWrapMode verticalMode)
+        {
+            if (text == null)
+            {
+                return;
+            }
+
+            LayoutElement layout = text.GetComponent<LayoutElement>();
+            if (layout != null)
+            {
+                layout.preferredHeight = preferredHeight;
+                layout.flexibleHeight = 0f;
+            }
+
+            text.verticalOverflow = verticalMode;
+        }
+
+        private static void CreateListSectionHeader(Transform parent, string label)
+        {
+            GameObject headerRoot = new GameObject("SectionHeader", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            headerRoot.transform.SetParent(parent, false);
+            headerRoot.GetComponent<LayoutElement>().preferredHeight = 22f;
+            HorizontalLayoutGroup layout = headerRoot.GetComponent<HorizontalLayoutGroup>();
+            layout.spacing = 8f;
+            layout.childControlHeight = true;
+            layout.childControlWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = false;
+
+            Text sectionLabel = BattleHudFactory.CreateText(headerRoot.transform, label, 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            sectionLabel.GetComponent<LayoutElement>().preferredWidth = 140f;
+
+            GameObject divider = new GameObject("Divider", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+            divider.transform.SetParent(headerRoot.transform, false);
+            divider.GetComponent<LayoutElement>().preferredHeight = 2f;
+            divider.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            Image dividerImage = divider.GetComponent<Image>();
+            dividerImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            dividerImage.color = BattleUiTheme.Divider;
+        }
+    }
+
+    internal static class BattleHudFactory
+    {
+        public static GameObject CreatePanel(
             string name,
             Transform parent,
             Vector2 anchorMin,
@@ -1499,7 +2055,7 @@ namespace PhalanxChronicle.UI
             RectTransform rectTransform = panel.GetComponent<RectTransform>();
             rectTransform.anchorMin = anchorMin;
             rectTransform.anchorMax = anchorMax;
-            rectTransform.pivot = new Vector2(anchorMax.x, anchorMax.y);
+            rectTransform.pivot = new Vector2(0.5f, 0.5f);
             rectTransform.anchoredPosition = anchoredPosition;
             rectTransform.sizeDelta = size;
 
@@ -1513,78 +2069,85 @@ namespace PhalanxChronicle.UI
             return panel;
         }
 
-        private static GameObject CreateStretchPanel(string name, Transform parent, Color color)
+        public static GameObject CreatePanel(
+            string name,
+            Transform parent,
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            Vector2 anchoredPosition,
+            Vector2 size)
+        {
+            return CreatePanel(name, parent, anchorMin, anchorMax, anchoredPosition, size, BattleUiTheme.PanelBackdrop);
+        }
+
+        public static GameObject CreateStretchPanel(string name, Transform parent, Color color)
         {
             GameObject panel = new GameObject(name, typeof(RectTransform), typeof(Image));
             panel.transform.SetParent(parent, false);
-            RectTransform rectTransform = panel.GetComponent<RectTransform>();
-            rectTransform.anchorMin = Vector2.zero;
-            rectTransform.anchorMax = Vector2.one;
-            rectTransform.offsetMin = Vector2.zero;
-            rectTransform.offsetMax = Vector2.zero;
-
+            RectTransform rect = panel.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
             Image image = panel.GetComponent<Image>();
-            image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
+            image.sprite = RuntimeSpriteLibrary.WhiteSprite;
             image.color = color;
             return panel;
         }
 
-        private static GameObject CreateInsetPanel(string name, Transform parent, float preferredHeight)
+        public static GameObject CreateInsetPanel(string name, Transform parent, float preferredHeight)
         {
             return CreateInsetPanel(name, parent, preferredHeight, BattleUiTheme.PanelInset);
         }
 
-        private static GameObject CreateInsetPanel(string name, Transform parent, float preferredHeight, Color color)
+        public static GameObject CreateInsetPanel(string name, Transform parent, float preferredHeight, Color color)
         {
             GameObject panel = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(LayoutElement));
             panel.transform.SetParent(parent, false);
             Image image = panel.GetComponent<Image>();
             image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
             image.color = color;
-            panel.GetComponent<LayoutElement>().preferredHeight = preferredHeight;
+
+            LayoutElement layoutElement = panel.GetComponent<LayoutElement>();
+            layoutElement.preferredHeight = preferredHeight;
+
             Outline outline = panel.AddComponent<Outline>();
             outline.effectDistance = new Vector2(1f, -1f);
             outline.effectColor = BattleUiTheme.OutlineSoft;
             return panel;
         }
 
-        private static Button CreateActionButton(Transform parent, string label)
+        public static Button CreateButton(Transform parent, string label, bool primary)
         {
             GameObject buttonObject = new GameObject(label + "Button", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
             buttonObject.transform.SetParent(parent, false);
-            LayoutElement layout = buttonObject.GetComponent<LayoutElement>();
-            layout.preferredHeight = 50f;
-            layout.minWidth = 220f;
-            layout.flexibleWidth = 1f;
+            LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
+            layoutElement.preferredHeight = 40f;
+            layoutElement.flexibleWidth = 1f;
 
             Image image = buttonObject.GetComponent<Image>();
             image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
-            image.color = BattleUiTheme.ButtonPrimary;
+            image.color = primary ? BattleUiTheme.ButtonPrimary : BattleUiTheme.ButtonSecondary;
 
             Outline outline = buttonObject.AddComponent<Outline>();
             outline.effectDistance = new Vector2(1f, -1f);
-            outline.effectColor = new Color(0.34f, 0.22f, 0.08f, 0.66f);
+            outline.effectColor = primary ? new Color(0.34f, 0.22f, 0.08f, 0.66f) : new Color(0.24f, 0.33f, 0.48f, 0.6f);
 
             Button button = buttonObject.GetComponent<Button>();
             ColorBlock colors = button.colors;
-            colors.highlightedColor = BattleUiTheme.ButtonPrimaryHighlight;
-            colors.pressedColor = BattleUiTheme.ButtonPrimaryPressed;
+            colors.highlightedColor = primary ? BattleUiTheme.ButtonPrimaryHighlight : BattleUiTheme.ButtonSecondaryHighlight;
+            colors.pressedColor = primary ? BattleUiTheme.ButtonPrimaryPressed : BattleUiTheme.ButtonSecondaryPressed;
             colors.disabledColor = BattleUiTheme.ButtonDisabled;
             button.colors = colors;
 
-            Text text = CreateAbsoluteText(buttonObject.transform, Vector2.zero, Vector2.zero, label, 18, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.ButtonText);
-            RectTransform textRect = text.GetComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(14f, 8f);
-            textRect.offsetMax = new Vector2(-14f, -8f);
-            text.resizeTextForBestFit = false;
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
+            Text text = CreateAbsoluteText(buttonObject.transform, Vector2.zero, Vector2.zero, label, 16, FontStyle.Bold, TextAnchor.MiddleCenter, primary ? BattleUiTheme.ButtonText : BattleUiTheme.ButtonSecondaryText);
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 12;
+            text.resizeTextMaxSize = 16;
             return button;
         }
 
-        private static void SetButtonLabel(Button button, string label)
+        public static void SetButtonLabel(Button button, string label)
         {
             if (button == null)
             {
@@ -1594,17 +2157,17 @@ namespace PhalanxChronicle.UI
             Text text = button.GetComponentInChildren<Text>();
             if (text != null)
             {
-                text.text = label ?? string.Empty;
+                text.text = label;
             }
         }
 
-        private static void CreateSectionHeader(Transform parent, string text)
+        public static void CreateSectionHeader(Transform parent, string text)
         {
-            Text header = CreateText(parent, text, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            header.GetComponent<LayoutElement>().preferredHeight = 20f;
+            Text header = CreateText(parent, text, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            header.GetComponent<LayoutElement>().preferredHeight = 18f;
         }
 
-        private static Text CreateText(Transform parent, string content, int size, FontStyle fontStyle, TextAnchor alignment, Color color)
+        public static Text CreateText(Transform parent, string content, int size, FontStyle fontStyle, TextAnchor alignment, Color color)
         {
             GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
             textObject.transform.SetParent(parent, false);
@@ -1616,17 +2179,19 @@ namespace PhalanxChronicle.UI
             text.alignment = alignment;
             text.color = color;
             text.alignByGeometry = true;
-            text.supportRichText = false;
-            text.lineSpacing = size >= 18 ? 1.14f : 1.08f;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Overflow;
-            ApplyTextLegibility(text, size >= 18);
+            text.lineSpacing = 1.02f;
 
-            textObject.GetComponent<LayoutElement>().preferredHeight = size + 10f;
+            Shadow shadow = textObject.AddComponent<Shadow>();
+            shadow.effectDistance = new Vector2(0.25f, -0.25f);
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.42f);
+
+            textObject.GetComponent<LayoutElement>().preferredHeight = size + 8f;
             return text;
         }
 
-        private static Text CreateAbsoluteText(
+        public static Text CreateAbsoluteText(
             Transform parent,
             Vector2 offsetMin,
             Vector2 offsetMax,
@@ -1638,11 +2203,11 @@ namespace PhalanxChronicle.UI
         {
             GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(Text));
             textObject.transform.SetParent(parent, false);
-            RectTransform rectTransform = textObject.GetComponent<RectTransform>();
-            rectTransform.anchorMin = Vector2.zero;
-            rectTransform.anchorMax = Vector2.one;
-            rectTransform.offsetMin = offsetMin;
-            rectTransform.offsetMax = offsetMax;
+            RectTransform rect = textObject.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
 
             Text text = textObject.GetComponent<Text>();
             text.text = content;
@@ -1652,108 +2217,240 @@ namespace PhalanxChronicle.UI
             text.alignment = alignment;
             text.color = color;
             text.alignByGeometry = true;
-            text.supportRichText = false;
-            text.lineSpacing = size >= 18 ? 1.14f : 1.08f;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Overflow;
-            ApplyTextLegibility(text, size >= 18);
+            text.lineSpacing = 1.04f;
+
+            Shadow shadow = textObject.AddComponent<Shadow>();
+            shadow.effectDistance = new Vector2(0.35f, -0.35f);
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.46f);
             return text;
         }
 
-        private static Transform CreateInsetContentRoot(Transform parent, float padding)
+        public static Transform CreateInsetContentRoot(Transform parent, float padding)
         {
-            GameObject rootObject = new GameObject("Content", typeof(RectTransform));
-            rootObject.transform.SetParent(parent, false);
-            RectTransform rectTransform = rootObject.GetComponent<RectTransform>();
-            rectTransform.anchorMin = Vector2.zero;
-            rectTransform.anchorMax = Vector2.one;
-            rectTransform.offsetMin = new Vector2(padding, padding);
-            rectTransform.offsetMax = new Vector2(-padding, -padding);
-            return rootObject.transform;
+            GameObject root = new GameObject("Content", typeof(RectTransform));
+            root.transform.SetParent(parent, false);
+            RectTransform rect = root.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(padding, padding);
+            rect.offsetMax = new Vector2(-padding, -padding);
+            return root.transform;
         }
 
-        private static void EnableBestFit(Text text, int minSize, int maxSize, bool singleLine)
+        public static void EnableBestFit(Text text, int minSize, int maxSize, bool resizeHeight)
         {
-            text.resizeTextForBestFit = true;
-            text.resizeTextMinSize = minSize;
-            text.resizeTextMaxSize = maxSize;
-            if (!singleLine)
+            if (text == null)
             {
                 return;
             }
 
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            text.verticalOverflow = VerticalWrapMode.Truncate;
-            text.alignByGeometry = true;
-        }
-
-        private static void ApplyTextLegibility(Text text, bool strong)
-        {
-            Shadow shadow = text.gameObject.AddComponent<Shadow>();
-            shadow.effectColor = strong
-                ? new Color(0f, 0f, 0f, 0.66f)
-                : new Color(0f, 0f, 0f, 0.5f);
-            shadow.effectDistance = strong
-                ? new Vector2(0.8f, -0.8f)
-                : new Vector2(0.45f, -0.45f);
-            text.material = text.font != null ? text.font.material : text.material;
-        }
-
-        private sealed class RosterEntryView
-        {
-            public RosterEntryView(
-                GameObject root,
-                Button button,
-                Image background,
-                Outline outline,
-                Image accent,
-                Text nameLabel,
-                Text roleLabel,
-                Text positionLabel,
-                Text stateLabel,
-                Text skillLabel,
-                Text hpLabel,
-                Image hpFill)
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = minSize;
+            text.resizeTextMaxSize = maxSize;
+            if (resizeHeight)
             {
-                Root = root;
-                Button = button;
-                Background = background;
-                Outline = outline;
-                Accent = accent;
-                NameLabel = nameLabel;
-                RoleLabel = roleLabel;
-                PositionLabel = positionLabel;
-                StateLabel = stateLabel;
-                SkillLabel = skillLabel;
-                HpLabel = hpLabel;
-                HpFill = hpFill;
+                ContentSizeFitter fitter = text.gameObject.GetComponent<ContentSizeFitter>();
+                if (fitter == null)
+                {
+                    fitter = text.gameObject.AddComponent<ContentSizeFitter>();
+                }
+
+                fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            }
+        }
+
+        public static void CreateStretchUiBar(Transform parent, out Image fill)
+        {
+            GameObject background = new GameObject("BarBackground", typeof(RectTransform), typeof(Image));
+            background.transform.SetParent(parent, false);
+            RectTransform backgroundRect = background.GetComponent<RectTransform>();
+            backgroundRect.anchorMin = Vector2.zero;
+            backgroundRect.anchorMax = Vector2.one;
+            backgroundRect.offsetMin = Vector2.zero;
+            backgroundRect.offsetMax = Vector2.zero;
+            Image backgroundImage = background.GetComponent<Image>();
+            backgroundImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            backgroundImage.color = new Color(0.13f, 0.13f, 0.14f, 0.96f);
+
+            GameObject fillObject = new GameObject("BarFill", typeof(RectTransform), typeof(Image));
+            fillObject.transform.SetParent(background.transform, false);
+            RectTransform fillRect = fillObject.GetComponent<RectTransform>();
+            fillRect.anchorMin = new Vector2(0f, 0f);
+            fillRect.anchorMax = new Vector2(1f, 1f);
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+            fill = fillObject.GetComponent<Image>();
+            fill.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            fill.type = Image.Type.Filled;
+            fill.fillMethod = Image.FillMethod.Horizontal;
+            fill.fillOrigin = 0;
+            fill.fillAmount = 0f;
+        }
+
+        public static GameObject CreateAdaptiveChip(Transform parent, HudChipModel chip, float preferredHeight)
+        {
+            GameObject root = CreateInsetPanel("AdaptiveChip", parent, preferredHeight, chip.BackgroundColor);
+            LayoutElement layout = root.GetComponent<LayoutElement>();
+            layout.preferredWidth = Mathf.Clamp(40f + chip.Text.Length * 7f, 56f, 220f);
+            Text text = CreateAbsoluteText(root.transform, Vector2.zero, Vector2.zero, chip.Text, 11, FontStyle.Bold, TextAnchor.MiddleCenter, chip.TextColor);
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = 9;
+            text.resizeTextMaxSize = 11;
+            return root;
+        }
+
+        public static GameObject CreateFactCard(Transform parent, HudFactModel fact, float preferredWidth, float preferredHeight)
+        {
+            GameObject root = CreateInsetPanel("FactCard", parent, preferredHeight, new Color(0.15f, 0.13f, 0.1f, 0.94f));
+            LayoutElement layout = root.GetComponent<LayoutElement>();
+            layout.preferredWidth = preferredWidth;
+            Image accent = new GameObject("Accent", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            accent.transform.SetParent(root.transform, false);
+            RectTransform accentRect = accent.GetComponent<RectTransform>();
+            accentRect.anchorMin = new Vector2(0f, 0f);
+            accentRect.anchorMax = new Vector2(0f, 1f);
+            accentRect.sizeDelta = new Vector2(4f, 0f);
+            accentRect.anchoredPosition = Vector2.zero;
+            accent.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            accent.color = fact.AccentColor;
+
+            Text label = CreateAbsoluteText(root.transform, new Vector2(12f, 3f), new Vector2(-12f, -12f), fact.Label, 10, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextMuted);
+            Text value = CreateAbsoluteText(root.transform, new Vector2(12f, 11f), new Vector2(-12f, -3f), fact.Value, 12, FontStyle.Bold, TextAnchor.LowerRight, BattleUiTheme.TextPrimary);
+            label.resizeTextForBestFit = true;
+            label.resizeTextMinSize = 8;
+            label.resizeTextMaxSize = 10;
+            value.resizeTextForBestFit = true;
+            value.resizeTextMinSize = 10;
+            value.resizeTextMaxSize = 12;
+            return root;
+        }
+
+        public static TabButtonView CreateTabButton(Transform parent, string label)
+        {
+            GameObject root = new GameObject(label + "Tab", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+            root.transform.SetParent(parent, false);
+            root.GetComponent<LayoutElement>().preferredHeight = 28f;
+            Image background = root.GetComponent<Image>();
+            background.sprite = RuntimeSpriteLibrary.InkPanelSprite;
+            background.color = BattleUiTheme.TabIdle;
+            Button button = root.GetComponent<Button>();
+            ColorBlock colors = button.colors;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.04f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
+            colors.disabledColor = new Color(0.7f, 0.7f, 0.72f, 0.8f);
+            button.colors = colors;
+            Outline outline = root.AddComponent<Outline>();
+            outline.effectDistance = new Vector2(1f, -1f);
+            outline.effectColor = BattleUiTheme.DividerSoft;
+            Text text = CreateAbsoluteText(root.transform, Vector2.zero, Vector2.zero, label, 12, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TabIdleText);
+            return new TabButtonView(button, background, outline, text);
+        }
+
+        public static void DestroyChildren(Transform root)
+        {
+            if (root == null)
+            {
+                return;
             }
 
-            public GameObject Root { get; }
-
-            public Button Button { get; }
-
-            public Image Background { get; }
-
-            public Outline Outline { get; }
-
-            public Image Accent { get; }
-
-            public Text NameLabel { get; }
-
-            public Text RoleLabel { get; }
-
-            public Text PositionLabel { get; }
-
-            public Text StateLabel { get; }
-
-            public Text SkillLabel { get; }
-
-            public Text HpLabel { get; }
-
-            public Image HpFill { get; }
-
-            public string UnitId { get; set; } = string.Empty;
+            for (int index = root.childCount - 1; index >= 0; index--)
+            {
+                UnityEngine.Object.Destroy(root.GetChild(index).gameObject);
+            }
         }
+    }
+
+    internal sealed class TabButtonView
+    {
+        public TabButtonView(Button button, Image background, Outline outline, Text label)
+        {
+            Button = button;
+            Background = background;
+            Outline = outline;
+            Label = label;
+        }
+
+        public Button Button { get; }
+
+        public Image Background { get; }
+
+        public Outline Outline { get; }
+
+        public Text Label { get; }
+    }
+
+    internal sealed class TagChipView
+    {
+        public TagChipView(GameObject root, Image background, Text label)
+        {
+            Root = root;
+            Background = background;
+            Label = label;
+        }
+
+        public GameObject Root { get; }
+
+        public Image Background { get; }
+
+        public Text Label { get; }
+    }
+
+    internal sealed class RosterEntryView
+    {
+        public RosterEntryView(
+            GameObject root,
+            Button button,
+            Image background,
+            Outline outline,
+            Image accent,
+            Text nameLabel,
+            Text roleLabel,
+            Text positionLabel,
+            TagChipView primaryTagView,
+            TagChipView secondaryTagView,
+            Text hpLabel,
+            Image hpFill)
+        {
+            Root = root;
+            Button = button;
+            Background = background;
+            Outline = outline;
+            Accent = accent;
+            NameLabel = nameLabel;
+            RoleLabel = roleLabel;
+            PositionLabel = positionLabel;
+            PrimaryTagView = primaryTagView;
+            SecondaryTagView = secondaryTagView;
+            HpLabel = hpLabel;
+            HpFill = hpFill;
+        }
+
+        public string UnitId { get; set; }
+
+        public GameObject Root { get; }
+
+        public Button Button { get; }
+
+        public Image Background { get; }
+
+        public Outline Outline { get; }
+
+        public Image Accent { get; }
+
+        public Text NameLabel { get; }
+
+        public Text RoleLabel { get; }
+
+        public Text PositionLabel { get; }
+
+        public TagChipView PrimaryTagView { get; }
+
+        public TagChipView SecondaryTagView { get; }
+
+        public Text HpLabel { get; }
+
+        public Image HpFill { get; }
     }
 }

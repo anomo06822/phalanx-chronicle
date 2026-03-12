@@ -163,24 +163,24 @@ namespace PhalanxChronicle.Editor
                 changed |= SetFloat(serializedObject, "battleScale", 0f);
             }
 
-            Sprite portraitSprite = FindSpriteByBaseName(PortraitsRoot, row.PortraitAssetKey);
+            Sprite portraitSprite = FindPreferredSprite(PortraitsRoot, row.UnitId + "__portrait", row.PortraitAssetKey);
             if (portraitSprite == null)
             {
                 result.MissingPortraits.Add($"{row.UnitId}:{row.PortraitAssetKey}");
             }
             else
             {
-                changed |= SetObjectIfMissing(serializedObject, "portraitSprite", portraitSprite);
+                changed |= SetObject(serializedObject, "portraitSprite", portraitSprite);
             }
 
-            Sprite battleSprite = FindSpriteByBaseName(BattleRoot, row.BattleAssetKey);
+            Sprite battleSprite = FindPreferredSprite(BattleRoot, row.UnitId + "__battle", row.BattleAssetKey);
             if (battleSprite == null)
             {
                 result.MissingBattles.Add($"{row.UnitId}:{row.BattleAssetKey}");
             }
             else
             {
-                changed |= SetObjectIfMissing(serializedObject, "battleSprite", battleSprite);
+                changed |= SetObject(serializedObject, "battleSprite", battleSprite);
                 SerializedProperty battleScaleProperty = serializedObject.FindProperty("battleScale");
                 if (battleScaleProperty != null && battleScaleProperty.floatValue <= 0f)
                 {
@@ -196,7 +196,7 @@ namespace PhalanxChronicle.Editor
             }
             else
             {
-                changed |= SetObjectIfMissing(serializedObject, "weaponIcon", weaponIcon);
+                changed |= SetObject(serializedObject, "weaponIcon", weaponIcon);
             }
 
             return changed;
@@ -338,6 +338,17 @@ namespace PhalanxChronicle.Editor
             return trimmed.Replace("\"\"", "\"");
         }
 
+        private static Sprite FindPreferredSprite(string rootFolder, string preferredBaseName, string fallbackBaseName)
+        {
+            Sprite preferred = FindSpriteByBaseName(rootFolder, preferredBaseName);
+            if (preferred != null)
+            {
+                return preferred;
+            }
+
+            return FindSpriteByBaseName(rootFolder, fallbackBaseName);
+        }
+
         private static Sprite FindSpriteByBaseName(string rootFolder, string baseName)
         {
             if (string.IsNullOrWhiteSpace(baseName) || !AssetDatabase.IsValidFolder(rootFolder))
@@ -413,15 +424,10 @@ namespace PhalanxChronicle.Editor
             return true;
         }
 
-        private static bool SetObjectIfMissing(SerializedObject serializedObject, string propertyName, UnityEngine.Object value)
+        private static bool SetObject(SerializedObject serializedObject, string propertyName, UnityEngine.Object value)
         {
-            if (value == null)
-            {
-                return false;
-            }
-
             SerializedProperty property = serializedObject.FindProperty(propertyName);
-            if (property == null || property.objectReferenceValue != null)
+            if (property == null || property.objectReferenceValue == value)
             {
                 return false;
             }

@@ -34,6 +34,10 @@ namespace PhalanxChronicle.Battle.States
         {
         }
 
+        public virtual void OnCellHovered(GridPosition position, bool isHovered)
+        {
+        }
+
         public virtual void OnAttackRequested()
         {
         }

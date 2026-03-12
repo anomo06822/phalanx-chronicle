@@ -4,10 +4,93 @@ using System.Collections.Generic;
 
 namespace PhalanxChronicle.UI
 {
+    public sealed class HudFactModel
+    {
+        public string Label { get; set; } = string.Empty;
+
+        public string Value { get; set; } = string.Empty;
+
+        public Color AccentColor { get; set; } = Color.clear;
+    }
+
+    public sealed class HudChipModel
+    {
+        public string Text { get; set; } = string.Empty;
+
+        public Color BackgroundColor { get; set; } = new Color(0.16f, 0.14f, 0.11f, 0.95f);
+
+        public Color TextColor { get; set; } = Color.white;
+    }
+
     public enum BattleActionMenuMode
     {
         HoldPosition,
         AfterMove,
+    }
+
+    public enum BattleActionDescriptorType
+    {
+        Attack,
+        Skill,
+        Wait,
+        Back,
+    }
+
+    public enum BattleActionDescriptorPriority
+    {
+        Primary,
+        Secondary,
+    }
+
+    public enum BattleForecastMode
+    {
+        Neutral,
+        MovePreview,
+        ActionPreview,
+        ResultConfirm,
+    }
+
+    public enum BattleRosterTag
+    {
+        Ready,
+        Done,
+        SkillReady,
+        Threatening,
+        LowHp,
+        Exposed,
+    }
+
+    public sealed class BattleActionDescriptor
+    {
+        public BattleActionDescriptorType Type { get; set; }
+
+        public string Label { get; set; } = string.Empty;
+
+        public bool IsEnabled { get; set; }
+
+        public string Reason { get; set; } = string.Empty;
+
+        public int ManaCost { get; set; }
+
+        public string Range { get; set; } = string.Empty;
+
+        public string Area { get; set; } = string.Empty;
+
+        public int BestDamage { get; set; }
+
+        public IReadOnlyList<string> PredictedStatuses { get; set; } = new List<string>();
+
+        public string ThreatAfterAction { get; set; } = string.Empty;
+
+        public bool Lethal { get; set; }
+
+        public IReadOnlyList<HudChipModel> MetricChips { get; set; } = new List<HudChipModel>();
+
+        public string OutcomeLine { get; set; } = string.Empty;
+
+        public HudChipModel RiskChip { get; set; }
+
+        public BattleActionDescriptorPriority Priority { get; set; } = BattleActionDescriptorPriority.Secondary;
     }
 
     public sealed class BattleActionMenuModel
@@ -16,29 +99,15 @@ namespace PhalanxChronicle.UI
 
         public string ModeLabel { get; set; } = string.Empty;
 
-        public bool CanAttack { get; set; }
+        public string ContextHint { get; set; } = string.Empty;
 
-        public string AttackDetail { get; set; } = string.Empty;
-
-        public string SkillName { get; set; } = string.Empty;
-
-        public bool CanUseSkill { get; set; }
-
-        public string SkillDetail { get; set; } = string.Empty;
-
-        public bool CanWait { get; set; } = true;
-
-        public string WaitDetail { get; set; } = string.Empty;
-
-        public bool CanBack { get; set; }
-
-        public string BackLabel { get; set; } = string.Empty;
-
-        public string BackDetail { get; set; } = string.Empty;
+        public IReadOnlyList<BattleActionDescriptor> Actions { get; set; } = new List<BattleActionDescriptor>();
     }
 
     public sealed class BattleOverviewModel
     {
+        public string HeaderEyebrow { get; set; } = string.Empty;
+
         public string StageLabel { get; set; } = string.Empty;
 
         public string SeedLabel { get; set; } = string.Empty;
@@ -60,6 +129,12 @@ namespace PhalanxChronicle.UI
         public string ObjectiveFailure { get; set; } = string.Empty;
 
         public string InstructionText { get; set; } = string.Empty;
+
+        public string SecondaryInstructionText { get; set; } = string.Empty;
+
+        public IReadOnlyList<HudFactModel> HeaderFacts { get; set; } = new List<HudFactModel>();
+
+        public IReadOnlyList<HudFactModel> ObjectiveFacts { get; set; } = new List<HudFactModel>();
     }
 
     public sealed class BattleSelectedUnitModel
@@ -73,6 +148,8 @@ namespace PhalanxChronicle.UI
         public UnitRole Role { get; set; }
 
         public string RoleLabel { get; set; } = string.Empty;
+
+        public string IdentitySubtitle { get; set; } = string.Empty;
 
         public string PositionLabel { get; set; } = string.Empty;
 
@@ -131,6 +208,38 @@ namespace PhalanxChronicle.UI
         public string ThreatSummary { get; set; } = string.Empty;
 
         public string ThreatDetail { get; set; } = string.Empty;
+
+        public string ProjectedRiskLabel { get; set; } = string.Empty;
+
+        public string EquipmentSummary { get; set; } = string.Empty;
+
+        public string MountSummary { get; set; } = string.Empty;
+
+        public string MountDeltaLabel { get; set; } = string.Empty;
+
+        public BattleThreatProjection ThreatProjection { get; set; }
+
+        public IReadOnlyList<HudChipModel> IdentityChips { get; set; } = new List<HudChipModel>();
+
+        public IReadOnlyList<HudFactModel> VitalFacts { get; set; } = new List<HudFactModel>();
+
+        public IReadOnlyList<HudFactModel> CombatFacts { get; set; } = new List<HudFactModel>();
+
+        public IReadOnlyList<HudChipModel> StatusPills { get; set; } = new List<HudChipModel>();
+
+        public IReadOnlyList<HudFactModel> IdentityFacts { get; set; } = new List<HudFactModel>();
+
+        public IReadOnlyList<HudFactModel> PrimaryFacts { get; set; } = new List<HudFactModel>();
+
+        public IReadOnlyList<HudChipModel> PrimaryChips { get; set; } = new List<HudChipModel>();
+
+        public HudChipModel ThreatChip { get; set; }
+
+        public string ThreatLine { get; set; } = string.Empty;
+
+        public string DetailHeader { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> DetailLines { get; set; } = new List<string>();
     }
 
     public sealed class BattleRosterEntryModel
@@ -162,28 +271,75 @@ namespace PhalanxChronicle.UI
         public bool IsSelected { get; set; }
 
         public bool IsThreateningSelection { get; set; }
+
+        public bool IsLowHp { get; set; }
+
+        public bool IsSkillReady { get; set; }
+
+        public bool IsExposed { get; set; }
+
+        public IReadOnlyList<BattleRosterTag> Tags { get; set; } = new List<BattleRosterTag>();
+
+        public BattleRosterTag? PrimaryTag { get; set; }
+
+        public BattleRosterTag? SecondaryTag { get; set; }
     }
 
     public sealed class BattleForecastModel
     {
+        public BattleForecastMode Mode { get; set; } = BattleForecastMode.Neutral;
+
         public string Header { get; set; } = string.Empty;
 
         public string Title { get; set; } = string.Empty;
 
-        public string Summary { get; set; } = string.Empty;
+        public string OutcomeSummary { get; set; } = string.Empty;
 
-        public string Detail { get; set; } = string.Empty;
+        public string PrimaryEffect { get; set; } = string.Empty;
 
-        public string Footer { get; set; } = string.Empty;
+        public IReadOnlyList<string> SecondaryEffects { get; set; } = new List<string>();
+
+        public string RiskSummary { get; set; } = string.Empty;
+
+        public string CommitRecommendation { get; set; } = string.Empty;
 
         public Color AccentColor { get; set; } = Color.white;
+
+        public IReadOnlyList<HudFactModel> OutcomeFacts { get; set; } = new List<HudFactModel>();
+
+        public string PrimaryLine { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> SecondaryLines { get; set; } = new List<string>();
+
+        public HudChipModel RiskChip { get; set; }
+
+        public HudChipModel CommitChip { get; set; }
+    }
+
+    public sealed class BattleResultModel
+    {
+        public string Title { get; set; } = string.Empty;
+
+        public string Summary { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> RewardLines { get; set; } = new List<string>();
+
+        public IReadOnlyList<string> UnitLines { get; set; } = new List<string>();
     }
 
     public sealed class CampaignStageSelectModel
     {
+        public string Eyebrow { get; set; } = string.Empty;
+
         public string Title { get; set; } = string.Empty;
 
         public string Body { get; set; } = string.Empty;
+
+        public string ProgressLabel { get; set; } = string.Empty;
+
+        public string HighlightLabel { get; set; } = string.Empty;
+
+        public string DeckTitle { get; set; } = string.Empty;
 
         public IReadOnlyList<CampaignStageEntryModel> Stages { get; set; } = new List<CampaignStageEntryModel>();
     }
@@ -198,22 +354,52 @@ namespace PhalanxChronicle.UI
 
         public string Description { get; set; } = string.Empty;
 
+        public string BattlefieldLabel { get; set; } = string.Empty;
+
+        public string RewardLabel { get; set; } = string.Empty;
+
+        public string DurationLabel { get; set; } = string.Empty;
+
         public bool IsUnlocked { get; set; }
 
         public bool IsCleared { get; set; }
 
         public bool IsRecommended { get; set; }
+
+        public string BadgeText { get; set; } = string.Empty;
+
+        public string PriorityBadge { get; set; } = string.Empty;
+
+        public string RecommendedReason { get; set; } = string.Empty;
+
+        public string PreviewThemeId { get; set; } = string.Empty;
+
+        public int SortWeight { get; set; }
     }
 
     public sealed class CampaignInterludeModel
     {
+        public string Eyebrow { get; set; } = string.Empty;
+
         public string Title { get; set; } = string.Empty;
 
         public string Body { get; set; } = string.Empty;
 
+        public string ProgressLabel { get; set; } = string.Empty;
+
+        public string DeckTitle { get; set; } = string.Empty;
+
+        public string DeckBody { get; set; } = string.Empty;
+
         public IReadOnlyList<string> DetailLines { get; set; } = new List<string>();
 
         public string HighlightLine { get; set; } = string.Empty;
+
+        public string TerrainLabel { get; set; } = string.Empty;
+
+        public string RiskLabel { get; set; } = string.Empty;
+
+        public string RewardLabel { get; set; } = string.Empty;
 
         public string PrimaryActionLabel { get; set; } = string.Empty;
 
@@ -222,9 +408,17 @@ namespace PhalanxChronicle.UI
 
     public sealed class CampaignOptionListModel
     {
+        public string Eyebrow { get; set; } = string.Empty;
+
         public string Title { get; set; } = string.Empty;
 
         public string Body { get; set; } = string.Empty;
+
+        public string ProgressLabel { get; set; } = string.Empty;
+
+        public string HighlightLabel { get; set; } = string.Empty;
+
+        public string DeckTitle { get; set; } = string.Empty;
 
         public IReadOnlyList<CampaignOptionEntryModel> Options { get; set; } = new List<CampaignOptionEntryModel>();
 
@@ -237,16 +431,45 @@ namespace PhalanxChronicle.UI
     {
         public string OptionId { get; set; } = string.Empty;
 
+        public string Section { get; set; } = string.Empty;
+
         public string Title { get; set; } = string.Empty;
 
         public string Status { get; set; } = string.Empty;
 
         public string Description { get; set; } = string.Empty;
 
+        public string IconGlyph { get; set; } = string.Empty;
+
+        public string MetricLine { get; set; } = string.Empty;
+
+        public string BadgeText { get; set; } = string.Empty;
+
+        public string RecommendedReason { get; set; } = string.Empty;
+
+        public string AvailabilityReason { get; set; } = string.Empty;
+
+        public int SortWeight { get; set; }
+
         public bool IsEnabled { get; set; } = true;
 
         public bool IsEmphasized { get; set; }
 
         public bool IsPromotionOption { get; set; }
+    }
+
+    public sealed class BattleOnboardingModel
+    {
+        public string ProgressLabel { get; set; } = string.Empty;
+
+        public string Title { get; set; } = string.Empty;
+
+        public string Body { get; set; } = string.Empty;
+
+        public string HintText { get; set; } = string.Empty;
+
+        public string SkipLabel { get; set; } = string.Empty;
+
+        public bool CanSkip { get; set; } = true;
     }
 }

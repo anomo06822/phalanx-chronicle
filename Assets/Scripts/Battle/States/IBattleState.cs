@@ -17,6 +17,8 @@ namespace PhalanxChronicle.Battle.States
 
         void OnCellClicked(GridPosition position);
 
+        void OnCellHovered(GridPosition position, bool isHovered);
+
         void OnAttackRequested();
 
         void OnSkillRequested();
