@@ -39,6 +39,7 @@ namespace PhalanxChronicle.Battle.Effects
             Unit casterView = getUnitView(skillResult.CasterUnitId);
             Unit primaryTargetView = getUnitView(skillResult.PrimaryTargetUnitId);
             UnitRuntimeState casterState = simulation.Context.GetUnit(skillResult.CasterUnitId);
+            bool shouldBatchTargets = actionSequencer.ShouldBatchSkillResult(actingSide, skillResult);
             BattlePresentationProfile profile = actionSequencer.GetProfile(actingSide);
             if (actionSequencer.ShouldTakeOverRibbon(actingSide, skillResult))
             {
@@ -69,6 +70,7 @@ namespace PhalanxChronicle.Battle.Effects
                 yield return casterView.AnimateAttack(primaryTargetView.transform.position);
             }
 
+            int resolvedEffects = 0;
             foreach (SkillEffectResult effect in skillResult.Effects)
             {
                 Unit targetView = getUnitView(effect.UnitId);
@@ -110,10 +112,16 @@ namespace PhalanxChronicle.Battle.Effects
                     }
                 }
 
+                resolvedEffects++;
                 float interEffectDelay = actionSequencer.GetInterEffectDelay(actingSide, skillResult);
                 if (interEffectDelay > 0f)
                 {
                     yield return new WaitForSeconds(interEffectDelay);
+                }
+
+                if (shouldBatchTargets && resolvedEffects < skillResult.Effects.Count)
+                {
+                    continue;
                 }
             }
 

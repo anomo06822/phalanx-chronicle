@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using PhalanxChronicle.Core;
+using TMPro;
 using UnityEngine;
+using UnityEngine.TextCore.LowLevel;
 
 namespace PhalanxChronicle.Presentation
 {
@@ -32,6 +34,7 @@ namespace PhalanxChronicle.Presentation
         private static readonly Dictionary<string, Sprite> ambientOverlaySprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<string, Sprite> gradientSprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<GridOverlayKind, Sprite> gridOverlaySprites = new Dictionary<GridOverlayKind, Sprite>();
+        private static readonly Dictionary<string, TMP_FontAsset> tmpFontAssets = new Dictionary<string, TMP_FontAsset>();
 
         private static Sprite whiteSprite;
         private static Sprite tileSprite;
@@ -46,6 +49,10 @@ namespace PhalanxChronicle.Presentation
         private static Font defaultFont;
         private static Font headingFont;
         private static Font bodyFont;
+        private static TMP_FontAsset defaultTmpFont;
+        private static TMP_FontAsset headingTmpFont;
+        private static TMP_FontAsset bodyTmpFont;
+        private static TMP_FontAsset essentialTmpFont;
 
         public static Sprite WhiteSprite
         {
@@ -79,15 +86,136 @@ namespace PhalanxChronicle.Presentation
 
         public static Sprite ArrowSprite => arrowSprite ??= CreateArrowSprite();
 
-        public static Font HeadingFont => headingFont ??= CreateHeadingFont();
+        public static Font HeadingFont
+        {
+            get
+            {
+                EnsurePreferredResourceFonts();
+                return headingFont ??= CreateHeadingFont();
+            }
+        }
 
-        public static Font BodyFont => bodyFont ??= CreateBodyFont();
+        public static Font BodyFont
+        {
+            get
+            {
+                EnsurePreferredResourceFonts();
+                return bodyFont ??= CreateBodyFont();
+            }
+        }
 
-        public static Font DefaultFont => defaultFont ??= BodyFont;
+        public static Font DefaultFont
+        {
+            get
+            {
+                EnsurePreferredResourceFonts();
+                return defaultFont ??= BodyFont;
+            }
+        }
+
+        public static TMP_FontAsset HeadingTmpFont
+        {
+            get
+            {
+                EnsurePreferredResourceFonts();
+                headingTmpFont ??= CreateTmpFontAsset(HeadingFont, "Heading");
+                EnsureTmpFallbackChain();
+                return headingTmpFont;
+            }
+        }
+
+        public static TMP_FontAsset BodyTmpFont
+        {
+            get
+            {
+                EnsurePreferredResourceFonts();
+                bodyTmpFont ??= CreateTmpFontAsset(BodyFont, "Body");
+                EnsureTmpFallbackChain();
+                return bodyTmpFont;
+            }
+        }
+
+        public static TMP_FontAsset DefaultTmpFont
+        {
+            get
+            {
+                EnsurePreferredResourceFonts();
+                defaultTmpFont ??= BodyTmpFont;
+                EnsureTmpFallbackChain();
+                return defaultTmpFont;
+            }
+        }
 
         public static Font GetUiFont(int size, FontStyle fontStyle)
         {
             return fontStyle == FontStyle.Bold && size >= 17 ? HeadingFont : BodyFont;
+        }
+
+        public static TMP_FontAsset GetUiTmpFont(int size, FontStyle fontStyle)
+        {
+            return fontStyle == FontStyle.Bold && size >= 17 ? HeadingTmpFont : BodyTmpFont;
+        }
+
+        public static TMP_FontAsset GetWorldTmpFont(FontStyle fontStyle)
+        {
+            return fontStyle == FontStyle.Bold ? HeadingTmpFont : BodyTmpFont;
+        }
+
+        public static Material CreateTmpMaterialInstance(
+            TMP_FontAsset fontAsset,
+            Color faceColor,
+            Color outlineColor,
+            float outlineWidth,
+            Color? underlayColor = null,
+            Vector2? underlayOffset = null,
+            float underlaySoftness = 0f)
+        {
+            TMP_FontAsset resolvedFont = fontAsset != null ? fontAsset : DefaultTmpFont;
+            Material baseMaterial = resolvedFont != null ? resolvedFont.material : null;
+            if (baseMaterial == null)
+            {
+                return null;
+            }
+
+            Material material = new Material(baseMaterial);
+            material.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+            if (material.HasProperty(ShaderUtilities.ID_FaceColor))
+            {
+                material.SetColor(ShaderUtilities.ID_FaceColor, faceColor);
+            }
+
+            if (material.HasProperty(ShaderUtilities.ID_OutlineColor))
+            {
+                material.SetColor(ShaderUtilities.ID_OutlineColor, outlineColor);
+            }
+
+            if (material.HasProperty(ShaderUtilities.ID_OutlineWidth))
+            {
+                material.SetFloat(ShaderUtilities.ID_OutlineWidth, outlineWidth);
+            }
+
+            if (underlayColor.HasValue && material.HasProperty(ShaderUtilities.ID_UnderlayColor))
+            {
+                material.EnableKeyword(ShaderUtilities.Keyword_Underlay);
+                material.SetColor(ShaderUtilities.ID_UnderlayColor, underlayColor.Value);
+                Vector2 offset = underlayOffset ?? new Vector2(0.15f, -0.15f);
+                if (material.HasProperty(ShaderUtilities.ID_UnderlayOffsetX))
+                {
+                    material.SetFloat(ShaderUtilities.ID_UnderlayOffsetX, offset.x);
+                }
+
+                if (material.HasProperty(ShaderUtilities.ID_UnderlayOffsetY))
+                {
+                    material.SetFloat(ShaderUtilities.ID_UnderlayOffsetY, offset.y);
+                }
+
+                if (material.HasProperty(ShaderUtilities.ID_UnderlaySoftness))
+                {
+                    material.SetFloat(ShaderUtilities.ID_UnderlaySoftness, underlaySoftness);
+                }
+            }
+
+            return material;
         }
 
         public static Sprite GetUnitSprite(string unitId, UnitFaction faction)
@@ -509,21 +637,28 @@ namespace PhalanxChronicle.Presentation
 
         private static Sprite CreateInkPanelSprite()
         {
-            Texture2D texture = CreateTexture(48, 48, FilterMode.Bilinear);
+            const int size = 96;
+            const int border = 12;
+            Texture2D texture = CreateTexture(size, size, FilterMode.Bilinear);
             for (int y = 0; y < texture.height; y++)
             {
                 for (int x = 0; x < texture.width; x++)
                 {
-                    float edgeDistance = Mathf.Min(Mathf.Min(x, texture.width - 1 - x), Mathf.Min(y, texture.height - 1 - y));
-                    float edgeFade = Mathf.Clamp01(edgeDistance / 6f);
-                    float grain = (((x * 13) + (y * 7)) % 17) / 16f;
-                    float alpha = Mathf.Lerp(0.82f, 1f, grain * 0.16f) * edgeFade;
+                    int edgeDistance = Mathf.Min(Mathf.Min(x, texture.width - 1 - x), Mathf.Min(y, texture.height - 1 - y));
+                    float grain = (((x * 17) + (y * 11) + ((x * y) % 19)) % 29) / 28f;
+                    float paperNoise = Mathf.Lerp(-0.018f, 0.02f, grain);
+                    float edgeAlpha = edgeDistance <= 2
+                        ? 0.88f
+                        : edgeDistance <= 5
+                            ? 0.94f
+                            : 0.985f;
+                    float alpha = Mathf.Clamp01(edgeAlpha + paperNoise);
                     texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
                 }
             }
 
             texture.Apply();
-            return CreateSprite(texture, 24f);
+            return CreateSprite(texture, 48f, new Vector4(border, border, border, border));
         }
 
         private static Sprite CreateSlashSprite()
@@ -1996,7 +2131,19 @@ namespace PhalanxChronicle.Presentation
 
         private static Sprite CreateSprite(Texture2D texture, float pixelsPerUnit)
         {
-            return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), pixelsPerUnit);
+            return CreateSprite(texture, pixelsPerUnit, Vector4.zero);
+        }
+
+        private static Sprite CreateSprite(Texture2D texture, float pixelsPerUnit, Vector4 border)
+        {
+            return Sprite.Create(
+                texture,
+                new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                pixelsPerUnit,
+                0u,
+                SpriteMeshType.FullRect,
+                border);
         }
 
         private static void FillRect(Texture2D texture, int xMin, int yMin, int xMax, int yMax, Color color)
@@ -2281,6 +2428,127 @@ namespace PhalanxChronicle.Presentation
         {
             Font dynamicFont = Font.CreateDynamicFontFromOSFont(candidates, size);
             return dynamicFont;
+        }
+
+        private static TMP_FontAsset GetEssentialTmpFont()
+        {
+            if (essentialTmpFont != null)
+            {
+                return essentialTmpFont;
+            }
+
+            essentialTmpFont = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+            if (essentialTmpFont == null)
+            {
+                essentialTmpFont = TMP_Settings.defaultFontAsset;
+            }
+
+            return essentialTmpFont;
+        }
+
+        private static void EnsurePreferredResourceFonts()
+        {
+            Font preferredBodyFont = Resources.Load<Font>("Fonts/NotoSansTC");
+            Font preferredHeadingFont = Resources.Load<Font>("Fonts/NotoSerifTC") ?? Resources.Load<Font>("Fonts/SourceHanSerifTC");
+            bool fontChanged = false;
+
+            if (preferredBodyFont != null && bodyFont != preferredBodyFont)
+            {
+                bodyFont = preferredBodyFont;
+                bodyTmpFont = null;
+                defaultFont = null;
+                defaultTmpFont = null;
+                fontChanged = true;
+            }
+
+            if (preferredHeadingFont != null && headingFont != preferredHeadingFont)
+            {
+                headingFont = preferredHeadingFont;
+                headingTmpFont = null;
+                fontChanged = true;
+            }
+
+            if (fontChanged)
+            {
+                tmpFontAssets.Clear();
+            }
+        }
+
+        private static void EnsureTmpFallbackChain()
+        {
+            TMP_FontAsset essentialFont = GetEssentialTmpFont();
+            AddTmpFallback(essentialFont, bodyTmpFont);
+            AddTmpFallback(essentialFont, headingTmpFont);
+            AddTmpFallback(bodyTmpFont, essentialFont);
+            AddTmpFallback(headingTmpFont, essentialFont);
+            AddTmpFallback(bodyTmpFont, headingTmpFont);
+            AddTmpFallback(headingTmpFont, bodyTmpFont);
+        }
+
+        private static void AddTmpFallback(TMP_FontAsset owner, TMP_FontAsset fallback)
+        {
+            if (owner == null || fallback == null || owner == fallback)
+            {
+                return;
+            }
+
+            owner.fallbackFontAssetTable ??= new List<TMP_FontAsset>();
+            if (!owner.fallbackFontAssetTable.Contains(fallback))
+            {
+                owner.fallbackFontAssetTable.Add(fallback);
+            }
+        }
+
+        private static TMP_FontAsset CreateTmpFontAsset(Font font, string roleKey)
+        {
+            Font sourceFont = font != null ? font : DefaultFont;
+            if (sourceFont == null)
+            {
+                return GetEssentialTmpFont();
+            }
+
+            string cacheKey = roleKey + ":" + sourceFont.name;
+            if (tmpFontAssets.TryGetValue(cacheKey, out TMP_FontAsset cachedFontAsset) && cachedFontAsset != null)
+            {
+                return cachedFontAsset;
+            }
+
+            TMP_FontAsset fontAsset = null;
+            try
+            {
+                fontAsset = TMP_FontAsset.CreateFontAsset(
+                    sourceFont,
+                    90,
+                    9,
+                    GlyphRenderMode.SDFAA,
+                    1024,
+                    1024,
+                    AtlasPopulationMode.Dynamic,
+                    true);
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogWarning($"[RuntimeSpriteLibrary] Failed to create TMP font asset for '{sourceFont.name}' ({roleKey}). Falling back to essential TMP font. {exception.Message}");
+            }
+
+            if (fontAsset == null)
+            {
+                fontAsset = GetEssentialTmpFont();
+                if (fontAsset == null)
+                {
+                    return null;
+                }
+
+                tmpFontAssets[cacheKey] = fontAsset;
+                EnsureTmpFallbackChain();
+                return fontAsset;
+            }
+
+            fontAsset.name = sourceFont.name + " " + roleKey + " TMP";
+            fontAsset.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+            tmpFontAssets[cacheKey] = fontAsset;
+            EnsureTmpFallbackChain();
+            return fontAsset;
         }
     }
 }

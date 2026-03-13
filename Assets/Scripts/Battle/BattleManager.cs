@@ -12,6 +12,7 @@ using PhalanxChronicle.Localization;
 using PhalanxChronicle.Presentation;
 using PhalanxChronicle.UI;
 using UnityEngine;
+using UnityEngine.U2D;
 using UnityEngine.UI;
 
 namespace PhalanxChronicle.Battle
@@ -51,6 +52,8 @@ namespace PhalanxChronicle.Battle
         private bool enableFirstBattleOnboarding;
         private Action<bool> firstBattleOnboardingResolvedHandler;
         private FirstBattleOnboardingController onboardingController;
+        private BattleDecisionContext currentDecisionContext = new BattleDecisionContext();
+        private BattleOverviewModel currentOverviewModel = new BattleOverviewModel();
 
         public bool IsDialogueVisible => battleHUD != null && battleHUD.IsDialogueVisible;
 
@@ -322,7 +325,15 @@ namespace PhalanxChronicle.Battle
             }
 
             ApplyMovePreview(selected, preview);
-            battleHUD.BindForecast(BuildMovePreviewModel(selected, preview));
+            BindDecisionContext(
+                new BattleDecisionContext
+                {
+                    SourceState = BattleDecisionContextSource.MoveHover,
+                    ActorUnitId = selected.Id,
+                    TargetUnitId = string.Empty,
+                    Rationale = preview.BlockReason,
+                    Preview = preview,
+                });
         }
 
         public void ShowAttackRangeForSelection()
@@ -355,8 +366,19 @@ namespace PhalanxChronicle.Battle
 
         public void ShowActionMenu()
         {
+            BindDecisionContext(
+                new BattleDecisionContext
+                {
+                    SourceState = BattleDecisionContextSource.ActionMenu,
+                    ActorUnitId = GetSelectedUnit()?.Id,
+                    TargetUnitId = string.Empty,
+                    Rationale = string.Empty,
+                    Preview = null,
+                });
+
+            BattleHudDecisionContextModel decisionContextModel = BuildDecisionContextModel();
             actionMenuPanel.Show(
-                BuildActionMenuModel(),
+                decisionContextModel.ActionMenuModel,
                 HandleAttackRequested,
                 HandleSkillRequested,
                 HandleWaitRequested,
@@ -576,17 +598,12 @@ namespace PhalanxChronicle.Battle
                 : LocalizationService.Text("ui.log.choose_action_hold", "原地可選擇攻擊、技能或待命。");
         }
 
-        private BattleActionMenuModel BuildActionMenuModel()
-        {
-            return hudModelBuilder.BuildActionMenuModel(simulation, GetSelectedUnit(), HasSelectionMoved());
-        }
-
         public void ResolvePlayerAction(string logMessage)
         {
             SetLog(logMessage);
             PushBattleFeedEntry(logMessage);
             HideActionMenu();
-            battleHUD.ClearForecast();
+            ClearDecisionContext();
             ClearSelectionAndHighlights();
 
             Type nextStateType = AreAllPlayerUnitsDone() ? typeof(EnemyTurnState) : typeof(UnitSelectionState);
@@ -677,7 +694,7 @@ namespace PhalanxChronicle.Battle
             }
 
             simulation.EndCurrentTurn();
-            battleHUD.ClearForecast();
+            ClearDecisionContext();
             ChangeState<PlayerTurnStartState>();
         }
 
@@ -836,10 +853,31 @@ namespace PhalanxChronicle.Battle
             float orthographicSizeForHeight = (boardHeight * 0.5f) / usableHeight;
             float orthographicSizeForWidth = (boardWidth * 0.5f) / (aspect * usableWidth);
             float orthographicSize = Mathf.Max(orthographicSizeForHeight, orthographicSizeForWidth);
+            orthographicSize = Mathf.Ceil(orthographicSize * 16f) / 16f;
             float verticalOffset = (topHudReserve - bottomHudReserve) * orthographicSize * 0.24f;
 
-            mainCamera.transform.position = new Vector3(0f, verticalOffset, -10f);
+            PixelPerfectCamera pixelPerfectCamera = mainCamera.GetComponent<PixelPerfectCamera>();
+            if (pixelPerfectCamera != null)
+            {
+                pixelPerfectCamera.assetsPPU = 64;
+            }
+
+            mainCamera.transform.position = SnapToPixelGrid(new Vector3(0f, verticalOffset, -10f), 64f);
             mainCamera.orthographicSize = orthographicSize;
+        }
+
+        private static Vector3 SnapToPixelGrid(Vector3 position, float assetsPpu)
+        {
+            if (assetsPpu <= 0f)
+            {
+                return position;
+            }
+
+            float pixel = 1f / assetsPpu;
+            return new Vector3(
+                Mathf.Round(position.x / pixel) * pixel,
+                Mathf.Round(position.y / pixel) * pixel,
+                position.z);
         }
 
         private void RegisterStates()
@@ -993,12 +1031,14 @@ namespace PhalanxChronicle.Battle
                 threatProjection = BattleThreatAnalyzer.AnalyzeProjected(simulation.Context, selected, selected.Position);
             }
 
-            battleHUD.BindOverview(BuildOverviewModel());
+            currentOverviewModel = BuildOverviewModel();
+            battleHUD.BindOverview(currentOverviewModel);
             battleHUD.BindSelectedUnit(BuildSelectedUnitModel(selected, threatProjection));
             battleHUD.BindRoster(
                 BuildRosterEntries(UnitFaction.Player, threatProjection),
                 BuildRosterEntries(UnitFaction.Enemy, threatProjection),
                 HandleHudUnitRequested);
+            battleHUD.BindDecisionContextModel(BuildDecisionContextModel());
             RefreshOnboardingPrompt();
         }
 
@@ -1100,7 +1140,15 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            battleHUD.BindForecast(BuildAttackPreviewModel(selected, target, preview));
+            BindDecisionContext(
+                new BattleDecisionContext
+                {
+                    SourceState = BattleDecisionContextSource.AttackHover,
+                    ActorUnitId = selected.Id,
+                    TargetUnitId = target.Id,
+                    Rationale = preview.BlockReason,
+                    Preview = preview,
+                });
         }
 
         public void PreviewQuickAttackTarget(Unit unitView, bool isHovered)
@@ -1133,7 +1181,15 @@ namespace PhalanxChronicle.Battle
             }
 
             ApplyQuickAttackPreview(selected, target, preview);
-            battleHUD.BindForecast(BuildQuickAttackPreviewModel(selected, target, preview));
+            BindDecisionContext(
+                new BattleDecisionContext
+                {
+                    SourceState = BattleDecisionContextSource.AttackHover,
+                    ActorUnitId = selected.Id,
+                    TargetUnitId = target.Id,
+                    Rationale = preview.BlockReason,
+                    Preview = preview,
+                });
         }
 
         public void PreviewSkillTarget(Unit unitView, bool isHovered)
@@ -1169,16 +1225,21 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            battleHUD.BindForecast(BuildSkillPreviewModel(selected, target, preview));
+            BindDecisionContext(
+                new BattleDecisionContext
+                {
+                    SourceState = BattleDecisionContextSource.SkillHover,
+                    ActorUnitId = selected.Id,
+                    TargetUnitId = target.Id,
+                    Rationale = preview.BlockReason,
+                    Preview = preview,
+                });
             RefreshSkillTargetPreview(selected, target);
         }
 
         public void ClearTargetPreview()
         {
-            if (battleHUD != null)
-            {
-                battleHUD.ClearForecast();
-            }
+            ClearDecisionContext();
         }
 
         private void RestoreMoveSelectionPreview()
@@ -1234,26 +1295,6 @@ namespace PhalanxChronicle.Battle
             {
                 gridManager.ShowAttackRange(affectedPositions);
             }
-        }
-
-        private BattleForecastModel BuildAttackPreviewModel(UnitRuntimeState attacker, UnitRuntimeState defender, BattleIntentPreview preview)
-        {
-            return hudModelBuilder.BuildIntentForecastModel(simulation, preview);
-        }
-
-        private BattleForecastModel BuildMovePreviewModel(UnitRuntimeState unit, BattleIntentPreview preview)
-        {
-            return hudModelBuilder.BuildIntentForecastModel(simulation, preview);
-        }
-
-        private BattleForecastModel BuildQuickAttackPreviewModel(UnitRuntimeState attacker, UnitRuntimeState defender, BattleIntentPreview preview)
-        {
-            return hudModelBuilder.BuildIntentForecastModel(simulation, preview);
-        }
-
-        private BattleForecastModel BuildSkillPreviewModel(UnitRuntimeState caster, UnitRuntimeState primaryTarget, BattleIntentPreview preview)
-        {
-            return hudModelBuilder.BuildIntentForecastModel(simulation, preview);
         }
 
         private void PushBattleFeedEntry(string text)
@@ -1328,7 +1369,7 @@ namespace PhalanxChronicle.Battle
                 ? new FirstBattleOnboardingController(string.Empty)
                 : null;
 
-            battleHUD.ClearForecast();
+            ClearDecisionContext();
             battleHUD.HideResult();
             battleHUD.HideDialogue();
             battleHUD.HideCampaignOverlay();
@@ -1608,12 +1649,38 @@ namespace PhalanxChronicle.Battle
                     return true;
                 }
 
-                battleHUD.ClearForecast();
+                ClearDecisionContext();
                 ChangeState(terminalState);
                 return true;
             }
 
             return TryEnterScenarioDialogue(defaultResumeStateType);
+        }
+
+        private void BindDecisionContext(BattleDecisionContext context)
+        {
+            currentDecisionContext = context ?? new BattleDecisionContext();
+            UpdateHudModels();
+        }
+
+        private void ClearDecisionContext()
+        {
+            currentDecisionContext = new BattleDecisionContext();
+            if (battleHUD != null)
+            {
+                battleHUD.ClearContext();
+            }
+        }
+
+        private BattleHudDecisionContextModel BuildDecisionContextModel()
+        {
+            return hudModelBuilder.BuildDecisionContextModel(
+                simulation,
+                currentDecisionContext,
+                GetSelectedUnit(),
+                HasSelectionMoved(),
+                currentOverviewModel,
+                battleHUD != null ? battleHUD.FeedEntries : Array.Empty<string>());
         }
     }
 }

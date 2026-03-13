@@ -84,11 +84,17 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GuardOrder:
                     ApplyGuardOrder(caster, affectedUnits, effects);
                     break;
+                case ActiveSkillType.KingsBanner:
+                    ApplyKingsBanner(caster, affectedUnits, effects);
+                    break;
                 case ActiveSkillType.PowerStrike:
                     ApplyPowerStrike(context, caster, affectedUnits[0], effects);
                     break;
                 case ActiveSkillType.DragonPierce:
                     ApplyDragonPierce(context, caster, affectedUnits[0], effects);
+                    break;
+                case ActiveSkillType.WhiteHorseRescue:
+                    ApplyWhiteHorseRescue(context, caster, affectedUnits[0], effects);
                     break;
                 case ActiveSkillType.Volley:
                     ApplyVolley(context, caster, affectedUnits, effects);
@@ -99,11 +105,17 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.AzureDragonSlash:
                     ApplyAzureDragonSlash(context, caster, affectedUnits, effects);
                     break;
+                case ActiveSkillType.CrimsonCrescent:
+                    ApplyCrimsonCrescent(context, caster, affectedUnits, primaryTarget, effects);
+                    break;
                 case ActiveSkillType.WarCry:
                     ApplyWarCry(caster, affectedUnits, effects);
                     break;
                 case ActiveSkillType.LionWarCry:
                     ApplyLionWarCry(caster, affectedUnits, effects);
+                    break;
+                case ActiveSkillType.StonewallChallenge:
+                    ApplyStonewallChallenge(context, caster, affectedUnits, effects);
                     break;
                 case ActiveSkillType.SkyVolley:
                     ApplySkyVolley(context, caster, affectedUnits, effects);
@@ -114,11 +126,20 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.WesternStampede:
                     ApplyWesternStampede(context, caster, affectedUnits, effects);
                     break;
+                case ActiveSkillType.StormbreakCharge:
+                    ApplyStormbreakCharge(context, caster, affectedUnits, primaryTarget, effects);
+                    break;
+                case ActiveSkillType.DustDevilSweep:
+                    ApplyDustDevilSweep(context, caster, affectedUnits, effects);
+                    break;
                 case ActiveSkillType.FireStratagem:
                     ApplyFireStratagem(context, caster, affectedUnits, primaryTarget, effects);
                     break;
                 case ActiveSkillType.EightTrigramInferno:
                     ApplyEightTrigramInferno(context, caster, affectedUnits, effects);
+                    break;
+                case ActiveSkillType.FeatherFormation:
+                    ApplyFeatherFormation(caster, affectedUnits, effects);
                     break;
                 default:
                     caster.RestoreMana(manaCost);
@@ -201,15 +222,36 @@ namespace PhalanxChronicle.Core
                     return new List<UnitRuntimeState> { primaryTarget };
                 case ActiveSkillType.ImperialAid:
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
                     return context.GetUnits(caster.Faction)
                         .Where(unit => unit.Id == primaryTarget.Id ||
                                        (unit.Id != primaryTarget.Id && unit.Position.ManhattanDistance(primaryTarget.Position) == 1))
                         .OrderBy(unit => unit.Id == primaryTarget.Id ? 0 : 1)
                         .ThenBy(unit => unit.Id)
                         .ToList();
+                case ActiveSkillType.FeatherFormation:
+                {
+                    List<UnitRuntimeState> formationUnits = context.GetUnits(caster.Faction)
+                        .Where(unit => unit.Id == primaryTarget.Id ||
+                                       (unit.Id != primaryTarget.Id && unit.Position.ManhattanDistance(primaryTarget.Position) == 1))
+                        .OrderBy(unit => unit.Id == primaryTarget.Id ? 0 : 1)
+                        .ThenBy(unit => unit.Id)
+                        .ToList();
+                    UnitRuntimeState lowestHpAlly = context.GetUnits(caster.Faction)
+                        .OrderBy(unit => unit.CurrentHp)
+                        .ThenBy(unit => unit.Id)
+                        .FirstOrDefault();
+                    if (lowestHpAlly != null && formationUnits.All(unit => unit.Id != lowestHpAlly.Id))
+                    {
+                        formationUnits.Add(lowestHpAlly);
+                    }
+
+                    return formationUnits;
+                }
                 case ActiveSkillType.PowerStrike:
                 case ActiveSkillType.PinningShot:
                 case ActiveSkillType.DragonPierce:
+                case ActiveSkillType.WhiteHorseRescue:
                     return new List<UnitRuntimeState> { primaryTarget };
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.SkyVolley:
@@ -219,9 +261,13 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
+                case ActiveSkillType.CrimsonCrescent:
+                case ActiveSkillType.StormbreakCharge:
                     return BattlePreviewCalculator.GetGreenDragonSlashTargets(context, origin, primaryTarget);
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
+                case ActiveSkillType.StonewallChallenge:
+                case ActiveSkillType.DustDevilSweep:
                     return context.GetUnits(caster.Faction == UnitFaction.Player ? UnitFaction.Enemy : UnitFaction.Player)
                         .Where(unit => origin.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(caster))
                         .OrderBy(unit => origin.ManhattanDistance(unit.Position))
@@ -278,17 +324,24 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.ImperialAid:
                     return candidate.Faction == caster.Faction && candidate.CurrentHp < candidate.MaxHp;
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
+                case ActiveSkillType.FeatherFormation:
                     return candidate.Faction == caster.Faction;
                 case ActiveSkillType.PowerStrike:
                 case ActiveSkillType.DragonPierce:
+                case ActiveSkillType.WhiteHorseRescue:
                 case ActiveSkillType.PinningShot:
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.GreenDragonSlash:
+                case ActiveSkillType.CrimsonCrescent:
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.LionWarCry:
+                case ActiveSkillType.StonewallChallenge:
                 case ActiveSkillType.SkyVolley:
                 case ActiveSkillType.WesternStampede:
+                case ActiveSkillType.StormbreakCharge:
+                case ActiveSkillType.DustDevilSweep:
                 case ActiveSkillType.FireStratagem:
                 case ActiveSkillType.EightTrigramInferno:
                     return candidate.Faction != caster.Faction;
@@ -363,6 +416,32 @@ namespace PhalanxChronicle.Core
             }
         }
 
+        private static void ApplyKingsBanner(UnitRuntimeState caster, IReadOnlyList<UnitRuntimeState> affectedUnits, ICollection<SkillEffectResult> effects)
+        {
+            if (affectedUnits == null || affectedUnits.Count == 0)
+            {
+                return;
+            }
+
+            for (int index = 0; index < affectedUnits.Count; index++)
+            {
+                UnitRuntimeState target = affectedUnits[index];
+                int healedAmount = index == 0
+                    ? target.ApplyHealing(BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetKingsBannerHealAmount(caster)))
+                    : 0;
+                List<(StatusEffectType Type, int Duration)> statuses = new List<(StatusEffectType Type, int Duration)>
+                {
+                    (StatusEffectType.Inspired, ActiveSkillRules.GetInspiredDuration()),
+                };
+                if (index == 0 || ActiveSkillRules.IsMastered(caster))
+                {
+                    statuses.Add((StatusEffectType.Guarded, ActiveSkillRules.GetGuardedDuration()));
+                }
+
+                effects.Add(CreateEffect(target, healedAmount, false, healedAmount > 0, ApplyStatuses(caster, target, statuses.ToArray())));
+            }
+        }
+
         private static void ApplyPowerStrike(
             BattleContext context,
             UnitRuntimeState caster,
@@ -427,6 +506,55 @@ namespace PhalanxChronicle.Core
                 .OrderBy(unit => unit.CurrentHp)
                 .ThenBy(unit => unit.Id)
                 .FirstOrDefault();
+            if (ally != null)
+            {
+                effects.Add(CreateEffect(
+                    ally,
+                    0,
+                    false,
+                    false,
+                    ApplyStatuses(caster, ally, (StatusEffectType.Guarded, ActiveSkillRules.GetGuardedDuration()))));
+            }
+        }
+
+        private static void ApplyWhiteHorseRescue(
+            BattleContext context,
+            UnitRuntimeState caster,
+            UnitRuntimeState primaryTarget,
+            ICollection<SkillEffectResult> effects)
+        {
+            int damage = BattlePreviewCalculator.EstimateAttackDamage(
+                context,
+                caster,
+                caster.Position,
+                primaryTarget,
+                ActiveSkillRules.GetWhiteHorseRescueBonus(caster),
+                ActiveSkillRules.GetWhiteHorseRescueIgnoredDefense(caster));
+
+            primaryTarget.ApplyDamage(damage);
+            if (!primaryTarget.IsAlive)
+            {
+                context.RemoveUnit(primaryTarget.Id);
+            }
+
+            effects.Add(CreateEffect(primaryTarget, damage, !primaryTarget.IsAlive, false, new List<SkillStatusApplication>()));
+
+            List<(StatusEffectType Type, int Duration)> casterStatuses = new List<(StatusEffectType Type, int Duration)>
+            {
+                (StatusEffectType.Guarded, ActiveSkillRules.GetGuardedDuration()),
+            };
+
+            UnitRuntimeState ally = context.GetUnits(caster.Faction)
+                .Where(unit => unit.Id != caster.Id && unit.Position.ManhattanDistance(caster.Position) == 1)
+                .OrderBy(unit => unit.CurrentHp)
+                .ThenBy(unit => unit.Id)
+                .FirstOrDefault();
+            if (ally == null && ActiveSkillRules.IsMastered(caster))
+            {
+                casterStatuses.Add((StatusEffectType.Inspired, ActiveSkillRules.GetInspiredDuration()));
+            }
+
+            effects.Add(CreateEffect(caster, 0, false, false, ApplyStatuses(caster, caster, casterStatuses.ToArray())));
             if (ally != null)
             {
                 effects.Add(CreateEffect(
@@ -630,6 +758,53 @@ namespace PhalanxChronicle.Core
             }
         }
 
+        private static void ApplyCrimsonCrescent(
+            BattleContext context,
+            UnitRuntimeState caster,
+            IReadOnlyList<UnitRuntimeState> affectedUnits,
+            UnitRuntimeState primaryTarget,
+            ICollection<SkillEffectResult> effects)
+        {
+            foreach (UnitRuntimeState target in affectedUnits)
+            {
+                int damage = BattlePreviewCalculator.EstimateAttackDamage(
+                    context,
+                    caster,
+                    caster.Position,
+                    target,
+                    ActiveSkillRules.GetCrimsonCrescentBonus(caster));
+
+                target.ApplyDamage(damage);
+                IReadOnlyList<SkillStatusApplication> statuses = new List<SkillStatusApplication>();
+                if (!target.IsAlive)
+                {
+                    context.RemoveUnit(target.Id);
+                }
+                else if (target.Id == primaryTarget.Id)
+                {
+                    statuses = ApplyStatuses(
+                        caster,
+                        target,
+                        (StatusEffectType.ShatteredArmor, ActiveSkillRules.GetShatteredArmorDuration(ActiveSkillType.CrimsonCrescent, caster)));
+                }
+                else
+                {
+                    List<(StatusEffectType Type, int Duration)> secondaryStatuses = new List<(StatusEffectType Type, int Duration)>
+                    {
+                        (StatusEffectType.Bleeding, ActiveSkillRules.GetBleedingDuration(ActiveSkillType.CrimsonCrescent, caster)),
+                    };
+                    if (ActiveSkillRules.IsMastered(caster))
+                    {
+                        secondaryStatuses.Add((StatusEffectType.ShatteredArmor, ActiveSkillRules.GetShatteredArmorDuration(ActiveSkillType.CrimsonCrescent, caster)));
+                    }
+
+                    statuses = ApplyStatuses(caster, target, secondaryStatuses.ToArray());
+                }
+
+                effects.Add(CreateEffect(target, damage, !target.IsAlive, false, statuses));
+            }
+        }
+
         private static void ApplyWarCry(
             UnitRuntimeState caster,
             IReadOnlyList<UnitRuntimeState> affectedUnits,
@@ -663,6 +838,46 @@ namespace PhalanxChronicle.Core
             }
 
             effects.Add(CreateEffect(caster, 0, false, false, ApplyStatuses(caster, caster, casterStatuses.ToArray())));
+        }
+
+        private static void ApplyStonewallChallenge(
+            BattleContext context,
+            UnitRuntimeState caster,
+            IReadOnlyList<UnitRuntimeState> affectedUnits,
+            ICollection<SkillEffectResult> effects)
+        {
+            foreach (UnitRuntimeState target in affectedUnits)
+            {
+                int damage = BattlePreviewCalculator.EstimateAttackDamage(
+                    context,
+                    caster,
+                    caster.Position,
+                    target,
+                    ActiveSkillRules.GetStonewallChallengeBonus(caster));
+                target.ApplyDamage(damage);
+                IReadOnlyList<SkillStatusApplication> statuses = new List<SkillStatusApplication>();
+                if (!target.IsAlive)
+                {
+                    context.RemoveUnit(target.Id);
+                }
+                else
+                {
+                    statuses = ApplyStatuses(
+                        caster,
+                        target,
+                        (StatusEffectType.Intimidated, ActiveSkillRules.GetIntimidatedDuration(ActiveSkillType.StonewallChallenge, caster)),
+                        (StatusEffectType.Taunted, ActiveSkillRules.GetTauntedDuration(caster)));
+                }
+
+                effects.Add(CreateEffect(target, damage, !target.IsAlive, false, statuses));
+            }
+
+            effects.Add(CreateEffect(
+                caster,
+                0,
+                false,
+                false,
+                ApplyStatuses(caster, caster, (StatusEffectType.Guarded, ActiveSkillRules.GetGuardedDuration()))));
         }
 
         private static void ApplyFireStratagem(
@@ -730,6 +945,123 @@ namespace PhalanxChronicle.Core
                 }
 
                 effects.Add(CreateEffect(target, damage, !target.IsAlive, false, statuses));
+            }
+        }
+
+        private static void ApplyFeatherFormation(
+            UnitRuntimeState caster,
+            IReadOnlyList<UnitRuntimeState> affectedUnits,
+            ICollection<SkillEffectResult> effects)
+        {
+            if (affectedUnits == null || affectedUnits.Count == 0)
+            {
+                return;
+            }
+
+            UnitRuntimeState healTarget = affectedUnits
+                .OrderBy(unit => unit.CurrentHp)
+                .ThenBy(unit => unit.Id)
+                .FirstOrDefault();
+
+            for (int index = 0; index < affectedUnits.Count; index++)
+            {
+                UnitRuntimeState target = affectedUnits[index];
+                int healedAmount = healTarget != null && target.Id == healTarget.Id
+                    ? target.ApplyHealing(BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetFeatherFormationHealAmount(caster)))
+                    : 0;
+                List<(StatusEffectType Type, int Duration)> statuses = new List<(StatusEffectType Type, int Duration)>
+                {
+                    (StatusEffectType.Guarded, ActiveSkillRules.GetGuardedDuration()),
+                };
+                if (index == 0 || ActiveSkillRules.IsMastered(caster))
+                {
+                    statuses.Add((StatusEffectType.Inspired, ActiveSkillRules.GetInspiredDuration()));
+                }
+
+                effects.Add(CreateEffect(target, healedAmount, false, healedAmount > 0, ApplyStatuses(caster, target, statuses.ToArray())));
+            }
+        }
+
+        private static void ApplyStormbreakCharge(
+            BattleContext context,
+            UnitRuntimeState caster,
+            IReadOnlyList<UnitRuntimeState> affectedUnits,
+            UnitRuntimeState primaryTarget,
+            ICollection<SkillEffectResult> effects)
+        {
+            foreach (UnitRuntimeState target in affectedUnits)
+            {
+                int damage = BattlePreviewCalculator.EstimateAttackDamage(
+                    context,
+                    caster,
+                    caster.Position,
+                    target,
+                    ActiveSkillRules.GetStormbreakChargeBonus(caster));
+                target.ApplyDamage(damage);
+                IReadOnlyList<SkillStatusApplication> statuses = new List<SkillStatusApplication>();
+                if (!target.IsAlive)
+                {
+                    context.RemoveUnit(target.Id);
+                }
+                else
+                {
+                    List<(StatusEffectType Type, int Duration)> appliedStatuses = new List<(StatusEffectType Type, int Duration)>
+                    {
+                        (StatusEffectType.Intimidated, ActiveSkillRules.GetIntimidatedDuration(ActiveSkillType.StormbreakCharge, caster)),
+                    };
+                    if (target.Id == primaryTarget.Id || ActiveSkillRules.IsMastered(caster))
+                    {
+                        appliedStatuses.Add((StatusEffectType.Bleeding, ActiveSkillRules.GetBleedingDuration(ActiveSkillType.StormbreakCharge, caster)));
+                    }
+
+                    statuses = ApplyStatuses(caster, target, appliedStatuses.ToArray());
+                }
+
+                effects.Add(CreateEffect(target, damage, !target.IsAlive, false, statuses));
+            }
+        }
+
+        private static void ApplyDustDevilSweep(
+            BattleContext context,
+            UnitRuntimeState caster,
+            IReadOnlyList<UnitRuntimeState> affectedUnits,
+            ICollection<SkillEffectResult> effects)
+        {
+            int hits = 0;
+            foreach (UnitRuntimeState target in affectedUnits)
+            {
+                int damage = BattlePreviewCalculator.EstimateAttackDamage(
+                    context,
+                    caster,
+                    caster.Position,
+                    target,
+                    ActiveSkillRules.GetDustDevilSweepBonus(caster));
+                target.ApplyDamage(damage);
+                IReadOnlyList<SkillStatusApplication> statuses = new List<SkillStatusApplication>();
+                if (!target.IsAlive)
+                {
+                    context.RemoveUnit(target.Id);
+                }
+                else
+                {
+                    hits++;
+                    statuses = ApplyStatuses(
+                        caster,
+                        target,
+                        (StatusEffectType.Bleeding, ActiveSkillRules.GetBleedingDuration(ActiveSkillType.DustDevilSweep, caster)));
+                }
+
+                effects.Add(CreateEffect(target, damage, !target.IsAlive, false, statuses));
+            }
+
+            if (hits >= 2)
+            {
+                effects.Add(CreateEffect(
+                    caster,
+                    0,
+                    false,
+                    false,
+                    ApplyStatuses(caster, caster, (StatusEffectType.Inspired, ActiveSkillRules.GetInspiredDuration()))));
             }
         }
 

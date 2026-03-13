@@ -14,6 +14,8 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.RoyalAid:
                 case ActiveSkillType.ImperialAid:
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
+                case ActiveSkillType.FeatherFormation:
                     return 2;
                 case ActiveSkillType.PinningShot:
                     return PassiveSkillRules.GetAttackRange(unit) + 1;
@@ -22,6 +24,11 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
                     return PassiveSkillRules.GetAttackRange(unit);
+                case ActiveSkillType.WhiteHorseRescue:
+                    return 2;
+                case ActiveSkillType.CrimsonCrescent:
+                case ActiveSkillType.StormbreakCharge:
+                    return 1;
                 case ActiveSkillType.FireStratagem:
                     return 3;
                 case ActiveSkillType.EightTrigramInferno:
@@ -32,7 +39,10 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GreenDragonSlash:
                     return 1;
                 case ActiveSkillType.WarCry:
+                case ActiveSkillType.DustDevilSweep:
                     return 1;
+                case ActiveSkillType.StonewallChallenge:
+                    return IsMastered(unit) ? 2 : 1;
                 case ActiveSkillType.LionWarCry:
                     return 2;
                 default:
@@ -64,6 +74,20 @@ namespace PhalanxChronicle.Core
                     return 5;
                 case ActiveSkillType.GuardOrder:
                     return 3;
+                case ActiveSkillType.KingsBanner:
+                    return 4;
+                case ActiveSkillType.CrimsonCrescent:
+                    return 5;
+                case ActiveSkillType.StonewallChallenge:
+                    return 4;
+                case ActiveSkillType.FeatherFormation:
+                    return 4;
+                case ActiveSkillType.WhiteHorseRescue:
+                    return 4;
+                case ActiveSkillType.StormbreakCharge:
+                    return 5;
+                case ActiveSkillType.DustDevilSweep:
+                    return 4;
                 case ActiveSkillType.PinningShot:
                     return 4;
                 case ActiveSkillType.FireStratagem:
@@ -88,7 +112,9 @@ namespace PhalanxChronicle.Core
         {
             return skillType == ActiveSkillType.RoyalAid ||
                    skillType == ActiveSkillType.ImperialAid ||
-                   skillType == ActiveSkillType.GuardOrder;
+                   skillType == ActiveSkillType.GuardOrder ||
+                   skillType == ActiveSkillType.KingsBanner ||
+                   skillType == ActiveSkillType.FeatherFormation;
         }
 
         public static bool IsOffensiveSkill(ActiveSkillType skillType)
@@ -102,7 +128,12 @@ namespace PhalanxChronicle.Core
                    skillType == ActiveSkillType.FireStratagem ||
                    skillType == ActiveSkillType.EightTrigramInferno ||
                    skillType == ActiveSkillType.DragonPierce ||
-                   skillType == ActiveSkillType.WesternStampede;
+                   skillType == ActiveSkillType.WesternStampede ||
+                   skillType == ActiveSkillType.CrimsonCrescent ||
+                   skillType == ActiveSkillType.StonewallChallenge ||
+                   skillType == ActiveSkillType.WhiteHorseRescue ||
+                   skillType == ActiveSkillType.StormbreakCharge ||
+                   skillType == ActiveSkillType.DustDevilSweep;
         }
 
         public static int GetPowerStrikeBonus()
@@ -170,6 +201,61 @@ namespace PhalanxChronicle.Core
             return IsMastered(unit) ? 3 : 2;
         }
 
+        public static int GetKingsBannerHealAmount()
+        {
+            return 4;
+        }
+
+        public static int GetKingsBannerHealAmount(UnitRuntimeState unit)
+        {
+            return IsMastered(unit) ? 6 : GetKingsBannerHealAmount();
+        }
+
+        public static int GetCrimsonCrescentBonus()
+        {
+            return 4;
+        }
+
+        public static int GetCrimsonCrescentBonus(UnitRuntimeState unit)
+        {
+            return (IsMastered(unit) ? 5 : GetCrimsonCrescentBonus()) + EquipmentEffectRules.GetSkillDamageBonus(unit);
+        }
+
+        public static int GetStonewallChallengeBonus()
+        {
+            return 2;
+        }
+
+        public static int GetStonewallChallengeBonus(UnitRuntimeState unit)
+        {
+            return (IsMastered(unit) ? 3 : GetStonewallChallengeBonus()) + EquipmentEffectRules.GetSkillDamageBonus(unit);
+        }
+
+        public static int GetFeatherFormationHealAmount()
+        {
+            return 4;
+        }
+
+        public static int GetFeatherFormationHealAmount(UnitRuntimeState unit)
+        {
+            return IsMastered(unit) ? 6 : GetFeatherFormationHealAmount();
+        }
+
+        public static int GetWhiteHorseRescueBonus()
+        {
+            return 3;
+        }
+
+        public static int GetWhiteHorseRescueBonus(UnitRuntimeState unit)
+        {
+            return (IsMastered(unit) ? 5 : GetWhiteHorseRescueBonus()) + EquipmentEffectRules.GetSkillDamageBonus(unit);
+        }
+
+        public static int GetWhiteHorseRescueIgnoredDefense(UnitRuntimeState unit)
+        {
+            return IsMastered(unit) ? 3 : 2;
+        }
+
         public static int GetWesternStampedeBonus()
         {
             return 2;
@@ -178,6 +264,26 @@ namespace PhalanxChronicle.Core
         public static int GetWesternStampedeBonus(UnitRuntimeState unit)
         {
             return (IsMastered(unit) ? 3 : GetWesternStampedeBonus()) + EquipmentEffectRules.GetSkillDamageBonus(unit);
+        }
+
+        public static int GetStormbreakChargeBonus()
+        {
+            return 3;
+        }
+
+        public static int GetStormbreakChargeBonus(UnitRuntimeState unit)
+        {
+            return (IsMastered(unit) ? 4 : GetStormbreakChargeBonus()) + EquipmentEffectRules.GetSkillDamageBonus(unit);
+        }
+
+        public static int GetDustDevilSweepBonus()
+        {
+            return 2;
+        }
+
+        public static int GetDustDevilSweepBonus(UnitRuntimeState unit)
+        {
+            return (IsMastered(unit) ? 3 : GetDustDevilSweepBonus()) + EquipmentEffectRules.GetSkillDamageBonus(unit);
         }
 
         public static int GetRoyalAidAmount()
@@ -284,6 +390,8 @@ namespace PhalanxChronicle.Core
                     return 2;
                 case ActiveSkillType.EightTrigramInferno:
                     return 2;
+                case ActiveSkillType.CrimsonCrescent:
+                    return 1;
                 default:
                     return GetShatteredArmorDuration(skillType);
             }
@@ -306,10 +414,28 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
                 case ActiveSkillType.WesternStampede:
+                case ActiveSkillType.StonewallChallenge:
+                case ActiveSkillType.StormbreakCharge:
                     return 2;
                 default:
                     return GetIntimidatedDuration();
             }
+        }
+
+        public static int GetBleedingDuration(ActiveSkillType skillType, UnitRuntimeState unit)
+        {
+            switch (skillType)
+            {
+                case ActiveSkillType.DustDevilSweep:
+                    return IsMastered(unit) ? 2 : 1;
+                default:
+                    return 1;
+            }
+        }
+
+        public static int GetTauntedDuration(UnitRuntimeState unit)
+        {
+            return IsMastered(unit) ? 2 : 1;
         }
 
         public static int GetRootedDuration(UnitRuntimeState unit)

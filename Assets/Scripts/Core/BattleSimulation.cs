@@ -574,8 +574,20 @@ namespace PhalanxChronicle.Core
                             ? ActiveSkillRules.GetRoyalAidAmount(caster)
                             : ActiveSkillRules.GetImperialAidSplashAmount(caster));
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
                     return target.Id == primaryTarget.Id
-                        ? BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetGuardOrderHealAmount(caster))
+                        ? BattlePreviewCalculator.EstimateHealing(
+                            target,
+                            caster.ActiveSkill == ActiveSkillType.KingsBanner
+                                ? ActiveSkillRules.GetKingsBannerHealAmount(caster)
+                                : ActiveSkillRules.GetGuardOrderHealAmount(caster))
+                        : 0;
+                case ActiveSkillType.FeatherFormation:
+                    return Context.GetUnits(caster.Faction)
+                               .OrderBy(unit => unit.CurrentHp)
+                               .ThenBy(unit => unit.Id)
+                               .FirstOrDefault()?.Id == target.Id
+                        ? BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetFeatherFormationHealAmount(caster))
                         : 0;
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
@@ -589,6 +601,8 @@ namespace PhalanxChronicle.Core
                         GetSkillFlatBonus(caster),
                         caster.ActiveSkill == ActiveSkillType.DragonPierce
                             ? ActiveSkillRules.GetDragonPierceIgnoredDefense(caster)
+                            : caster.ActiveSkill == ActiveSkillType.WhiteHorseRescue
+                                ? ActiveSkillRules.GetWhiteHorseRescueIgnoredDefense(caster)
                             : 0);
             }
         }
@@ -623,6 +637,22 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GuardOrder:
                     statuses.Add(CreatePreviewStatus(StatusEffectType.Guarded, ActiveSkillRules.GetGuardedDuration()));
                     if (isPrimaryTarget && ActiveSkillRules.IsMastered(caster))
+                    {
+                        statuses.Add(CreatePreviewStatus(StatusEffectType.Inspired, ActiveSkillRules.GetInspiredDuration()));
+                    }
+
+                    break;
+                case ActiveSkillType.KingsBanner:
+                    statuses.Add(CreatePreviewStatus(StatusEffectType.Inspired, ActiveSkillRules.GetInspiredDuration()));
+                    if (isPrimaryTarget || ActiveSkillRules.IsMastered(caster))
+                    {
+                        statuses.Add(CreatePreviewStatus(StatusEffectType.Guarded, ActiveSkillRules.GetGuardedDuration()));
+                    }
+
+                    break;
+                case ActiveSkillType.FeatherFormation:
+                    statuses.Add(CreatePreviewStatus(StatusEffectType.Guarded, ActiveSkillRules.GetGuardedDuration()));
+                    if (isPrimaryTarget || ActiveSkillRules.IsMastered(caster))
                     {
                         statuses.Add(CreatePreviewStatus(StatusEffectType.Inspired, ActiveSkillRules.GetInspiredDuration()));
                     }
@@ -664,6 +694,21 @@ namespace PhalanxChronicle.Core
                     }
 
                     break;
+                case ActiveSkillType.CrimsonCrescent:
+                    if (targetSurvives)
+                    {
+                        if (isPrimaryTarget || ActiveSkillRules.IsMastered(caster))
+                        {
+                            statuses.Add(CreatePreviewStatus(StatusEffectType.ShatteredArmor, ActiveSkillRules.GetShatteredArmorDuration(ActiveSkillType.CrimsonCrescent, caster)));
+                        }
+
+                        if (!isPrimaryTarget)
+                        {
+                            statuses.Add(CreatePreviewStatus(StatusEffectType.Bleeding, ActiveSkillRules.GetBleedingDuration(ActiveSkillType.CrimsonCrescent, caster)));
+                        }
+                    }
+
+                    break;
                 case ActiveSkillType.GreenDragonSlash:
                     if (targetSurvives && ActiveSkillRules.IsMastered(caster))
                     {
@@ -696,6 +741,14 @@ namespace PhalanxChronicle.Core
                     }
 
                     break;
+                case ActiveSkillType.StonewallChallenge:
+                    if (targetSurvives)
+                    {
+                        statuses.Add(CreatePreviewStatus(StatusEffectType.Intimidated, ActiveSkillRules.GetIntimidatedDuration(ActiveSkillType.StonewallChallenge, caster)));
+                        statuses.Add(CreatePreviewStatus(StatusEffectType.Taunted, ActiveSkillRules.GetTauntedDuration(caster)));
+                    }
+
+                    break;
                 case ActiveSkillType.FireStratagem:
                     if (targetSurvives && (isPrimaryTarget || ActiveSkillRules.IsMastered(caster)))
                     {
@@ -708,6 +761,24 @@ namespace PhalanxChronicle.Core
                     {
                         statuses.Add(CreatePreviewStatus(StatusEffectType.Intimidated, ActiveSkillRules.GetIntimidatedDuration(ActiveSkillType.EightTrigramInferno, caster)));
                         statuses.Add(CreatePreviewStatus(StatusEffectType.ShatteredArmor, ActiveSkillRules.GetShatteredArmorDuration(ActiveSkillType.EightTrigramInferno, caster)));
+                    }
+
+                    break;
+                case ActiveSkillType.StormbreakCharge:
+                    if (targetSurvives)
+                    {
+                        statuses.Add(CreatePreviewStatus(StatusEffectType.Intimidated, ActiveSkillRules.GetIntimidatedDuration(ActiveSkillType.StormbreakCharge, caster)));
+                        if (isPrimaryTarget || ActiveSkillRules.IsMastered(caster))
+                        {
+                            statuses.Add(CreatePreviewStatus(StatusEffectType.Bleeding, ActiveSkillRules.GetBleedingDuration(ActiveSkillType.StormbreakCharge, caster)));
+                        }
+                    }
+
+                    break;
+                case ActiveSkillType.DustDevilSweep:
+                    if (targetSurvives)
+                    {
+                        statuses.Add(CreatePreviewStatus(StatusEffectType.Bleeding, ActiveSkillRules.GetBleedingDuration(ActiveSkillType.DustDevilSweep, caster)));
                     }
 
                     break;
@@ -729,10 +800,13 @@ namespace PhalanxChronicle.Core
                     return "Single ally";
                 case ActiveSkillType.ImperialAid:
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
+                case ActiveSkillType.FeatherFormation:
                     return "Ally + adjacent";
                 case ActiveSkillType.PowerStrike:
                 case ActiveSkillType.PinningShot:
                 case ActiveSkillType.DragonPierce:
+                case ActiveSkillType.WhiteHorseRescue:
                     return "Single foe";
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.SkyVolley:
@@ -742,9 +816,13 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
+                case ActiveSkillType.CrimsonCrescent:
+                case ActiveSkillType.StormbreakCharge:
                     return "Line cleave";
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
+                case ActiveSkillType.StonewallChallenge:
+                case ActiveSkillType.DustDevilSweep:
                     return "Nearby foes";
                 default:
                     return string.Empty;
@@ -759,18 +837,28 @@ namespace PhalanxChronicle.Core
                     return ActiveSkillRules.GetPowerStrikeBonus(caster);
                 case ActiveSkillType.DragonPierce:
                     return ActiveSkillRules.GetDragonPierceBonus(caster);
+                case ActiveSkillType.WhiteHorseRescue:
+                    return ActiveSkillRules.GetWhiteHorseRescueBonus(caster);
                 case ActiveSkillType.PinningShot:
                     return ActiveSkillRules.GetPinningShotBonus(caster);
                 case ActiveSkillType.Volley:
                     return ActiveSkillRules.GetVolleyBonus(caster);
                 case ActiveSkillType.SkyVolley:
                     return ActiveSkillRules.GetSkyVolleyBonus(caster);
+                case ActiveSkillType.CrimsonCrescent:
+                    return ActiveSkillRules.GetCrimsonCrescentBonus(caster);
                 case ActiveSkillType.GreenDragonSlash:
                     return ActiveSkillRules.GetGreenDragonSlashBonus(caster);
                 case ActiveSkillType.AzureDragonSlash:
                     return ActiveSkillRules.GetAzureDragonSlashBonus(caster);
                 case ActiveSkillType.WesternStampede:
                     return ActiveSkillRules.GetWesternStampedeBonus(caster);
+                case ActiveSkillType.StonewallChallenge:
+                    return ActiveSkillRules.GetStonewallChallengeBonus(caster);
+                case ActiveSkillType.StormbreakCharge:
+                    return ActiveSkillRules.GetStormbreakChargeBonus(caster);
+                case ActiveSkillType.DustDevilSweep:
+                    return ActiveSkillRules.GetDustDevilSweepBonus(caster);
                 case ActiveSkillType.FireStratagem:
                     return ActiveSkillRules.GetFireStratagemBonus(caster);
                 case ActiveSkillType.EightTrigramInferno:

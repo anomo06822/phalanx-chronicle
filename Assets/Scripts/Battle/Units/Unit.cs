@@ -3,6 +3,7 @@ using System.Collections;
 using PhalanxChronicle.Core;
 using PhalanxChronicle.Localization;
 using PhalanxChronicle.Presentation;
+using TMPro;
 using UnityEngine;
 
 namespace PhalanxChronicle.Battle.Units
@@ -14,14 +15,25 @@ namespace PhalanxChronicle.Battle.Units
         private const float HpBarWidth = 0.62f;
         private const float HpBarBackHeight = 0.07f;
         private const float HpBarFillHeight = 0.045f;
-        private const float BaseNameCharacterSize = 0.042f;
-        private const float GlobalVisualScale = 1.18f;
-        private const float NameInfoWorldY = 0.62f;
-        private const float HpInfoWorldY = 0.47f;
+        private const float BaseNameFontSize = 6.4f;
+        private const float GlobalVisualScale = 1.22f;
+        private const float NameInfoWorldY = 0.72f;
+        private const float HpInfoWorldY = 0.56f;
+        private const float GeneralSoldierScaleMultiplier = 1.10f;
+        private const float HeroScaleMultiplier = 1.16f;
+        private const float BossScaleMultiplier = 1.18f;
+        private const float RoleScaleFallback = 1.00f;
+        private const float NamePlateHeight = 0.16f;
+        private const float NamePlateMinWidth = 0.5f;
+        private const float NamePlateMidWidth = 0.58f;
+        private const float NamePlateMaxWidth = 0.66f;
+        private const float WorldTextScale = 0.1f;
+        private const float WorldTextHeight = 1.6f;
 
         private Action<Unit> clickHandler;
         private Action<Unit, bool> hoverChangedHandler;
         private SpriteRenderer spriteRenderer;
+        private SpriteRenderer silhouetteRenderer;
         private SpriteRenderer shadowRenderer;
         private SpriteRenderer frameRenderer;
         private SpriteRenderer factionRingRenderer;
@@ -30,8 +42,8 @@ namespace PhalanxChronicle.Battle.Units
         private SpriteRenderer namePlateRenderer;
         private SpriteRenderer hpBackRenderer;
         private SpriteRenderer hpFillRenderer;
-        private TextMesh nameText;
-        private TextMesh nameTextShadow;
+        private TextMeshPro nameText;
+        private TextMeshPro nameTextShadow;
         private GameObject nameInfoRoot;
         private GameObject hpInfoRoot;
         private UnitVisualProfile visualProfile;
@@ -60,7 +72,7 @@ namespace PhalanxChronicle.Battle.Units
             colliderComponent.size = new Vector2(0.5f, 0.74f);
             colliderComponent.offset = new Vector2(0f, -0.06f);
             colliderComponent.isTrigger = false;
-            float scaledSize = visualProfile.BattleScale * GlobalVisualScale;
+            float scaledSize = visualProfile.BattleScale * GlobalVisualScale * GetRoleScaleMultiplier(runtimeState, visualProfile);
             restingScale = new Vector3(scaledSize, scaledSize, 1f);
             transform.localScale = restingScale;
             gameObject.name = LocalizationService.Text(runtimeState.DisplayNameKey, runtimeState.DisplayName);
@@ -192,6 +204,14 @@ namespace PhalanxChronicle.Battle.Units
         private void BuildDecorations()
         {
             shadowRenderer = CreateSpriteChild("Shadow", transform, RuntimeSpriteLibrary.MistBandSprite, new Color(0f, 0f, 0f, 0.22f), new Vector3(0f, -0.38f, 0f), new Vector3(0.32f, 0.07f, 1f), 20);
+            silhouetteRenderer = CreateSpriteChild(
+                "Silhouette",
+                transform,
+                spriteRenderer != null ? spriteRenderer.sprite : null,
+                new Color(0.04f, 0.04f, 0.05f, 0.92f),
+                new Vector3(0f, -0.01f, 0f),
+                new Vector3(1.08f, 1.08f, 1f),
+                28);
             factionRingRenderer = CreateSpriteChild(
                 "FactionMarker",
                 transform,
@@ -233,6 +253,8 @@ namespace PhalanxChronicle.Battle.Units
             nameInfoRoot = new GameObject("NameInfoRoot");
             nameInfoRoot.transform.SetParent(transform, false);
             nameInfoRoot.transform.localPosition = new Vector3(0f, NameInfoWorldY, 0f);
+            string localizedName = LocalizationService.Text(RuntimeState.DisplayNameKey, RuntimeState.DisplayName);
+            float namePlateWidth = GetNamePlateWidth(localizedName);
 
             namePlateRenderer = CreateSpriteChild(
                 "NamePlate",
@@ -240,30 +262,36 @@ namespace PhalanxChronicle.Battle.Units
                 RuntimeSpriteLibrary.BannerSprite,
                 BattleUiTheme.GetFactionPlateColor(RuntimeState.Faction, exhausted: false),
                 new Vector3(0f, 0f, 0f),
-                new Vector3(0.72f, 0.135f, 1f),
+                new Vector3(namePlateWidth, NamePlateHeight, 1f),
                 36);
 
-            string localizedName = LocalizationService.Text(RuntimeState.DisplayNameKey, RuntimeState.DisplayName);
             nameTextShadow = CreateTextChild(
                 "NameTextShadow",
                 nameInfoRoot.transform,
                 localizedName,
                 new Vector3(0.018f, -0.01f, -0.015f),
                 36,
-                GetNameCharacterSize(localizedName),
-                TextAlignment.Center,
-                TextAnchor.MiddleCenter);
-            nameTextShadow.color = new Color(0.06f, 0.04f, 0.03f, 0.9f);
+                GetNameFontSize(localizedName),
+                namePlateWidth,
+                RuntimeSpriteLibrary.GetWorldTmpFont(FontStyle.Bold),
+                new Color(0.09f, 0.06f, 0.04f, 0.95f),
+                new Color(0.02f, 0.015f, 0.01f, 0.7f),
+                0.08f);
             nameText = CreateTextChild(
                 "NameText",
                 nameInfoRoot.transform,
                 localizedName,
                 new Vector3(0f, 0f, -0.01f),
                 37,
-                GetNameCharacterSize(localizedName),
-                TextAlignment.Center,
-                TextAnchor.MiddleCenter);
-            nameText.color = BattleUiTheme.TextPrimary;
+                GetNameFontSize(localizedName),
+                namePlateWidth,
+                RuntimeSpriteLibrary.GetWorldTmpFont(FontStyle.Bold),
+                BattleUiTheme.TextPrimary,
+                new Color(0.18f, 0.1f, 0.04f, 0.92f),
+                0.14f,
+                new Color(0.04f, 0.03f, 0.02f, 0.7f),
+                new Vector2(0.12f, -0.12f),
+                0.08f);
 
             hpInfoRoot = new GameObject("HpInfoRoot");
             hpInfoRoot.transform.SetParent(transform, false);
@@ -314,6 +342,13 @@ namespace PhalanxChronicle.Battle.Units
             spriteRenderer.color = hasActed
                 ? Color.Lerp(Color.white, new Color(0.58f, 0.6f, 0.62f, 1f), 0.5f)
                 : Color.white;
+            if (silhouetteRenderer != null)
+            {
+                silhouetteRenderer.sprite = spriteRenderer.sprite;
+                silhouetteRenderer.color = hasActed
+                    ? new Color(0.12f, 0.13f, 0.16f, 0.82f)
+                    : new Color(0.04f, 0.04f, 0.05f, 0.94f);
+            }
             factionRingRenderer.color = hasActed
                 ? Color.Lerp(visualProfile.MarkerColor, new Color(0.34f, 0.35f, 0.39f, 1f), 0.42f)
                 : visualProfile.MarkerColor;
@@ -334,12 +369,16 @@ namespace PhalanxChronicle.Battle.Units
                 BattleUiTheme.GetFactionPlateColor(RuntimeState.Faction, hasActed),
                 visualProfile.SecondaryColor,
                 0.2f);
+            float namePlateWidth = GetNamePlateWidth(localizedName);
+            namePlateRenderer.transform.localScale = new Vector3(namePlateWidth, NamePlateHeight, 1f);
             nameText.text = localizedName;
-            nameText.characterSize = GetNameCharacterSize(localizedName);
+            nameText.fontSize = GetNameFontSize(localizedName);
+            ApplyTextBounds(nameText, namePlateWidth);
             if (nameTextShadow != null)
             {
                 nameTextShadow.text = localizedName;
-                nameTextShadow.characterSize = nameText.characterSize;
+                nameTextShadow.fontSize = nameText.fontSize;
+                ApplyTextBounds(nameTextShadow, namePlateWidth);
             }
 
             float fillWidth = Mathf.Max(0.01f, HpBarWidth * hpRatio);
@@ -392,9 +431,9 @@ namespace PhalanxChronicle.Battle.Units
             }
 
             bool lowHealth = RuntimeState.MaxHp > 0 && ((float)RuntimeState.CurrentHp / RuntimeState.MaxHp) <= 0.45f;
-            bool alwaysShowIdentity = RuntimeState.Faction == UnitFaction.Player || visualProfile.FrameStyle == UnitFrameStyle.Boss;
+            bool alwaysShowIdentity = visualProfile.FrameStyle == UnitFrameStyle.Boss;
             bool showName = RuntimeState.IsAlive && (alwaysShowIdentity || isHovered || isSelected);
-            bool showHp = RuntimeState.IsAlive && (isHovered || isSelected || lowHealth || RuntimeState.Faction == UnitFaction.Player);
+            bool showHp = RuntimeState.IsAlive && (isHovered || isSelected || lowHealth || RuntimeState.Faction == UnitFaction.Player || visualProfile.FrameStyle == UnitFrameStyle.Boss);
 
             if (nameInfoRoot != null)
             {
@@ -457,35 +496,76 @@ namespace PhalanxChronicle.Battle.Units
             return Color.white;
         }
 
-        private static float GetNameCharacterSize(string localizedName)
+        private static float GetNameFontSize(string localizedName)
         {
             if (string.IsNullOrWhiteSpace(localizedName))
             {
-                return BaseNameCharacterSize;
+                return BaseNameFontSize;
             }
 
             int visibleLength = localizedName.Replace(" ", string.Empty).Length;
             if (visibleLength <= 4)
             {
-                return BaseNameCharacterSize;
+                return BaseNameFontSize;
             }
 
             if (visibleLength <= 6)
             {
-                return 0.0395f;
+                return 5.8f;
             }
 
             if (visibleLength <= 9)
             {
-                return 0.0365f;
+                return 5.2f;
             }
 
             if (visibleLength <= 12)
             {
-                return 0.0335f;
+                return 4.7f;
             }
 
-            return 0.031f;
+            return 4.3f;
+        }
+
+        private static float GetNamePlateWidth(string localizedName)
+        {
+            if (string.IsNullOrWhiteSpace(localizedName))
+            {
+                return NamePlateMidWidth;
+            }
+
+            int visibleLength = localizedName.Replace(" ", string.Empty).Length;
+            if (visibleLength <= 4)
+            {
+                return NamePlateMinWidth;
+            }
+
+            if (visibleLength <= 8)
+            {
+                return NamePlateMidWidth;
+            }
+
+            return NamePlateMaxWidth;
+        }
+
+        private static float GetRoleScaleMultiplier(UnitRuntimeState runtimeState, UnitVisualProfile unitVisualProfile)
+        {
+            if (unitVisualProfile == null)
+            {
+                return RoleScaleFallback;
+            }
+
+            if (unitVisualProfile.FrameStyle == UnitFrameStyle.Boss)
+            {
+                return BossScaleMultiplier;
+            }
+
+            if (unitVisualProfile.FrameStyle == UnitFrameStyle.Hero)
+            {
+                return HeroScaleMultiplier;
+            }
+
+            return runtimeState == null ? RoleScaleFallback : GeneralSoldierScaleMultiplier;
         }
 
         private void UpdateInfoAnchorLayout()
@@ -539,33 +619,69 @@ namespace PhalanxChronicle.Battle.Units
             return renderer;
         }
 
-        private TextMesh CreateTextChild(
+        private TextMeshPro CreateTextChild(
             string childName,
             Transform parent,
             string content,
             Vector3 localPosition,
             int sortingOrder,
-            float characterSize,
-            TextAlignment alignment,
-            TextAnchor anchor)
+            float fontSize,
+            float worldWidth,
+            TMP_FontAsset font,
+            Color faceColor,
+            Color outlineColor,
+            float outlineWidth,
+            Color? underlayColor = null,
+            Vector2? underlayOffset = null,
+            float underlaySoftness = 0f)
         {
-            GameObject child = new GameObject(childName);
+            GameObject child = new GameObject(childName, typeof(RectTransform));
             child.transform.SetParent(parent, false);
             child.transform.localPosition = localPosition;
+            child.transform.localScale = new Vector3(WorldTextScale, WorldTextScale, 1f);
 
-            TextMesh textMesh = child.AddComponent<TextMesh>();
+            TextMeshPro textMesh = child.AddComponent<TextMeshPro>();
             textMesh.text = content;
-            textMesh.font = RuntimeSpriteLibrary.HeadingFont;
-            textMesh.fontSize = 64;
-            textMesh.characterSize = characterSize;
-            textMesh.alignment = alignment;
-            textMesh.anchor = anchor;
-            textMesh.color = Color.white;
+            textMesh.font = font != null ? font : RuntimeSpriteLibrary.DefaultTmpFont;
+            textMesh.fontSize = fontSize;
+            textMesh.fontStyle = FontStyles.Bold;
+            textMesh.alignment = TextAlignmentOptions.Midline;
+            textMesh.enableWordWrapping = false;
+            textMesh.overflowMode = TextOverflowModes.Truncate;
+            textMesh.enableAutoSizing = false;
+            textMesh.richText = false;
+            textMesh.color = faceColor;
+            textMesh.margin = Vector4.zero;
+            ApplyTextBounds(textMesh, worldWidth);
 
             MeshRenderer renderer = child.GetComponent<MeshRenderer>();
             renderer.sortingOrder = sortingOrder;
-            renderer.sharedMaterial = RuntimeSpriteLibrary.DefaultFont.material;
+            Material material = RuntimeSpriteLibrary.CreateTmpMaterialInstance(
+                textMesh.font,
+                faceColor,
+                outlineColor,
+                outlineWidth,
+                underlayColor,
+                underlayOffset,
+                underlaySoftness);
+            if (material != null)
+            {
+                renderer.sharedMaterial = material;
+            }
+
             return textMesh;
+        }
+
+        private static void ApplyTextBounds(TMP_Text textMesh, float worldWidth)
+        {
+            if (textMesh == null)
+            {
+                return;
+            }
+
+            textMesh.rectTransform.sizeDelta = new Vector2(
+                Mathf.Max(4.6f, worldWidth / WorldTextScale),
+                WorldTextHeight);
         }
 
         private void OnMouseUpAsButton()

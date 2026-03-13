@@ -499,10 +499,14 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.ImperialAid:
                     return EvaluateRoyalAid(enemyUnit, target);
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
                     return EvaluateGuardOrder(context, enemyUnit, target);
+                case ActiveSkillType.FeatherFormation:
+                    return EvaluateFeatherFormation(context, enemyUnit, target);
                 case ActiveSkillType.PowerStrike:
                     return EvaluatePowerStrike(context, enemyUnit, destination, target);
                 case ActiveSkillType.DragonPierce:
+                case ActiveSkillType.WhiteHorseRescue:
                     return EvaluateDragonPierce(context, enemyUnit, destination, target);
                 case ActiveSkillType.PinningShot:
                     return EvaluatePinningShot(context, enemyUnit, destination, target);
@@ -514,9 +518,13 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
+                case ActiveSkillType.CrimsonCrescent:
+                case ActiveSkillType.StormbreakCharge:
                     return EvaluateGreenDragonSlash(context, enemyUnit, destination, target);
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
+                case ActiveSkillType.StonewallChallenge:
+                case ActiveSkillType.DustDevilSweep:
                     return EvaluateWarCry(context, enemyUnit, destination);
                 default:
                     return new SkillEvaluation(0f, new HashSet<string>());
@@ -551,10 +559,18 @@ namespace PhalanxChronicle.Core
                 .ThenBy(unit => unit.Id)
                 .ToList();
 
-            int healedAmount = BattlePreviewCalculator.EstimateHealing(target, ActiveSkillRules.GetGuardOrderHealAmount(enemyUnit));
+            int healedAmount = BattlePreviewCalculator.EstimateHealing(
+                target,
+                enemyUnit.ActiveSkill == ActiveSkillType.KingsBanner
+                    ? ActiveSkillRules.GetKingsBannerHealAmount(enemyUnit)
+                    : ActiveSkillRules.GetGuardOrderHealAmount(enemyUnit));
             int freshGuardApplications = affectedUnits.Count(unit => !unit.HasStatus(StatusEffectType.Guarded));
+            int freshInspiredApplications = enemyUnit.ActiveSkill == ActiveSkillType.KingsBanner
+                ? affectedUnits.Count(unit => !unit.HasStatus(StatusEffectType.Inspired))
+                : 0;
             float reward = (healedAmount * HealingWeight) +
                            (freshGuardApplications * (StatusBonus + 2f)) +
+                           (freshInspiredApplications * StatusBonus) +
                            ((affectedUnits.Count - 1) * 2f) -
                            2f;
             if (ActiveSkillRules.IsMastered(enemyUnit) && !target.HasStatus(StatusEffectType.Inspired))
@@ -570,6 +586,40 @@ namespace PhalanxChronicle.Core
             if (healedAmount == 0 && freshGuardApplications == 0)
             {
                 reward -= 10f;
+            }
+
+            return new SkillEvaluation(reward, new HashSet<string>());
+        }
+
+        private static SkillEvaluation EvaluateFeatherFormation(
+            BattleContext context,
+            UnitRuntimeState enemyUnit,
+            UnitRuntimeState target)
+        {
+            IReadOnlyList<UnitRuntimeState> affectedUnits = context.GetUnits(enemyUnit.Faction)
+                .Where(unit => unit.Id == target.Id || unit.Position.ManhattanDistance(target.Position) == 1)
+                .OrderBy(unit => unit.Id == target.Id ? 0 : 1)
+                .ThenBy(unit => unit.CurrentHp)
+                .ThenBy(unit => unit.Id)
+                .ToList();
+
+            UnitRuntimeState healTarget = context.GetUnits(enemyUnit.Faction)
+                .OrderBy(unit => unit.CurrentHp)
+                .ThenBy(unit => unit.Id)
+                .FirstOrDefault();
+            int healedAmount = healTarget != null
+                ? BattlePreviewCalculator.EstimateHealing(healTarget, ActiveSkillRules.GetFeatherFormationHealAmount(enemyUnit))
+                : 0;
+            int freshGuardApplications = affectedUnits.Count(unit => !unit.HasStatus(StatusEffectType.Guarded));
+            int inspiredApplications = affectedUnits.Count(unit => (unit.Id == target.Id || ActiveSkillRules.IsMastered(enemyUnit)) && !unit.HasStatus(StatusEffectType.Inspired));
+            float reward = (healedAmount * HealingWeight) +
+                           (freshGuardApplications * (StatusBonus + 1f)) +
+                           (inspiredApplications * StatusBonus) +
+                           ((affectedUnits.Count - 1) * 2f) -
+                           1f;
+            if (healTarget != null && healTarget.CurrentHp <= healTarget.MaxHp / 2)
+            {
+                reward += 5f;
             }
 
             return new SkillEvaluation(reward, new HashSet<string>());
@@ -639,8 +689,12 @@ namespace PhalanxChronicle.Core
                 enemyUnit,
                 destination,
                 target,
-                ActiveSkillRules.GetDragonPierceBonus(enemyUnit),
-                ActiveSkillRules.GetDragonPierceIgnoredDefense(enemyUnit));
+                enemyUnit.ActiveSkill == ActiveSkillType.WhiteHorseRescue
+                    ? ActiveSkillRules.GetWhiteHorseRescueBonus(enemyUnit)
+                    : ActiveSkillRules.GetDragonPierceBonus(enemyUnit),
+                enemyUnit.ActiveSkill == ActiveSkillType.WhiteHorseRescue
+                    ? ActiveSkillRules.GetWhiteHorseRescueIgnoredDefense(enemyUnit)
+                    : ActiveSkillRules.GetDragonPierceIgnoredDefense(enemyUnit));
             bool targetDies = rawDamage >= target.CurrentHp;
             int realizedDamage = rawDamage > target.CurrentHp ? target.CurrentHp : rawDamage;
             int guardValue = 1;
@@ -745,8 +799,12 @@ namespace PhalanxChronicle.Core
                     affectedUnit,
                     enemyUnit.ActiveSkill == ActiveSkillType.AzureDragonSlash
                         ? ActiveSkillRules.GetAzureDragonSlashBonus(enemyUnit)
+                        : enemyUnit.ActiveSkill == ActiveSkillType.CrimsonCrescent
+                            ? ActiveSkillRules.GetCrimsonCrescentBonus(enemyUnit)
                         : enemyUnit.ActiveSkill == ActiveSkillType.WesternStampede
                             ? ActiveSkillRules.GetWesternStampedeBonus(enemyUnit)
+                        : enemyUnit.ActiveSkill == ActiveSkillType.StormbreakCharge
+                            ? ActiveSkillRules.GetStormbreakChargeBonus(enemyUnit)
                         : ActiveSkillRules.GetGreenDragonSlashBonus(enemyUnit));
                 int realizedDamage = rawDamage > affectedUnit.CurrentHp ? affectedUnit.CurrentHp : rawDamage;
                 totalDamage += realizedDamage;
@@ -762,8 +820,11 @@ namespace PhalanxChronicle.Core
                            (totalDamage * SkillDamageWeight) +
                            (defeatedCount * KillBonus) +
                            ((affectedUnits.Count - 1) * AdditionalTargetBonus) +
-                           (enemyUnit.ActiveSkill == ActiveSkillType.WesternStampede
+                           ((enemyUnit.ActiveSkill == ActiveSkillType.WesternStampede || enemyUnit.ActiveSkill == ActiveSkillType.StormbreakCharge)
                                ? affectedUnits.Count(unit => unit.CurrentHp > 0 && !unit.HasStatus(StatusEffectType.Intimidated)) * StatusBonus
+                               : 0f) +
+                           (enemyUnit.ActiveSkill == ActiveSkillType.CrimsonCrescent
+                               ? affectedUnits.Count(unit => unit.CurrentHp > 0 && !unit.HasStatus(StatusEffectType.ShatteredArmor)) * StatusBonus
                                : 0f) -
                            SkillCommitmentPenalty;
             return new SkillEvaluation(reward, defeatedUnitIds);
@@ -784,7 +845,47 @@ namespace PhalanxChronicle.Core
             int lethalThreats = affectedUnits.Count(unit =>
                 BattlePreviewCalculator.EstimateAttackDamage(context, unit, unit.Position, enemyUnit) >= enemyUnit.CurrentHp);
 
-            float reward = (freshApplications * StatusBonus) + (affectedUnits.Count * 3f) + (lethalThreats * 12f) - SkillCommitmentPenalty;
+            float reward;
+            if (enemyUnit.ActiveSkill == ActiveSkillType.StonewallChallenge || enemyUnit.ActiveSkill == ActiveSkillType.DustDevilSweep)
+            {
+                int totalDamage = 0;
+                int defeatedCount = 0;
+                foreach (UnitRuntimeState target in affectedUnits)
+                {
+                    int rawDamage = BattlePreviewCalculator.EstimateAttackDamage(
+                        context,
+                        enemyUnit,
+                        destination,
+                        target,
+                        enemyUnit.ActiveSkill == ActiveSkillType.StonewallChallenge
+                            ? ActiveSkillRules.GetStonewallChallengeBonus(enemyUnit)
+                            : ActiveSkillRules.GetDustDevilSweepBonus(enemyUnit));
+                    totalDamage += rawDamage > target.CurrentHp ? target.CurrentHp : rawDamage;
+                    if (rawDamage >= target.CurrentHp)
+                    {
+                        defeatedCount++;
+                    }
+                }
+
+                reward = (totalDamage * SkillDamageWeight) +
+                         (defeatedCount * KillBonus) +
+                         (freshApplications * StatusBonus) +
+                         (affectedUnits.Count * 3f) -
+                         SkillCommitmentPenalty;
+                if (enemyUnit.ActiveSkill == ActiveSkillType.StonewallChallenge && !enemyUnit.HasStatus(StatusEffectType.Guarded))
+                {
+                    reward += StatusBonus;
+                }
+
+                if (enemyUnit.ActiveSkill == ActiveSkillType.DustDevilSweep && affectedUnits.Count >= 2 && !enemyUnit.HasStatus(StatusEffectType.Inspired))
+                {
+                    reward += StatusBonus;
+                }
+            }
+            else
+            {
+                reward = (freshApplications * StatusBonus) + (affectedUnits.Count * 3f) + (lethalThreats * 12f) - SkillCommitmentPenalty;
+            }
             if (affectedUnits.Count < 2 && lethalThreats == 0)
             {
                 reward -= 12f;
@@ -903,15 +1004,17 @@ namespace PhalanxChronicle.Core
 
                 bestDamage = Math.Max(
                     bestDamage,
-                    BattlePreviewCalculator.EstimateAttackDamage(
-                        context,
-                        enemyUnit,
-                        origin,
-                        target,
-                        GetOffensiveSkillBonus(enemyUnit),
-                        enemyUnit.ActiveSkill == ActiveSkillType.DragonPierce
-                            ? ActiveSkillRules.GetDragonPierceIgnoredDefense(enemyUnit)
-                            : 0));
+                        BattlePreviewCalculator.EstimateAttackDamage(
+                            context,
+                            enemyUnit,
+                            origin,
+                            target,
+                            GetOffensiveSkillBonus(enemyUnit),
+                            enemyUnit.ActiveSkill == ActiveSkillType.DragonPierce
+                                ? ActiveSkillRules.GetDragonPierceIgnoredDefense(enemyUnit)
+                                : enemyUnit.ActiveSkill == ActiveSkillType.WhiteHorseRescue
+                                    ? ActiveSkillRules.GetWhiteHorseRescueIgnoredDefense(enemyUnit)
+                                : 0));
             }
 
             return bestDamage;
@@ -996,13 +1099,19 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
+                case ActiveSkillType.CrimsonCrescent:
+                case ActiveSkillType.StormbreakCharge:
                     return BattlePreviewCalculator.GetGreenDragonSlashTargets(context, destination, target).Count;
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
+                case ActiveSkillType.StonewallChallenge:
+                case ActiveSkillType.DustDevilSweep:
                     return context.GetUnits(UnitFaction.Player)
                         .Count(unit => destination.ManhattanDistance(unit.Position) <= ActiveSkillRules.GetRange(enemyUnit));
                 case ActiveSkillType.ImperialAid:
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
+                case ActiveSkillType.FeatherFormation:
                     return context.GetUnits(enemyUnit.Faction)
                         .Count(unit => unit.Id == target.Id || unit.Position.ManhattanDistance(target.Position) <= 1);
                 default:
@@ -1018,10 +1127,16 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.ImperialAid:
                     return target.CurrentHp < target.MaxHp || !target.HasStatus(StatusEffectType.Inspired);
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
                     return target.CurrentHp < target.MaxHp ||
                            !target.HasStatus(StatusEffectType.Guarded) ||
                            context.GetUnits(enemyUnit.Faction).Any(unit =>
                                unit.Position.ManhattanDistance(target.Position) == 1 &&
+                               !unit.HasStatus(StatusEffectType.Guarded));
+                case ActiveSkillType.FeatherFormation:
+                    return context.GetUnits(enemyUnit.Faction).Any(unit => unit.CurrentHp < unit.MaxHp) ||
+                           context.GetUnits(enemyUnit.Faction).Any(unit =>
+                               (unit.Id == target.Id || unit.Position.ManhattanDistance(target.Position) == 1) &&
                                !unit.HasStatus(StatusEffectType.Guarded));
                 default:
                     return true;
@@ -1170,14 +1285,24 @@ namespace PhalanxChronicle.Core
                     return ActiveSkillRules.GetPowerStrikeBonus(unit);
                 case ActiveSkillType.DragonPierce:
                     return ActiveSkillRules.GetDragonPierceBonus(unit);
+                case ActiveSkillType.WhiteHorseRescue:
+                    return ActiveSkillRules.GetWhiteHorseRescueBonus(unit);
                 case ActiveSkillType.PinningShot:
                     return ActiveSkillRules.GetPinningShotBonus(unit);
+                case ActiveSkillType.CrimsonCrescent:
+                    return ActiveSkillRules.GetCrimsonCrescentBonus(unit);
                 case ActiveSkillType.GreenDragonSlash:
                     return ActiveSkillRules.GetGreenDragonSlashBonus(unit);
                 case ActiveSkillType.AzureDragonSlash:
                     return ActiveSkillRules.GetAzureDragonSlashBonus(unit);
                 case ActiveSkillType.WesternStampede:
                     return ActiveSkillRules.GetWesternStampedeBonus(unit);
+                case ActiveSkillType.StonewallChallenge:
+                    return ActiveSkillRules.GetStonewallChallengeBonus(unit);
+                case ActiveSkillType.StormbreakCharge:
+                    return ActiveSkillRules.GetStormbreakChargeBonus(unit);
+                case ActiveSkillType.DustDevilSweep:
+                    return ActiveSkillRules.GetDustDevilSweepBonus(unit);
                 case ActiveSkillType.FireStratagem:
                     return ActiveSkillRules.GetFireStratagemBonus(unit);
                 case ActiveSkillType.EightTrigramInferno:

@@ -60,8 +60,10 @@ namespace PhalanxChronicle.Core
 
             bool normalized = CampaignSaveNormalizer.Normalize(saveData);
             BackfillMissingRewardRecruits(saveData);
+            bool backfilledUnlockProgress = BackfillUnlockProgress(saveData);
 
             return normalized ||
+                   backfilledUnlockProgress ||
                    !unitIdsBefore.SetEquals(saveData.Units.Select(unit => unit.UnitId)) ||
                    saveData.Units.Any(unit => activeSkillsBefore.TryGetValue(unit.UnitId, out ActiveSkillType skill) && skill != unit.ActiveSkill);
         }
@@ -326,6 +328,49 @@ namespace PhalanxChronicle.Core
             return Math.Min(5, clearCountTier + levelTier);
         }
 
+        private static bool BackfillUnlockProgress(CampaignSaveData saveData)
+        {
+            if (saveData == null)
+            {
+                return false;
+            }
+
+            CampaignDefinition definition = ResolveCampaignDefinition(saveData.CampaignId);
+            if (definition == null || definition.Stages == null || definition.Stages.Count == 0)
+            {
+                return false;
+            }
+
+            int highestUnlockedStageIndex = 0;
+            for (int stageIndex = 0; stageIndex < definition.Stages.Count; stageIndex++)
+            {
+                CampaignStageDefinition stage = definition.Stages[stageIndex];
+                if (stage == null || !saveData.Progress.IsCleared(stage.ScenarioId))
+                {
+                    continue;
+                }
+
+                highestUnlockedStageIndex = Math.Max(
+                    highestUnlockedStageIndex,
+                    Math.Min(stageIndex + 1, definition.Stages.Count - 1));
+            }
+
+            if (highestUnlockedStageIndex <= saveData.Progress.UnlockedStageIndex)
+            {
+                return false;
+            }
+
+            saveData.Progress.UnlockThrough(highestUnlockedStageIndex);
+            return true;
+        }
+
+        private static CampaignDefinition ResolveCampaignDefinition(string campaignId)
+        {
+            return string.Equals(campaignId, CampaignCatalog.LiuBeiLegendCampaignId, StringComparison.Ordinal)
+                ? CampaignCatalog.CreateLiuBeiLegend()
+                : null;
+        }
+
         private static BattleScenarioData ApplyReplayDifficulty(BattleScenarioData scenario, int replayTier)
         {
             if (scenario == null)
@@ -534,6 +579,20 @@ namespace PhalanxChronicle.Core
                     return ("skill.dragon_pierce.name", "skill.dragon_pierce.desc");
                 case ActiveSkillType.WesternStampede:
                     return ("skill.western_stampede.name", "skill.western_stampede.desc");
+                case ActiveSkillType.KingsBanner:
+                    return ("skill.kings_banner.name", "skill.kings_banner.desc");
+                case ActiveSkillType.CrimsonCrescent:
+                    return ("skill.crimson_crescent.name", "skill.crimson_crescent.desc");
+                case ActiveSkillType.StonewallChallenge:
+                    return ("skill.stonewall_challenge.name", "skill.stonewall_challenge.desc");
+                case ActiveSkillType.FeatherFormation:
+                    return ("skill.feather_formation.name", "skill.feather_formation.desc");
+                case ActiveSkillType.WhiteHorseRescue:
+                    return ("skill.white_horse_rescue.name", "skill.white_horse_rescue.desc");
+                case ActiveSkillType.StormbreakCharge:
+                    return ("skill.stormbreak_charge.name", "skill.stormbreak_charge.desc");
+                case ActiveSkillType.DustDevilSweep:
+                    return ("skill.dust_devil_sweep.name", "skill.dust_devil_sweep.desc");
                 default:
                     return (fallbackNameKey, fallbackDescriptionKey);
             }

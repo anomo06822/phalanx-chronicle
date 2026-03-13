@@ -69,5 +69,46 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal(0f, sequencer.GetInterEffectDelay(TurnSide.Enemy, skillResult));
             Assert.False(sequencer.ShouldShowSkillForecast(TurnSide.Enemy, skillResult));
         }
+
+        [Fact]
+        public void EnemyLowSignalMultiTargetSkill_BatchesImpact()
+        {
+            BattleActionSequencer sequencer = new BattleActionSequencer();
+            SkillResult skillResult = new SkillResult(
+                "enemy-archer",
+                ActiveSkillType.Volley,
+                "enemy-archer",
+                new List<SkillEffectResult>
+                {
+                    new SkillEffectResult("player-1", 0, 14, false, false),
+                    new SkillEffectResult("player-2", 0, 14, false, false),
+                    new SkillEffectResult("player-3", 0, 14, false, false),
+                },
+                0,
+                0);
+
+            Assert.Equal(BattlePresentationImpactTier.LowSignal, sequencer.GetImpactTier(skillResult));
+            Assert.True(sequencer.ShouldBatchSkillResult(TurnSide.Enemy, skillResult));
+            Assert.Equal(0f, sequencer.GetInterEffectDelay(TurnSide.Enemy, skillResult));
+        }
+
+        [Fact]
+        public void PlayerMultiTargetSkill_DoesNotBatchByDefault()
+        {
+            BattleActionSequencer sequencer = new BattleActionSequencer();
+            SkillResult skillResult = new SkillResult(
+                "player-archer",
+                ActiveSkillType.Volley,
+                "player-archer",
+                new List<SkillEffectResult>
+                {
+                    new SkillEffectResult("enemy-1", 4, 14, false, false),
+                    new SkillEffectResult("enemy-2", 4, 14, false, false),
+                },
+                0,
+                0);
+
+            Assert.False(sequencer.ShouldBatchSkillResult(TurnSide.Player, skillResult));
+        }
     }
 }

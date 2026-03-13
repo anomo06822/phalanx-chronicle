@@ -3,13 +3,22 @@ using System.Collections.Generic;
 using System.Linq;
 using PhalanxChronicle.Localization;
 using PhalanxChronicle.Presentation;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Text = TMPro.TextMeshProUGUI;
 
 namespace PhalanxChronicle.UI
 {
     public class BattleActionDockView : MonoBehaviour
     {
+        private const float MaxDockWidth = 1120f;
+        private const float MinDockWidth = 540f;
+        private const float LeftPanelWidthEstimate = 292f;
+        private const float RightPanelWidthEstimate = 318f;
+        private const float DockHorizontalReserve = 56f;
+        private const float ActionDockHeight = 292f;
+
         protected GameObject rootObject;
         protected Text modeLabel;
         protected Text contextHintLabel;
@@ -29,13 +38,21 @@ namespace PhalanxChronicle.UI
 
         public void Initialize(Transform canvasRoot)
         {
+            float dockWidth = MaxDockWidth;
+            RectTransform canvasRect = canvasRoot as RectTransform;
+            if (canvasRect != null && canvasRect.rect.width > 0f)
+            {
+                float reservedWidth = LeftPanelWidthEstimate + RightPanelWidthEstimate + DockHorizontalReserve;
+                dockWidth = Mathf.Clamp(canvasRect.rect.width - reservedWidth, MinDockWidth, MaxDockWidth);
+            }
+
             rootObject = CreatePanel(
                 "ActionDock",
                 canvasRoot,
                 new Vector2(0.5f, 0f),
                 new Vector2(0.5f, 0f),
                 new Vector2(0f, 14f),
-                new Vector2(1120f, 172f));
+                new Vector2(dockWidth, ActionDockHeight));
 
             VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
             layout.spacing = BattleUiTheme.Space8;
@@ -66,17 +83,18 @@ namespace PhalanxChronicle.UI
             modeRect.offsetMin = new Vector2(10f, 2f);
             modeRect.offsetMax = new Vector2(-10f, -2f);
 
-            contextHintLabel = CreateText(headerRow.transform, string.Empty, 12, FontStyle.Italic, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
+            contextHintLabel = CreateText(headerRow.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
             LayoutElement contextLayout = contextHintLabel.GetComponent<LayoutElement>();
             contextLayout.flexibleWidth = 1f;
             contextLayout.preferredHeight = 22f;
-            contextHintLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            BattleHudFactory.SetOverflow(contextHintLabel, TextOverflowModes.Truncate, true);
 
-            GameObject actionRow = CreateRow("ActionRow", rootObject.transform, 108f);
+            GameObject actionRow = CreateRow("PrimaryActionRow", rootObject.transform, 108f);
             attackButtonView = CreateCard(actionRow.transform, true);
             skillButtonView = CreateCard(actionRow.transform, true);
-            waitButtonView = CreateCard(actionRow.transform, false);
-            backButtonView = CreateCard(actionRow.transform, false);
+            GameObject secondaryRow = CreateRow("SecondaryActionRow", rootObject.transform, 108f);
+            waitButtonView = CreateCard(secondaryRow.transform, false);
+            backButtonView = CreateCard(secondaryRow.transform, false);
 
             Hide();
         }
@@ -196,15 +214,15 @@ namespace PhalanxChronicle.UI
                 ? (interactable ? BattleUiTheme.ButtonText : new Color(0.9f, 0.88f, 0.84f, 1f))
                 : (interactable ? BattleUiTheme.ButtonSecondaryText : BattleUiTheme.TextMuted);
             Color detailColor = primary
-                ? new Color(0.22f, 0.15f, 0.08f, 0.94f)
-                : new Color(0.78f, 0.83f, 0.9f, 1f);
+                ? new Color(0.2f, 0.12f, 0.07f, 0.98f)
+                : new Color(0.88f, 0.9f, 0.94f, 1f);
             Color disabledDetailColor = primary
                 ? new Color(0.74f, 0.75f, 0.78f, 1f)
                 : BattleUiTheme.TextMuted;
             view.ReasonLabel.color = interactable ? detailColor : disabledDetailColor;
             view.OutcomeLabel.color = interactable ? detailColor : disabledDetailColor;
             view.RiskLabel.color = interactable
-                ? (primary ? new Color(0.35f, 0.16f, 0.09f, 0.94f) : new Color(0.99f, 0.78f, 0.62f, 1f))
+                ? (primary ? new Color(0.42f, 0.16f, 0.08f, 0.98f) : new Color(0.99f, 0.83f, 0.65f, 1f))
                 : disabledDetailColor;
         }
 
@@ -251,6 +269,7 @@ namespace PhalanxChronicle.UI
             Image image = buttonObject.GetComponent<Image>();
             image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
             image.color = primary ? BattleUiTheme.ButtonPrimary : BattleUiTheme.ButtonSecondary;
+            image.type = Image.Type.Sliced;
 
             Outline outline = buttonObject.AddComponent<Outline>();
             outline.effectDistance = new Vector2(1f, -1f);
@@ -283,11 +302,11 @@ namespace PhalanxChronicle.UI
 
             Text titleLabel = CreateText(contentObject.transform, string.Empty, primary ? 16 : 15, FontStyle.Bold, TextAnchor.MiddleLeft, primary ? BattleUiTheme.ButtonText : BattleUiTheme.ButtonSecondaryText);
             titleLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
-            titleLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            BattleHudFactory.SetOverflow(titleLabel, TextOverflowModes.Truncate, false);
 
-            Text reasonLabel = CreateText(contentObject.transform, string.Empty, 11, FontStyle.Normal, TextAnchor.MiddleLeft, primary ? new Color(0.22f, 0.15f, 0.08f, 0.94f) : new Color(0.78f, 0.83f, 0.9f, 1f));
-            reasonLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
-            reasonLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            Text reasonLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, primary ? new Color(0.2f, 0.12f, 0.07f, 0.98f) : new Color(0.88f, 0.9f, 0.94f, 1f));
+            reasonLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+            BattleHudFactory.SetOverflow(reasonLabel, TextOverflowModes.Truncate, true);
 
             GameObject metricRow = new GameObject("MetricRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             metricRow.transform.SetParent(contentObject.transform, false);
@@ -300,13 +319,13 @@ namespace PhalanxChronicle.UI
             metricLayout.childForceExpandHeight = false;
             metricLayout.childForceExpandWidth = false;
 
-            Text outcomeLabel = CreateText(contentObject.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.UpperLeft, primary ? new Color(0.24f, 0.14f, 0.08f, 0.96f) : new Color(0.95f, 0.91f, 0.85f, 1f));
-            outcomeLabel.GetComponent<LayoutElement>().preferredHeight = 28f;
-            outcomeLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            Text outcomeLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, primary ? new Color(0.2f, 0.12f, 0.06f, 1f) : new Color(0.97f, 0.94f, 0.89f, 1f));
+            outcomeLabel.GetComponent<LayoutElement>().preferredHeight = 30f;
+            BattleHudFactory.SetOverflow(outcomeLabel, TextOverflowModes.Truncate, true);
 
-            Text riskLabel = CreateText(contentObject.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft, primary ? new Color(0.38f, 0.17f, 0.1f, 0.96f) : new Color(0.99f, 0.78f, 0.62f, 1f));
-            riskLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
-            riskLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            Text riskLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, primary ? new Color(0.42f, 0.16f, 0.08f, 0.98f) : new Color(0.99f, 0.83f, 0.65f, 1f));
+            riskLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            BattleHudFactory.SetOverflow(riskLabel, TextOverflowModes.Truncate, true);
 
             return new ActionCardView(button, image, outline, titleLabel, reasonLabel, metricRow.transform, outcomeLabel, riskLabel);
         }
@@ -324,13 +343,14 @@ namespace PhalanxChronicle.UI
             RectTransform rectTransform = panel.GetComponent<RectTransform>();
             rectTransform.anchorMin = anchorMin;
             rectTransform.anchorMax = anchorMax;
-            rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            rectTransform.pivot = new Vector2(0.5f, 0f);
             rectTransform.anchoredPosition = anchoredPosition;
             rectTransform.sizeDelta = size;
 
             Image image = panel.GetComponent<Image>();
             image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
             image.color = BattleUiTheme.PanelBackdrop;
+            image.type = Image.Type.Sliced;
 
             Outline outline = panel.AddComponent<Outline>();
             outline.effectDistance = new Vector2(1f, -1f);
@@ -345,6 +365,7 @@ namespace PhalanxChronicle.UI
             Image image = panel.GetComponent<Image>();
             image.sprite = RuntimeSpriteLibrary.InkPanelSprite;
             image.color = color;
+            image.type = Image.Type.Sliced;
 
             LayoutElement layoutElement = panel.GetComponent<LayoutElement>();
             layoutElement.preferredHeight = preferredHeight;
@@ -357,26 +378,7 @@ namespace PhalanxChronicle.UI
 
         private static Text CreateText(Transform parent, string content, int size, FontStyle fontStyle, TextAnchor alignment, Color color)
         {
-            GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(Text), typeof(LayoutElement));
-            textObject.transform.SetParent(parent, false);
-            Text text = textObject.GetComponent<Text>();
-            text.text = content;
-            text.font = RuntimeSpriteLibrary.GetUiFont(size, fontStyle);
-            text.fontSize = size;
-            text.fontStyle = fontStyle;
-            text.alignment = alignment;
-            text.color = color;
-            text.alignByGeometry = true;
-            text.horizontalOverflow = HorizontalWrapMode.Wrap;
-            text.verticalOverflow = VerticalWrapMode.Overflow;
-            text.lineSpacing = 1.02f;
-
-            Shadow shadow = textObject.AddComponent<Shadow>();
-            shadow.effectDistance = new Vector2(0.25f, -0.25f);
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.42f);
-
-            textObject.GetComponent<LayoutElement>().preferredHeight = size + 8f;
-            return text;
+            return BattleHudFactory.CreateText(parent, content, size, fontStyle, alignment, color);
         }
 
         private sealed class ActionCardView

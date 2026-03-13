@@ -9,11 +9,13 @@ using PhalanxChronicle.Battle.States;
 using PhalanxChronicle.Battle.Units;
 using PhalanxChronicle.Core;
 using PhalanxChronicle.UI;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using Text = TMPro.TMP_Text;
 
 namespace PhalanxChronicle.Editor
 {
@@ -108,7 +110,7 @@ namespace PhalanxChronicle.Editor
                     throw new InvalidOperationException("Expected first-launch intro copy to describe the first-session length.");
                 }
 
-                Text primaryButtonLabel = campaignPrimaryButton != null ? campaignPrimaryButton.GetComponentInChildren<Text>() : null;
+                Text primaryButtonLabel = campaignPrimaryButton != null ? campaignPrimaryButton.GetComponentInChildren<Text>(true) : null;
                 if (primaryButtonLabel == null ||
                     !ContainsAny(primaryButtonLabel.text, "開始首場戰鬥", "Start First Battle"))
                 {
@@ -219,16 +221,16 @@ namespace PhalanxChronicle.Editor
                 battleManager.ChangeState<UnitSelectionState>();
 
                 Unit armoredZealotView = units.Single(unit => unit.UnitId == "enemy-armored_zealot");
-                TextMesh armoredCaptainName = GetPrivateField<TextMesh>(armoredZealotView, "nameText");
-                if (armoredCaptainName == null || armoredCaptainName.characterSize >= 0.075f)
+                TextMeshPro armoredCaptainName = GetPrivateField<TextMeshPro>(armoredZealotView, "nameText");
+                if (armoredCaptainName == null || armoredCaptainName.font == null || armoredCaptainName.fontSize > 6.4f)
                 {
-                    throw new InvalidOperationException("Expected long world-space names to scale down for readability.");
+                    throw new InvalidOperationException("Expected world-space unit names to use TMP-authored font assets with readable sizing.");
                 }
 
                 Text selectedNameLabel = GetPrivateField<Text>(battleHud, "selectedNameLabel");
-                if (selectedNameLabel == null || !selectedNameLabel.resizeTextForBestFit)
+                if (selectedNameLabel == null || !selectedNameLabel.enableAutoSizing)
                 {
-                    throw new InvalidOperationException("Expected selected unit name label to use best fit.");
+                    throw new InvalidOperationException("Expected selected unit name label to use TMP auto sizing.");
                 }
 
                 DefeatUnit(battleManager.Simulation.Context, "enemy-yellow_turban_raider");

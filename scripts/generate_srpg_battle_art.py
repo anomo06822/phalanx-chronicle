@@ -33,9 +33,9 @@ from generate_character_art import (
 
 FIGURE_CENTER_X = 64
 FIGURE_CENTER_Y = 66
-FIGURE_SCALE_X = 1.14
-FIGURE_SCALE_Y = 1.18
-FIGURE_OFFSET_Y = 2
+FIGURE_SCALE_X = 1.28
+FIGURE_SCALE_Y = 1.34
+FIGURE_OFFSET_Y = 5
 
 
 def transform_point(x: int, y: int) -> tuple[int, int]:
@@ -73,6 +73,10 @@ def translate(points: Iterable[tuple[int, int]], dx: int = 0, dy: int = 0, flip_
     return [((128 - x) + dx, y + dy) for x, y in points]
 
 
+def shift_shape(points: Iterable[tuple[int, int]], dx: int, dy: int) -> list[tuple[int, int]]:
+    return [(x + dx, y + dy) for x, y in points]
+
+
 def render_battle_svg(spec: CharacterSpec) -> str:
     p = spec.palette
     outline = darken(p.line, 0.14)
@@ -94,6 +98,7 @@ def render_battle_svg(spec: CharacterSpec) -> str:
         render_arms(spec, outline, cloth_dark, metal_dark),
         render_head(spec, outline, skin_light, skin_dark, hair, metal_light, accent_light),
         render_role_signature(spec, outline, accent_dark, metal_light),
+        render_identity_accent(spec, outline, cloth_light, accent_dark, accent_light, metal_light),
     ]
 
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{BATTLE_SIZE}" height="{BATTLE_SIZE}" viewBox="0 0 {BATTLE_SIZE} {BATTLE_SIZE}" shape-rendering="crispEdges">
@@ -110,7 +115,9 @@ def render_back_cloak(spec: CharacterSpec, outline: str, cloth_dark: str) -> str
     flip_left = spec.weapon_side == "left"
     cloak = translate([(48, 56), (42, 76), (48, 98), (60, 90), (64, 70), (70, 90), (82, 98), (88, 74), (80, 54), (66, 48)], flip_x=flip_left)
     inner = translate([(50, 58), (46, 76), (50, 94), (60, 88), (64, 70), (68, 88), (78, 94), (82, 76), (78, 56), (66, 52)], flip_x=flip_left)
-    return poly(cloak, outline) + poly(inner, cloth_dark)
+    shadow = shift_shape(cloak, 1, 1)
+    highlight = shift_shape(inner, -1, 0)
+    return poly(shadow, darken(cloth_dark, 0.14), 0.22) + poly(cloak, outline) + poly(highlight, cloth_dark, 0.3) + poly(inner, cloth_dark)
 
 
 def render_body(spec: CharacterSpec, outline: str, cloth_mid: str, cloth_dark: str, cloth_light: str, accent_dark: str, metal_dark: str) -> str:
@@ -142,6 +149,7 @@ def render_body(spec: CharacterSpec, outline: str, cloth_mid: str, cloth_dark: s
     layers = [
         poly(body_shapes.get(spec.role, body_shapes["Commander"]), outline),
         poly(inner_shapes.get(spec.role, inner_shapes["Commander"]), cloth_mid),
+        poly([(x + 1, y + 1) for x, y in center_shadow], cloth_dark, 0.2),
         poly(center_shadow, cloth_dark, 0.9),
         poly(chest, cloth_light, 0.84),
         poly(sash.get(spec.role, sash["Commander"]), accent_dark, 0.78),
@@ -150,8 +158,10 @@ def render_body(spec: CharacterSpec, outline: str, cloth_mid: str, cloth_dark: s
     if spec.role in {"Guardian", "Raider"}:
         layers.append(poly([(46, 64), (50, 56), (58, 58), (58, 76), (48, 82), (44, 74)], metal_dark, 0.88))
         layers.append(poly([(82, 64), (78, 56), (70, 58), (70, 76), (80, 82), (84, 74)], metal_dark, 0.88))
+        layers.append(line([(46, 58), (50, 62), (64, 60), (78, 62), (82, 58)], accent_dark, 1, 0.34))
     elif spec.role in {"Ranger", "Scout"}:
         layers.append(poly([(46, 58), (52, 54), (56, 72), (50, 84), (44, 78)], darken(cloth_dark, 0.08), 0.92))
+        layers.append(line([(52, 58), (56, 62), (68, 64), (76, 58)], outline, 1, 0.28))
 
     return "".join(layers)
 
@@ -183,12 +193,12 @@ def render_arms(spec: CharacterSpec, outline: str, cloth_dark: str, metal_dark: 
 
 def render_head(spec: CharacterSpec, outline: str, skin_light: str, skin_dark: str, hair: str, metal_light: str, accent_light: str) -> str:
     face = [
-        rect(56, 36, 16, 18, outline),
-        rect(57, 37, 14, 16, skin_light),
-        rect(57, 45, 14, 8, skin_dark, 0.28),
-        rect(59, 43, 2, 2, outline, 0.7),
-        rect(67, 43, 2, 2, outline, 0.7),
-        rect(63, 47, 2, 3, darken(skin_dark, 0.18), 0.46),
+        rect(55, 35, 18, 20, outline),
+        rect(56, 36, 16, 18, skin_light),
+        rect(56, 46, 16, 8, skin_dark, 0.3),
+        rect(59, 43, 2, 2, outline, 0.8),
+        rect(67, 43, 2, 2, outline, 0.8),
+        rect(63, 48, 2, 3, darken(skin_dark, 0.18), 0.5),
     ]
 
     hair_shapes = {
@@ -226,7 +236,8 @@ def render_headwear(spec: CharacterSpec, outline: str, metal_light: str, accent_
         "bandana": poly([(54, 36), (58, 32), (64, 30), (72, 32), (76, 36), (72, 40), (56, 40)], accent_light, 0.82),
         "lighthelm": poly([(56, 36), (58, 30), (64, 26), (70, 30), (72, 36), (68, 36), (58, 36)], metal_light, 0.86),
     }
-    return mapping.get(spec.headwear, rect(58, 30, 12, 6, outline, 0.0))
+    helmet = mapping.get(spec.headwear, rect(58, 30, 12, 6, outline, 0.0))
+    return helmet + line([(56, 30), (64, 22), (72, 30)], outline, 1, 0.22) + line([(64, 30), (64, 37)], accent_light, 1, 0.26)
 
 
 def render_beard(spec: CharacterSpec, hair: str) -> str:
@@ -246,39 +257,75 @@ def render_beard(spec: CharacterSpec, hair: str) -> str:
 
 def render_weapon(spec: CharacterSpec, outline: str, metal_light: str, metal_dark: str, accent_light: str) -> str:
     flip_left = spec.weapon_side == "left"
-    offset = -4 if flip_left else 4
+    weapon_offset = -4 if flip_left else 4
 
     if spec.weapon in {"spear", "lance"}:
-        shaft = translate([(92, 28), (94, 28), (86, 102), (84, 102)], dx=offset, flip_x=flip_left)
-        blade = translate([(92, 18), (98, 28), (90, 34)], dx=offset, flip_x=flip_left)
-        tassel = translate([(90, 38), (96, 34), (100, 42), (94, 46)], dx=offset, flip_x=flip_left)
-        return poly(shaft, metal_dark, 0.88) + poly(blade, metal_light, 0.96) + poly(tassel, accent_light, 0.62)
+        shaft = translate([(92, 28), (94, 28), (86, 102), (84, 102)], dx=weapon_offset, flip_x=flip_left)
+        blade = translate([(92, 18), (98, 28), (90, 34)], dx=weapon_offset, flip_x=flip_left)
+        tassel = translate([(90, 38), (96, 34), (100, 42), (94, 46)], dx=weapon_offset, flip_x=flip_left)
+        return (
+            poly(shift_shape(shaft, 1, 1), darken(metal_dark, 0.2), 0.38)
+            + poly(shaft, metal_dark, 0.88)
+            + poly(shift_shape(blade, -1, 0), darken(metal_light, 0.2), 0.42)
+            + poly(blade, metal_light, 0.96)
+            + poly(shift_shape(tassel, 0, 1), darken(accent_light, 0.2), 0.38)
+            + poly(tassel, accent_light, 0.62)
+        )
 
     if spec.weapon == "glaive":
-        shaft = translate([(92, 30), (94, 30), (86, 102), (84, 102)], dx=offset, flip_x=flip_left)
-        blade = translate([(92, 18), (104, 24), (96, 38), (88, 34)], dx=offset, flip_x=flip_left)
-        return poly(shaft, metal_dark, 0.88) + poly(blade, metal_light, 0.96)
+        shaft = translate([(92, 30), (94, 30), (86, 102), (84, 102)], dx=weapon_offset, flip_x=flip_left)
+        blade = translate([(92, 18), (104, 24), (96, 38), (88, 34)], dx=weapon_offset, flip_x=flip_left)
+        return (
+            poly(shift_shape(shaft, 1, 1), darken(metal_dark, 0.2), 0.38)
+            + poly(shaft, metal_dark, 0.88)
+            + poly(shift_shape(blade, -1, 0), darken(metal_light, 0.2), 0.42)
+            + poly(blade, metal_light, 0.96)
+        )
 
     if spec.weapon == "bow":
-        bow = translate([(88, 26), (94, 34), (96, 48), (94, 72), (88, 82), (86, 72), (88, 48), (86, 34)], dx=offset, flip_x=flip_left)
-        string = translate([(90, 30), (92, 48), (90, 78)], dx=offset, flip_x=flip_left)
-        return poly(bow, accent_light, 0.76) + line(string, lighten(spec.palette.paper, 0.02), 1, 0.78)
+        bow = translate([(88, 26), (94, 34), (96, 48), (94, 72), (88, 82), (86, 72), (88, 48), (86, 34)], dx=weapon_offset, flip_x=flip_left)
+        string = translate([(90, 30), (92, 48), (90, 78)], dx=weapon_offset, flip_x=flip_left)
+        return (
+            poly(shift_shape(bow, 1, 1), darken(accent_light, 0.2), 0.42)
+            + poly(bow, accent_light, 0.76)
+            + line(shift_shape(string, 1, 0), lighten(spec.palette.paper, 0.18), 1, 0.78)
+            + line(string, lighten(spec.palette.paper, 0.02), 1, 0.78)
+        )
 
     if spec.weapon == "fan":
-        fan = translate([(84, 64), (94, 56), (102, 64), (94, 72)], dx=offset, flip_x=flip_left)
-        ribs = translate([(90, 60), (94, 56), (98, 60)], dx=offset, flip_x=flip_left)
-        handle = translate([(90, 70), (92, 70), (94, 82), (92, 84)], dx=offset, flip_x=flip_left)
-        return poly(fan, lighten(spec.palette.paper, 0.02), 0.92) + poly(ribs, accent_light, 0.46) + poly(handle, metal_dark, 0.78)
+        fan = translate([(84, 64), (94, 56), (102, 64), (94, 72)], dx=weapon_offset, flip_x=flip_left)
+        ribs = translate([(90, 60), (94, 56), (98, 60)], dx=weapon_offset, flip_x=flip_left)
+        handle = translate([(90, 70), (92, 70), (94, 82), (92, 84)], dx=weapon_offset, flip_x=flip_left)
+        return (
+            poly(shift_shape(fan, 1, 1), darken(lighten(spec.palette.paper, 0.02), 0.2), 0.4)
+            + poly(fan, lighten(spec.palette.paper, 0.02), 0.92)
+            + poly(shift_shape(ribs, -1, 0), darken(accent_light, 0.2), 0.52)
+            + poly(ribs, accent_light, 0.46)
+            + poly(shift_shape(handle, 0, 1), darken(metal_dark, 0.2), 0.56)
+            + poly(handle, metal_dark, 0.78)
+        )
 
     if spec.weapon == "seal":
-        block = translate([(88, 56), (96, 56), (96, 68), (88, 68)], dx=offset, flip_x=flip_left)
-        top = translate([(90, 48), (94, 48), (94, 56), (90, 56)], dx=offset, flip_x=flip_left)
-        return poly(block, accent_light, 0.88) + poly(top, metal_dark, 0.82)
+        block = translate([(88, 56), (96, 56), (96, 68), (88, 68)], dx=weapon_offset, flip_x=flip_left)
+        top = translate([(90, 48), (94, 48), (94, 56), (90, 56)], dx=weapon_offset, flip_x=flip_left)
+        return (
+            poly(shift_shape(block, 1, 1), darken(accent_light, 0.2), 0.42)
+            + poly(block, accent_light, 0.88)
+            + poly(shift_shape(top, -1, 0), darken(metal_dark, 0.2), 0.42)
+            + poly(top, metal_dark, 0.82)
+        )
 
-    blade = translate([(92, 20), (98, 32), (92, 46), (86, 32)], dx=offset, flip_x=flip_left)
-    grip = translate([(90, 44), (94, 44), (88, 102), (84, 102)], dx=offset, flip_x=flip_left)
-    cross = translate([(86, 46), (98, 46), (98, 50), (86, 50)], dx=offset, flip_x=flip_left)
-    return poly(blade, metal_light, 0.96) + poly(grip, metal_dark, 0.86) + poly(cross, accent_light, 0.68)
+    blade = translate([(92, 20), (98, 32), (92, 46), (86, 32)], dx=weapon_offset, flip_x=flip_left)
+    grip = translate([(90, 44), (94, 44), (88, 102), (84, 102)], dx=weapon_offset, flip_x=flip_left)
+    cross = translate([(86, 46), (98, 46), (98, 50), (86, 50)], dx=weapon_offset, flip_x=flip_left)
+    return (
+        poly(shift_shape(blade, 1, 1), darken(metal_light, 0.2), 0.4)
+        + poly(blade, metal_light, 0.96)
+        + poly(shift_shape(grip, 0, 1), darken(metal_dark, 0.2), 0.5)
+        + poly(grip, metal_dark, 0.86)
+        + poly(shift_shape(cross, -1, 0), darken(accent_light, 0.2), 0.42)
+        + poly(cross, accent_light, 0.68)
+    )
 
 
 def render_role_signature(spec: CharacterSpec, outline: str, accent_dark: str, metal_light: str) -> str:
@@ -291,6 +338,76 @@ def render_role_signature(spec: CharacterSpec, outline: str, accent_dark: str, m
     if spec.role == "Scout":
         return line([(50, 60), (46, 74), (50, 88)], metal_light, 2, 0.56) + line([(78, 60), (82, 74), (78, 88)], metal_light, 2, 0.56)
     return line([(48, 62), (82, 84)], metal_light, 2, 0.42)
+
+
+def render_identity_accent(
+    spec: CharacterSpec,
+    outline: str,
+    cloth_light: str,
+    accent_dark: str,
+    accent_light: str,
+    metal_light: str,
+) -> str:
+    key = spec.base_key.lower()
+
+    if key == "player-liu-bei":
+        return (
+            line([(56, 60), (64, 56), (72, 60)], accent_light, 1, 0.52)
+            + line([(60, 72), (64, 90), (68, 72)], cloth_light, 1, 0.46)
+        )
+
+    if key == "player-guan-yu":
+        return (
+            poly([(58, 48), (60, 60), (64, 84), (68, 60), (70, 48), (68, 86), (64, 96), (60, 86)], darken(accent_dark, 0.3), 0.86)
+            + line([(50, 58), (56, 62), (74, 62), (80, 58)], accent_light, 1, 0.4)
+        )
+
+    if key == "player-zhang-fei":
+        return (
+            line([(56, 50), (62, 54), (64, 58), (66, 54), (72, 50)], darken(outline, 0.12), 2, 0.66)
+            + line([(48, 58), (54, 64), (74, 64), (80, 58)], accent_dark, 2, 0.38)
+        )
+
+    if key == "player-huang-zhong":
+        return (
+            line([(52, 54), (52, 92)], darken(accent_dark, 0.18), 2, 0.5)
+            + line([(50, 58), (58, 60), (58, 80), (50, 84)], accent_light, 1, 0.44)
+        )
+
+    if key == "player-zhuge-liang":
+        return (
+            line([(60, 56), (64, 62), (68, 56)], cloth_light, 1, 0.58)
+            + line([(48, 64), (44, 74), (48, 84)], accent_light, 1, 0.42)
+        )
+
+    if key == "player-zhao-yun":
+        return (
+            line([(64, 22), (74, 14), (82, 26)], cloth_light, 2, 0.7)
+            + line([(54, 58), (60, 60), (74, 58)], metal_light, 1, 0.46)
+        )
+
+    if key == "player-ma-chao":
+        return (
+            line([(66, 22), (78, 14), (88, 28)], accent_light, 2, 0.76)
+            + line([(48, 60), (56, 66), (76, 64), (82, 58)], accent_dark, 1, 0.4)
+        )
+
+    if key in {"enemy-zhang-bao", "enemy-zhang-liang", "enemy-pursuit_commander", "enemy-xiahou-dun", "enemy-xiahou-yuan", "enemy-jiameng-commandant", "enemy-hanshui-commander"}:
+        return (
+            line([(54, 30), (64, 20), (76, 32)], accent_light, 2, 0.58)
+            + line([(48, 58), (54, 64), (74, 64), (80, 58)], metal_light, 1, 0.38)
+        )
+
+    if "tiger_guard" in key or "shield" in key:
+        return line([(46, 60), (52, 66), (76, 66), (82, 60)], metal_light, 1, 0.32)
+
+    if "rider" in key or spec.role == "Raider":
+        return line([(52, 62), (64, 72), (76, 84)], accent_light, 1, 0.34)
+
+    if "archer" in key or spec.role == "Ranger":
+        return line([(48, 58), (56, 54), (80, 82)], cloth_light, 1, 0.28)
+
+    return ""
 
 
 def generate_battle_assets() -> None:

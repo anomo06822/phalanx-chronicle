@@ -12,9 +12,12 @@ namespace PhalanxChronicle.Battle.Effects
         {
             return skillType == ActiveSkillType.PowerStrike ||
                    skillType == ActiveSkillType.DragonPierce ||
+                   skillType == ActiveSkillType.WhiteHorseRescue ||
                    skillType == ActiveSkillType.WesternStampede ||
+                   skillType == ActiveSkillType.StormbreakCharge ||
                    skillType == ActiveSkillType.GreenDragonSlash ||
-                   skillType == ActiveSkillType.AzureDragonSlash;
+                   skillType == ActiveSkillType.AzureDragonSlash ||
+                   skillType == ActiveSkillType.CrimsonCrescent;
         }
 
         public static IEnumerator PlayCasterEffect(ActiveSkillType skillType, Unit casterView, Unit primaryTargetView, UnitRuntimeState casterState = null)
@@ -28,6 +31,22 @@ namespace PhalanxChronicle.Battle.Effects
             bool mastered = ActiveSkillRules.IsMastered(casterState);
             switch (skillType)
             {
+                case ActiveSkillType.KingsBanner:
+                    yield return PlayPulse("KingsBannerCast", casterView.GetAnchorPosition(0.34f), accent, new Vector3(0.32f, 0.32f, 1f), new Vector3(mastered ? 1.28f : 1.08f, mastered ? 1.28f : 1.08f, 1f), mastered ? 0.22f : 0.18f, RuntimeSpriteLibrary.BannerSprite, 0f, 10f);
+                    yield return PlayPulse("KingsBannerSeal", casterView.GetAnchorPosition(0.56f), new Color(1f, 0.95f, 0.72f, 0.9f), new Vector3(0.18f, 0.18f, 1f), new Vector3(mastered ? 1.16f : 0.96f, mastered ? 1.16f : 0.96f, 1f), 0.14f, RuntimeSpriteLibrary.RingSprite, 0.02f, 0f);
+                    if (primaryTargetView != null)
+                    {
+                        yield return PlayBeam(casterView.GetAnchorPosition(0.5f), primaryTargetView.GetAnchorPosition(0.6f), accent, 0.1f, 0.13f);
+                    }
+                    break;
+                case ActiveSkillType.FeatherFormation:
+                    yield return PlayPulse("FeatherFormationCast", casterView.GetAnchorPosition(0.4f), accent, new Vector3(0.28f, 0.28f, 1f), new Vector3(mastered ? 1.36f : 1.14f, mastered ? 1.36f : 1.14f, 1f), mastered ? 0.2f : 0.16f, RuntimeSpriteLibrary.BannerSprite, 0f, -18f);
+                    yield return PlayPulse("FeatherFormationGrid", casterView.GetAnchorPosition(0.4f), new Color(0.9f, 0.98f, 1f, 0.86f), new Vector3(0.16f, 0.16f, 1f), new Vector3(mastered ? 1.44f : 1.18f, mastered ? 1.44f : 1.18f, 1f), 0.16f, RuntimeSpriteLibrary.RingSprite, 0.04f, 30f);
+                    if (primaryTargetView != null)
+                    {
+                        yield return PlayBeam(casterView.GetAnchorPosition(0.46f), primaryTargetView.GetAnchorPosition(0.6f), accent, 0.09f, 0.12f);
+                    }
+                    break;
                 case ActiveSkillType.RoyalAid:
                 case ActiveSkillType.ImperialAid:
                 case ActiveSkillType.GuardOrder:
@@ -71,6 +90,14 @@ namespace PhalanxChronicle.Battle.Effects
                     }
 
                     break;
+                case ActiveSkillType.WhiteHorseRescue:
+                    yield return PlaySparkBurst(casterView.GetAnchorPosition(0.34f), accent, 0.12f, mastered ? 0.96f : 0.8f);
+                    yield return PlayPulse("WhiteHorseRescueCast", casterView.GetAnchorPosition(0.28f), new Color(0.92f, 0.98f, 1f, 0.9f), new Vector3(0.2f, 0.2f, 1f), new Vector3(mastered ? 1f : 0.82f, mastered ? 1f : 0.82f, 1f), 0.12f, RuntimeSpriteLibrary.RingSprite, 0f, 18f);
+                    if (primaryTargetView != null)
+                    {
+                        yield return PlayBeam(casterView.GetAnchorPosition(0.48f), primaryTargetView.GetAnchorPosition(0.34f), accent, 0.12f, 0.15f);
+                    }
+                    break;
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.SkyVolley:
                 case ActiveSkillType.PinningShot:
@@ -89,6 +116,13 @@ namespace PhalanxChronicle.Battle.Effects
                         yield return PlaySparkBurst(casterView.GetAnchorPosition(0.56f), new Color(1f, 0.94f, 0.68f, 1f), 0.12f, 0.46f);
                     }
 
+                    break;
+                case ActiveSkillType.CrimsonCrescent:
+                    yield return PlaySparkBurst(casterView.GetAnchorPosition(0.34f), accent, 0.14f, mastered ? 0.94f : 0.78f);
+                    if (primaryTargetView != null)
+                    {
+                        yield return PlayBeam(casterView.GetAnchorPosition(0.48f), primaryTargetView.GetAnchorPosition(0.36f), new Color(1f, 0.78f, 0.4f, 0.96f), 0.12f, 0.16f);
+                    }
                     break;
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
@@ -123,6 +157,14 @@ namespace PhalanxChronicle.Battle.Effects
                     }
 
                     break;
+                case ActiveSkillType.StonewallChallenge:
+                    yield return PlayPulse("StonewallChallengeCast", casterView.GetAnchorPosition(0.22f), accent, new Vector3(0.34f, 0.34f, 1f), new Vector3(mastered ? 2.1f : 1.72f, mastered ? 2.1f : 1.72f, 1f), mastered ? 0.24f : 0.19f, RuntimeSpriteLibrary.BannerSprite, 0f, 0f);
+                    yield return PlaySparkBurst(casterView.GetAnchorPosition(0.18f), new Color(0.95f, 0.84f, 0.58f, 0.92f), 0.14f, mastered ? 0.74f : 0.58f);
+                    break;
+                case ActiveSkillType.DustDevilSweep:
+                    yield return PlayPulse("DustDevilSweepCast", casterView.GetAnchorPosition(0.22f), accent, new Vector3(0.32f, 0.32f, 1f), new Vector3(mastered ? 1.86f : 1.58f, mastered ? 1.86f : 1.58f, 1f), mastered ? 0.22f : 0.18f, RuntimeSpriteLibrary.RingSprite, 0f, -12f);
+                    yield return PlaySparkBurst(casterView.GetAnchorPosition(0.26f), new Color(0.98f, 0.82f, 0.54f, 0.94f), 0.12f, mastered ? 0.78f : 0.62f);
+                    break;
                 case ActiveSkillType.FireStratagem:
                 case ActiveSkillType.EightTrigramInferno:
                     yield return PlayArcaneSigil(casterView.GetAnchorPosition(0.18f), accent, mastered ? 1.22f : 1f, mastered);
@@ -131,6 +173,10 @@ namespace PhalanxChronicle.Battle.Effects
                         yield return PlayBeam(casterView.GetAnchorPosition(0.44f), primaryTargetView.GetAnchorPosition(0.52f), accent, mastered ? 0.12f : 0.09f, mastered ? 0.14f : 0.11f);
                     }
 
+                    break;
+                case ActiveSkillType.StormbreakCharge:
+                    yield return PlaySparkBurst(casterView.GetAnchorPosition(0.34f), accent, 0.14f, mastered ? 1f : 0.84f);
+                    yield return PlayPulse("StormbreakChargeTrail", casterView.GetAnchorPosition(0.3f), new Color(0.84f, 0.9f, 1f, 0.86f), new Vector3(0.22f, 0.22f, 1f), new Vector3(mastered ? 1.08f : 0.9f, mastered ? 1.08f : 0.9f, 1f), 0.12f, RuntimeSpriteLibrary.SlashSprite, 0f, 42f);
                     break;
             }
         }
@@ -146,6 +192,14 @@ namespace PhalanxChronicle.Battle.Effects
             bool mastered = ActiveSkillRules.IsMastered(casterState);
             switch (skillType)
             {
+                case ActiveSkillType.KingsBanner:
+                    yield return PlayPulse("KingsBannerTarget", targetView.GetAnchorPosition(0.56f), accent, new Vector3(0.28f, 0.28f, 1f), new Vector3(mastered ? 1.32f : 1.12f, mastered ? 1.32f : 1.12f, 1f), 0.16f, RuntimeSpriteLibrary.BannerSprite, 0.04f, 0f);
+                    yield return PlaySparkBurst(targetView.GetAnchorPosition(0.86f), new Color(1f, 0.98f, 0.76f, 1f), 0.12f, mastered ? 0.88f : 0.7f);
+                    break;
+                case ActiveSkillType.FeatherFormation:
+                    yield return PlayPulse("FeatherFormationTarget", targetView.GetAnchorPosition(0.54f), accent, new Vector3(0.26f, 0.26f, 1f), new Vector3(mastered ? 1.28f : 1.08f, mastered ? 1.28f : 1.08f, 1f), 0.16f, RuntimeSpriteLibrary.BannerSprite, 0.06f, -12f);
+                    yield return PlayPulse("FeatherFormationGridTarget", targetView.GetAnchorPosition(0.54f), new Color(0.92f, 1f, 1f, 0.9f), new Vector3(0.18f, 0.18f, 1f), new Vector3(mastered ? 1.34f : 1.12f, mastered ? 1.34f : 1.12f, 1f), 0.14f, RuntimeSpriteLibrary.RingSprite, 0.02f, 24f);
+                    break;
                 case ActiveSkillType.RoyalAid:
                 case ActiveSkillType.ImperialAid:
                 case ActiveSkillType.GuardOrder:
@@ -176,10 +230,18 @@ namespace PhalanxChronicle.Battle.Effects
                         0f,
                         22f);
                     break;
+                case ActiveSkillType.WhiteHorseRescue:
+                    yield return PlaySparkBurst(targetView.GetAnchorPosition(0.2f), accent, 0.14f, isPrimaryTarget ? (mastered ? 1.24f : 1.08f) : (mastered ? 0.92f : 0.78f));
+                    yield return PlayPulse("WhiteHorseRescueRing", targetView.GetAnchorPosition(0.18f), new Color(0.92f, 0.98f, 1f, 0.94f), new Vector3(0.2f, 0.2f, 1f), new Vector3(mastered ? 1.16f : 0.96f, mastered ? 1.16f : 0.96f, 1f), 0.12f, RuntimeSpriteLibrary.RingSprite, 0f, 20f);
+                    break;
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.SkyVolley:
                 case ActiveSkillType.PinningShot:
                     yield return PlayArrowStrike(targetView.GetAnchorPosition(0.18f), accent, isPrimaryTarget ? (mastered ? 1.08f : 0.96f) : (mastered ? 0.88f : 0.76f));
+                    break;
+                case ActiveSkillType.CrimsonCrescent:
+                    yield return PlaySlashArc(targetView.GetAnchorPosition(0.24f), accent, isPrimaryTarget ? (mastered ? 1.26f : 1.1f) : (mastered ? 0.98f : 0.84f));
+                    yield return PlaySparkBurst(targetView.GetAnchorPosition(0.24f), new Color(1f, 0.82f, 0.48f, 0.98f), 0.12f, isPrimaryTarget ? (mastered ? 0.92f : 0.76f) : (mastered ? 0.74f : 0.58f));
                     break;
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
@@ -200,9 +262,21 @@ namespace PhalanxChronicle.Battle.Effects
                         -18f);
                     yield return PlaySparkBurst(targetView.GetAnchorPosition(0.7f), new Color(1f, 0.75f, 0.56f, 0.95f), 0.12f, mastered ? 0.7f : 0.56f);
                     break;
+                case ActiveSkillType.StonewallChallenge:
+                    yield return PlayPulse("StonewallChallengeTarget", targetView.GetAnchorPosition(0.38f), accent, new Vector3(0.28f, 0.28f, 1f), new Vector3(mastered ? 1.26f : 1.08f, mastered ? 1.26f : 1.08f, 1f), 0.16f, RuntimeSpriteLibrary.BannerSprite, 0.05f, 0f);
+                    yield return PlaySparkBurst(targetView.GetAnchorPosition(0.68f), new Color(0.95f, 0.82f, 0.54f, 0.9f), 0.12f, mastered ? 0.68f : 0.54f);
+                    break;
+                case ActiveSkillType.DustDevilSweep:
+                    yield return PlayPulse("DustDevilSweepTarget", targetView.GetAnchorPosition(0.36f), accent, new Vector3(0.24f, 0.24f, 1f), new Vector3(mastered ? 1.18f : 1f, mastered ? 1.18f : 1f, 1f), 0.14f, RuntimeSpriteLibrary.RingSprite, 0.04f, -24f);
+                    yield return PlaySparkBurst(targetView.GetAnchorPosition(0.52f), new Color(0.96f, 0.78f, 0.48f, 0.92f), 0.12f, mastered ? 0.68f : 0.54f);
+                    break;
                 case ActiveSkillType.FireStratagem:
                 case ActiveSkillType.EightTrigramInferno:
                     yield return PlayMeteorStrike(targetView.GetAnchorPosition(0.3f), accent, isPrimaryTarget ? 1f : 0.82f, mastered);
+                    break;
+                case ActiveSkillType.StormbreakCharge:
+                    yield return PlaySlashArc(targetView.GetAnchorPosition(0.22f), accent, isPrimaryTarget ? (mastered ? 1.28f : 1.1f) : (mastered ? 1f : 0.82f));
+                    yield return PlaySparkBurst(targetView.GetAnchorPosition(0.2f), new Color(0.88f, 0.94f, 1f, 0.96f), 0.14f, isPrimaryTarget ? (mastered ? 1f : 0.84f) : (mastered ? 0.76f : 0.62f));
                     break;
             }
         }

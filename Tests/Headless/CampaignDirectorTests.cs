@@ -11,14 +11,10 @@ namespace PhalanxChronicle.Headless.Tests
             CampaignDirector director = new CampaignDirector(CampaignCatalog.CreateLiuBeiLegend());
 
             Assert.True(director.IsStageUnlocked(0));
-            Assert.False(director.IsStageUnlocked(1));
-            Assert.False(director.IsStageUnlocked(2));
-            Assert.False(director.IsStageUnlocked(3));
-            Assert.False(director.IsStageUnlocked(4));
-            Assert.False(director.IsStageUnlocked(5));
-            Assert.False(director.IsStageUnlocked(6));
-            Assert.False(director.IsStageUnlocked(7));
-            Assert.False(director.IsStageUnlocked(8));
+            for (int index = 1; index < 12; index++)
+            {
+                Assert.False(director.IsStageUnlocked(index));
+            }
             Assert.Equal(0, director.GetRecommendedStageIndex());
         }
 
@@ -38,7 +34,7 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.True(director.IsStageUnlocked(1));
             Assert.False(director.IsStageUnlocked(2));
             Assert.False(director.IsStageUnlocked(3));
-            Assert.False(director.IsStageUnlocked(8));
+            Assert.False(director.IsStageUnlocked(11));
             Assert.Equal(1, director.GetRecommendedStageIndex());
             Assert.Equal(1, director.Progress.GetClearCount(BattleScenarioCatalog.GuangzongScenarioId));
         }
@@ -78,7 +74,7 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.False(director.IsStageCleared(0));
             Assert.True(director.IsStageUnlocked(0));
             Assert.False(director.IsStageUnlocked(1));
-            Assert.False(director.IsStageUnlocked(8));
+            Assert.False(director.IsStageUnlocked(11));
             Assert.Equal(0, director.GetRecommendedStageIndex());
         }
 
@@ -102,7 +98,7 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
-        public void Campaign_ClearingAllNineStagesUnlocksFullWarMap()
+        public void Campaign_ClearingAllTwelveStagesUnlocksFullWarMap()
         {
             CampaignDirector director = new CampaignDirector(CampaignCatalog.CreateLiuBeiLegend());
 
@@ -111,15 +107,18 @@ namespace PhalanxChronicle.Headless.Tests
             director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.ChangbanScenarioId, TurnSide.Player, 4, new[] { "player-liu-bei" }));
             director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.JiangxiaScenarioId, TurnSide.Player, 4, new[] { "player-liu-bei" }));
             director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.JiamengPassScenarioId, TurnSide.Player, 5, new[] { "player-liu-bei" }));
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.BaishuiScenarioId, TurnSide.Player, 5, new[] { "player-liu-bei" }));
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.MianzhuScenarioId, TurnSide.Player, 5, new[] { "player-liu-bei" }));
             director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.LuochengScenarioId, TurnSide.Player, 5, new[] { "player-liu-bei" }));
             director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.YangpingScenarioId, TurnSide.Player, 5, new[] { "player-liu-bei" }));
+            director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.TiandangScenarioId, TurnSide.Player, 6, new[] { "player-liu-bei" }));
             director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.HanshuiScenarioId, TurnSide.Player, 6, new[] { "player-liu-bei" }));
             director.RecordBattleResult(new BattleResultSummary(BattleScenarioCatalog.DingjunScenarioId, TurnSide.Player, 7, new[] { "player-liu-bei" }));
 
-            Assert.Equal(8, director.Progress.UnlockedStageIndex);
-            Assert.True(director.IsStageUnlocked(8));
-            Assert.True(director.IsStageCleared(8));
-            Assert.Equal(8, director.GetRecommendedStageIndex());
+            Assert.Equal(11, director.Progress.UnlockedStageIndex);
+            Assert.True(director.IsStageUnlocked(11));
+            Assert.True(director.IsStageCleared(11));
+            Assert.Equal(11, director.GetRecommendedStageIndex());
         }
     }
 }

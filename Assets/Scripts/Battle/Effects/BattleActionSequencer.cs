@@ -94,10 +94,26 @@ namespace PhalanxChronicle.Battle.Effects
             return ShouldShowSkillForecast(actingSide, skillResult);
         }
 
+        public bool ShouldBatchSkillResult(TurnSide actingSide, SkillResult skillResult)
+        {
+            if (actingSide != TurnSide.Enemy)
+            {
+                return false;
+            }
+
+            if (skillResult == null || skillResult.Effects == null || skillResult.Effects.Count <= 1)
+            {
+                return false;
+            }
+
+            return GetImpactTier(skillResult) == BattlePresentationImpactTier.LowSignal;
+        }
+
         public float GetInterEffectDelay(TurnSide actingSide, SkillResult skillResult)
         {
             BattlePresentationProfile profile = GetProfile(actingSide);
-            if ((actingSide == TurnSide.Enemy && skillResult != null && skillResult.Effects.Count >= 3) ||
+            if (ShouldBatchSkillResult(actingSide, skillResult) ||
+                (actingSide == TurnSide.Enemy && skillResult != null && skillResult.Effects.Count >= 3) ||
                 GetImpactTier(skillResult) == BattlePresentationImpactTier.LowSignal)
             {
                 return 0f;

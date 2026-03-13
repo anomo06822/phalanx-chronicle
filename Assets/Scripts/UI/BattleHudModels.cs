@@ -1,6 +1,7 @@
 using PhalanxChronicle.Core;
 using UnityEngine;
 using System.Collections.Generic;
+using System;
 
 namespace PhalanxChronicle.UI
 {
@@ -50,6 +51,16 @@ namespace PhalanxChronicle.UI
         ResultConfirm,
     }
 
+    public enum BattleDecisionContextSource
+    {
+        None,
+        Neutral,
+        MoveHover,
+        AttackHover,
+        SkillHover,
+        ActionMenu,
+    }
+
     public enum BattleRosterTag
     {
         Ready,
@@ -58,6 +69,30 @@ namespace PhalanxChronicle.UI
         Threatening,
         LowHp,
         Exposed,
+    }
+
+    public sealed class BattleDecisionContext
+    {
+        public BattleDecisionContextSource SourceState { get; set; } = BattleDecisionContextSource.None;
+
+        public string ActorUnitId { get; set; } = string.Empty;
+
+        public string TargetUnitId { get; set; } = string.Empty;
+
+        public string Rationale { get; set; } = string.Empty;
+
+        public BattleIntentPreview Preview { get; set; }
+    }
+
+    public sealed class BattleHudDecisionContextModel
+    {
+        public BattleForecastModel ForecastModel { get; set; } = new BattleForecastModel();
+
+        public BattleActionMenuModel ActionMenuModel { get; set; } = new BattleActionMenuModel();
+
+        public BattleDecisionContextSource SourceState { get; set; } = BattleDecisionContextSource.None;
+
+        public string Rationale { get; set; } = string.Empty;
     }
 
     public sealed class BattleActionDescriptor

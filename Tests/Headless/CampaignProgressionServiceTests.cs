@@ -183,7 +183,29 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
-        public void NormalizeSave_UpdatesLegacyZhaoYunAndMaChaoSkills()
+        public void NormalizeSave_BackfillsUnlockedStageIndexFromClearedChapters()
+        {
+            CampaignProgressionService service = new CampaignProgressionService();
+            CampaignSaveData save = service.CreateNewSave(CampaignCatalog.CreateLiuBeiLegend());
+
+            save.Progress.MarkCleared(BattleScenarioCatalog.GuangzongScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.BowangpoScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.ChangbanScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.JiangxiaScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.JiamengPassScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.BaishuiScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.MianzhuScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.LuochengScenarioId);
+            save.Progress.MarkCleared(BattleScenarioCatalog.YangpingScenarioId);
+
+            bool normalized = service.NormalizeSave(save);
+
+            Assert.True(normalized);
+            Assert.Equal(9, save.Progress.UnlockedStageIndex);
+        }
+
+        [Fact]
+        public void NormalizeSave_UpdatesLegacyBranchSkills()
         {
             CampaignUnitState legacyZhaoYun = new CampaignUnitState(
                 "player-zhao-yun",
@@ -231,19 +253,71 @@ namespace PhalanxChronicle.Headless.Tests
                 EquipmentLoadout.Empty,
                 level: 10,
                 hasPromoted: true);
+            CampaignUnitState legacyTacticianZhuge = new CampaignUnitState(
+                "player-zhuge-liang",
+                "Zhuge Liang",
+                "unit.player_zhuge_liang",
+                UnitRole.Commander,
+                "role.commander",
+                PassiveSkillType.CommandAura,
+                "skill.command_aura.name",
+                "skill.command_aura.desc",
+                ActiveSkillType.GuardOrder,
+                "skill.guard_order.name",
+                "skill.guard_order.desc",
+                31,
+                9,
+                5,
+                3,
+                1,
+                23,
+                "tactician_general",
+                "tactician_general",
+                AiProfileType.Support,
+                EquipmentLoadout.Empty,
+                level: 10,
+                hasPromoted: true);
+            CampaignUnitState legacyWarlordLiuBei = new CampaignUnitState(
+                "player-liu-bei",
+                "Liu Bei",
+                "unit.player_liu_bei",
+                UnitRole.Commander,
+                "role.commander",
+                PassiveSkillType.CommandAura,
+                "skill.command_aura.name",
+                "skill.command_aura.desc",
+                ActiveSkillType.GuardOrder,
+                "skill.guard_order.name",
+                "skill.guard_order.desc",
+                34,
+                11,
+                6,
+                3,
+                1,
+                21,
+                "warlord",
+                "warlord",
+                AiProfileType.Support,
+                EquipmentLoadout.Empty,
+                level: 10,
+                hasPromoted: true);
 
             CampaignSaveData save = new CampaignSaveData(
                 "campaign",
                 new CampaignProgress(),
                 new CampaignInventoryState(),
-                new[] { legacyZhaoYun, legacyMaChao });
+                new[] { legacyZhaoYun, legacyMaChao, legacyTacticianZhuge, legacyWarlordLiuBei });
 
             CampaignSaveNormalizer.Normalize(save);
 
             Assert.Equal(ActiveSkillType.DragonPierce, legacyZhaoYun.ActiveSkill);
             Assert.Equal("skill.dragon_pierce.name", legacyZhaoYun.ActiveSkillNameKey);
-            Assert.Equal(ActiveSkillType.WesternStampede, legacyMaChao.ActiveSkill);
-            Assert.Equal("skill.western_stampede.name", legacyMaChao.ActiveSkillNameKey);
+            Assert.Equal(ActiveSkillType.StormbreakCharge, legacyMaChao.ActiveSkill);
+            Assert.Equal("skill.stormbreak_charge.name", legacyMaChao.ActiveSkillNameKey);
+            Assert.Equal(ActiveSkillType.FeatherFormation, legacyTacticianZhuge.ActiveSkill);
+            Assert.Equal("skill.feather_formation.name", legacyTacticianZhuge.ActiveSkillNameKey);
+            Assert.Equal(ActiveSkillType.KingsBanner, legacyWarlordLiuBei.ActiveSkill);
+            Assert.Equal("skill.kings_banner.name", legacyWarlordLiuBei.ActiveSkillNameKey);
         }
 
         [Fact]
@@ -429,7 +503,7 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.True(liuBei.HasPromoted);
             Assert.Equal("warlord", liuBei.ClassId);
             Assert.Equal(PassiveSkillType.CommandAura, liuBei.PassiveSkill);
-            Assert.Equal(ActiveSkillType.GuardOrder, liuBei.ActiveSkill);
+            Assert.Equal(ActiveSkillType.KingsBanner, liuBei.ActiveSkill);
             Assert.Equal(34, liuBei.MaxHp);
             Assert.Equal(11, liuBei.Attack);
             Assert.Equal(6, liuBei.Defense);
@@ -545,8 +619,8 @@ namespace PhalanxChronicle.Headless.Tests
 
             CampaignSaveNormalizer.Normalize(save);
 
-            Assert.Equal(ActiveSkillType.GuardOrder, tacticianZhuge.ActiveSkill);
-            Assert.Equal("skill.guard_order.name", tacticianZhuge.ActiveSkillNameKey);
+            Assert.Equal(ActiveSkillType.FeatherFormation, tacticianZhuge.ActiveSkill);
+            Assert.Equal("skill.feather_formation.name", tacticianZhuge.ActiveSkillNameKey);
         }
 
         [Fact]
@@ -560,7 +634,24 @@ namespace PhalanxChronicle.Headless.Tests
                 .Single(definition => definition.PromotionId == "tactician_general");
 
             Assert.Equal(ActiveSkillType.EightTrigramInferno, sleepingDragon.ActiveSkill);
-            Assert.Equal(ActiveSkillType.GuardOrder, tacticianGeneral.ActiveSkill);
+            Assert.Equal(ActiveSkillType.FeatherFormation, tacticianGeneral.ActiveSkill);
+        }
+
+        [Fact]
+        public void PromotionCatalog_AllPromotionBranchesUseUniqueActiveSkills()
+        {
+            PromotionDefinition[] options = PromotionCatalog
+                .GetOptions("player-liu-bei")
+                .Concat(PromotionCatalog.GetOptions("player-guan-yu"))
+                .Concat(PromotionCatalog.GetOptions("player-zhang-fei"))
+                .Concat(PromotionCatalog.GetOptions("player-huang-zhong"))
+                .Concat(PromotionCatalog.GetOptions("player-zhuge-liang"))
+                .Concat(PromotionCatalog.GetOptions("player-zhao-yun"))
+                .Concat(PromotionCatalog.GetOptions("player-ma-chao"))
+                .ToArray();
+
+            Assert.Equal(14, options.Length);
+            Assert.Equal(14, options.Select(option => option.ActiveSkill).Distinct().Count());
         }
 
         private static BattleScenarioData CreateSingleDuelScenario()

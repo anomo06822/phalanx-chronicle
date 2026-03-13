@@ -84,6 +84,145 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.True(sequencer.ShouldTakeOverRibbon(TurnSide.Player, combatResult));
         }
 
+        [Fact]
+        public void BuildDecisionContext_UsesIntentForecastAndActionMenuTogether()
+        {
+            BattleSimulation simulation = CreateSimulation();
+            BattleHudModelBuilder builder = new BattleHudModelBuilder();
+            UnitRuntimeState selected = simulation.Context.GetUnit("player-1");
+            BattleIntentPreview movePreview = simulation.PreviewMoveIntent(selected.Id, new GridPosition(1, 1));
+
+            BattleHudDecisionContextModel contextModel = builder.BuildDecisionContextModel(
+                simulation,
+                new BattleDecisionContext
+                {
+                    SourceState = BattleDecisionContextSource.MoveHover,
+                    ActorUnitId = selected.Id,
+                    TargetUnitId = string.Empty,
+                    Rationale = string.Empty,
+                    Preview = movePreview,
+                },
+                selected,
+                false,
+                new BattleOverviewModel(),
+                new List<string> { "feed" });
+
+            Assert.Equal(BattleForecastMode.MovePreview, contextModel.ForecastModel.Mode);
+            Assert.NotNull(contextModel.ActionMenuModel);
+            Assert.NotEmpty(contextModel.ActionMenuModel.Actions);
+            Assert.NotNull(contextModel.ActionMenuModel.Actions.Single(action => action.Type == BattleActionDescriptorType.Attack));
+            Assert.Equal(BattleDecisionContextSource.MoveHover, contextModel.SourceState);
+            Assert.Equal(string.Empty, contextModel.Rationale);
+            Assert.NotNull(contextModel.ForecastModel.CommitChip);
+            Assert.Contains(contextModel.ActionMenuModel.Actions, action => action.Type == BattleActionDescriptorType.Wait);
+        }
+
+        [Fact]
+        public void BuildDecisionContext_ActionPreview_UsesIntentForecastAndActionMenu()
+        {
+            BattleSimulation simulation = CreateAdjacentCombatSimulation();
+            BattleHudModelBuilder builder = new BattleHudModelBuilder();
+            UnitRuntimeState selected = simulation.Context.GetUnit("player-1");
+            UnitRuntimeState target = simulation.Context.GetUnit("enemy-1");
+            BattleIntentPreview attackPreview = simulation.PreviewAttackIntent(selected.Id, target.Id);
+
+            BattleHudDecisionContextModel contextModel = builder.BuildDecisionContextModel(
+                simulation,
+                new BattleDecisionContext
+                {
+                    SourceState = BattleDecisionContextSource.AttackHover,
+                    ActorUnitId = selected.Id,
+                    TargetUnitId = target.Id,
+                    Rationale = "in range",
+                    Preview = attackPreview,
+                },
+                selected,
+                false,
+                new BattleOverviewModel(),
+                new List<string> { "feed" });
+
+            Assert.Equal(BattleForecastMode.ActionPreview, contextModel.ForecastModel.Mode);
+            Assert.True(contextModel.ForecastModel.OutcomeFacts.Count >= 1);
+            Assert.Contains(contextModel.ForecastModel.OutcomeFacts, fact => fact.Value == attackPreview.PredictedDamage.ToString() || fact.Value == attackPreview.PredictedHealing.ToString());
+            Assert.Equal(BattleDecisionContextSource.AttackHover, contextModel.SourceState);
+            Assert.Equal("in range", contextModel.Rationale);
+            Assert.NotNull(contextModel.ActionMenuModel);
+            Assert.Contains(contextModel.ActionMenuModel.Actions, action => action.Type == BattleActionDescriptorType.Skill);
+        }
+
+        [Fact]
+        public void BuildDecisionContext_SkillPreview_UsesIntentForecastAndActionMenu()
+        {
+            BattleSimulation simulation = CreateAdjacentCombatSimulation(activeSkill: ActiveSkillType.Volley);
+            BattleHudModelBuilder builder = new BattleHudModelBuilder();
+            UnitRuntimeState selected = simulation.Context.GetUnit("player-1");
+            UnitRuntimeState target = simulation.Context.GetUnit("enemy-1");
+            BattleIntentPreview skillPreview = simulation.PreviewSkillIntent(selected.Id, target.Id);
+
+            BattleHudDecisionContextModel contextModel = builder.BuildDecisionContextModel(
+                simulation,
+                new BattleDecisionContext
+                {
+                    SourceState = BattleDecisionContextSource.SkillHover,
+                    ActorUnitId = selected.Id,
+                    TargetUnitId = target.Id,
+                    Rationale = "skill in range",
+                    Preview = skillPreview,
+                },
+                selected,
+                false,
+                new BattleOverviewModel(),
+                new List<string> { "feed" });
+
+            Assert.Equal(BattleForecastMode.ActionPreview, contextModel.ForecastModel.Mode);
+            Assert.NotNull(contextModel.ForecastModel.OutcomeFacts);
+            Assert.True(contextModel.ForecastModel.OutcomeFacts.Count > 0);
+            Assert.Equal(BattleDecisionContextSource.SkillHover, contextModel.SourceState);
+            Assert.Equal("skill in range", contextModel.Rationale);
+            Assert.NotNull(contextModel.ActionMenuModel);
+            Assert.Contains(contextModel.ActionMenuModel.Actions, action => action.Type == BattleActionDescriptorType.Skill);
+            Assert.NotNull(contextModel.ForecastModel.CommitChip);
+        }
+
+        [Fact]
+        public void BuildDecisionContext_WithNullContext_RendersNeutralForecast()
+        {
+            BattleSimulation simulation = CreateSimulation();
+            BattleHudModelBuilder builder = new BattleHudModelBuilder();
+            UnitRuntimeState selected = simulation.Context.GetUnit("player-1");
+
+            BattleHudDecisionContextModel contextModel = builder.BuildDecisionContextModel(
+                simulation,
+                null,
+                selected,
+                true,
+                new BattleOverviewModel { TurnLabel = "Turn 1", StageLabel = "Test Stage", ObjectivePrimary = "Survive" },
+                new List<string> { "first log" });
+
+            Assert.Equal(BattleForecastMode.Neutral, contextModel.ForecastModel.Mode);
+            Assert.Equal(BattleDecisionContextSource.None, contextModel.SourceState);
+            Assert.Equal(string.Empty, contextModel.Rationale);
+            Assert.NotEmpty(contextModel.ActionMenuModel.Actions);
+        }
+
+        [Fact]
+        public void RosterTags_RespectsPriorityAndCapAtTwo()
+        {
+            BattleSimulation simulation = CreateSimulation();
+            BattleHudModelSupport support = new BattleHudModelSupport();
+            UnitRuntimeState unit = simulation.Context.GetUnit("player-1");
+
+            IReadOnlyList<BattleRosterTag> priorityTags = support.BuildRosterTags(unit, lowHp: true, exposed: true, skillReady: true, threateningSelection: true);
+
+            Assert.Equal(2, priorityTags.Count);
+            Assert.Equal(BattleRosterTag.Exposed, priorityTags[0]);
+            Assert.Equal(BattleRosterTag.Threatening, priorityTags[1]);
+
+            IReadOnlyList<BattleRosterTag> readyTags = support.BuildRosterTags(unit, lowHp: false, exposed: false, skillReady: false, threateningSelection: false);
+            Assert.Single(readyTags);
+            Assert.Equal(BattleRosterTag.Ready, readyTags[0]);
+        }
+
         private static BattleSimulation CreateSimulation()
         {
             UnitDefinitionData playerDefinition = CreateDefinition("player-1", "Hero", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.None, attack: 10);
@@ -108,9 +247,9 @@ namespace PhalanxChronicle.Headless.Tests
             return new BattleSimulation(stage);
         }
 
-        private static BattleSimulation CreateAdjacentCombatSimulation(int enemyHpOverride = 20)
+        private static BattleSimulation CreateAdjacentCombatSimulation(int enemyHpOverride = 20, ActiveSkillType activeSkill = ActiveSkillType.None)
         {
-            UnitDefinitionData playerDefinition = CreateDefinition("player-1", "Hero", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, ActiveSkillType.None, attack: 10);
+            UnitDefinitionData playerDefinition = CreateDefinition("player-1", "Hero", UnitFaction.Player, UnitRole.Commander, PassiveSkillType.None, activeSkill, attack: 10);
             UnitDefinitionData enemyDefinition = CreateDefinition("enemy-1", "Bandit", UnitFaction.Enemy, UnitRole.Raider, PassiveSkillType.None, ActiveSkillType.None, maxHp: enemyHpOverride, attack: 8, defense: 3);
 
             StageDefinitionData stage = new StageDefinitionData(

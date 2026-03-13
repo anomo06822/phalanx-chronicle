@@ -125,6 +125,7 @@ namespace PhalanxChronicle.Core
             {
                 case ActiveSkillType.PowerStrike:
                 case ActiveSkillType.DragonPierce:
+                case ActiveSkillType.WhiteHorseRescue:
                 case ActiveSkillType.PinningShot:
                     return origin.ManhattanDistance(projectedPosition) <= range
                         ? BattlePreviewCalculator.EstimateAttackDamage(
@@ -136,6 +137,8 @@ namespace PhalanxChronicle.Core
                             GetSkillFlatBonus(caster),
                             caster.ActiveSkill == ActiveSkillType.DragonPierce
                                 ? ActiveSkillRules.GetDragonPierceIgnoredDefense(caster)
+                                : caster.ActiveSkill == ActiveSkillType.WhiteHorseRescue
+                                    ? ActiveSkillRules.GetWhiteHorseRescueIgnoredDefense(caster)
                                 : 0)
                         : 0;
                 case ActiveSkillType.Volley:
@@ -154,7 +157,20 @@ namespace PhalanxChronicle.Core
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
+                case ActiveSkillType.CrimsonCrescent:
+                case ActiveSkillType.StormbreakCharge:
                     return CanProjectedLineSkillHitFocus(context, caster, origin, projectedPosition, focusUnit, defeatedUnitIds)
+                        ? BattlePreviewCalculator.EstimateAttackDamage(
+                            context,
+                            caster,
+                            origin,
+                            focusUnit,
+                            projectedPosition,
+                            GetSkillFlatBonus(caster))
+                        : 0;
+                case ActiveSkillType.StonewallChallenge:
+                case ActiveSkillType.DustDevilSweep:
+                    return origin.ManhattanDistance(projectedPosition) <= range
                         ? BattlePreviewCalculator.EstimateAttackDamage(
                             context,
                             caster,
@@ -247,18 +263,28 @@ namespace PhalanxChronicle.Core
                     return ActiveSkillRules.GetPowerStrikeBonus(caster);
                 case ActiveSkillType.DragonPierce:
                     return ActiveSkillRules.GetDragonPierceBonus(caster);
+                case ActiveSkillType.WhiteHorseRescue:
+                    return ActiveSkillRules.GetWhiteHorseRescueBonus(caster);
                 case ActiveSkillType.PinningShot:
                     return ActiveSkillRules.GetPinningShotBonus(caster);
                 case ActiveSkillType.Volley:
                     return ActiveSkillRules.GetVolleyBonus(caster);
                 case ActiveSkillType.SkyVolley:
                     return ActiveSkillRules.GetSkyVolleyBonus(caster);
+                case ActiveSkillType.CrimsonCrescent:
+                    return ActiveSkillRules.GetCrimsonCrescentBonus(caster);
                 case ActiveSkillType.GreenDragonSlash:
                     return ActiveSkillRules.GetGreenDragonSlashBonus(caster);
                 case ActiveSkillType.AzureDragonSlash:
                     return ActiveSkillRules.GetAzureDragonSlashBonus(caster);
                 case ActiveSkillType.WesternStampede:
                     return ActiveSkillRules.GetWesternStampedeBonus(caster);
+                case ActiveSkillType.StonewallChallenge:
+                    return ActiveSkillRules.GetStonewallChallengeBonus(caster);
+                case ActiveSkillType.StormbreakCharge:
+                    return ActiveSkillRules.GetStormbreakChargeBonus(caster);
+                case ActiveSkillType.DustDevilSweep:
+                    return ActiveSkillRules.GetDustDevilSweepBonus(caster);
                 case ActiveSkillType.FireStratagem:
                     return ActiveSkillRules.GetFireStratagemBonus(caster);
                 case ActiveSkillType.EightTrigramInferno:

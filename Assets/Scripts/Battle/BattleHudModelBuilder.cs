@@ -156,6 +156,36 @@ namespace PhalanxChronicle.Battle
             return actionMenuModelBuilder.BuildActionMenuModel(simulation, selected, moved);
         }
 
+        public BattleHudDecisionContextModel BuildDecisionContextModel(
+            BattleSimulation simulation,
+            BattleDecisionContext context,
+            UnitRuntimeState selected,
+            bool selectedMoved,
+            BattleOverviewModel overview,
+            IReadOnlyList<string> feedEntries)
+        {
+            BattleDecisionContext safeContext = context ?? new BattleDecisionContext
+            {
+                SourceState = BattleDecisionContextSource.None,
+                ActorUnitId = string.Empty,
+                TargetUnitId = string.Empty,
+                Rationale = string.Empty,
+                Preview = null,
+            };
+
+            BattleForecastModel forecastModel = safeContext.Preview != null
+                ? BuildIntentForecastModel(simulation, safeContext.Preview)
+                : BuildNeutralForecastModel(overview, feedEntries);
+
+            return new BattleHudDecisionContextModel
+            {
+                ForecastModel = forecastModel,
+                ActionMenuModel = BuildActionMenuModel(simulation, selected, selectedMoved),
+                SourceState = safeContext.SourceState,
+                Rationale = safeContext.Rationale,
+            };
+        }
+
         public BattleForecastModel BuildNeutralForecastModel(BattleOverviewModel overview, IReadOnlyList<string> feedEntries)
         {
             return forecastModelBuilder.BuildNeutralForecastModel(overview, feedEntries);
@@ -1342,10 +1372,13 @@ namespace PhalanxChronicle.Battle
                     return LocalizationService.Text("ui.skill.impact.single_ally", "1 ally");
                 case ActiveSkillType.ImperialAid:
                 case ActiveSkillType.GuardOrder:
+                case ActiveSkillType.KingsBanner:
+                case ActiveSkillType.FeatherFormation:
                     return LocalizationService.Text("ui.skill.impact.ally_adjacent", "1 ally + adjacent");
                 case ActiveSkillType.PowerStrike:
                 case ActiveSkillType.PinningShot:
                 case ActiveSkillType.DragonPierce:
+                case ActiveSkillType.WhiteHorseRescue:
                     return LocalizationService.Text("ui.skill.impact.single_enemy", "1 foe");
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.SkyVolley:
@@ -1355,9 +1388,13 @@ namespace PhalanxChronicle.Battle
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
+                case ActiveSkillType.CrimsonCrescent:
+                case ActiveSkillType.StormbreakCharge:
                     return LocalizationService.Text("ui.skill.impact.line", "up to 2 foes");
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
+                case ActiveSkillType.StonewallChallenge:
+                case ActiveSkillType.DustDevilSweep:
                     return LocalizationService.Text("ui.skill.impact.nearby", "nearby foes");
                 default:
                     return string.Empty;
@@ -1788,30 +1825,44 @@ namespace PhalanxChronicle.Battle
                     return "ui.mastery.delta.imperial_aid";
                 case ActiveSkillType.GuardOrder:
                     return "ui.mastery.delta.guard_order";
+                case ActiveSkillType.KingsBanner:
+                    return "ui.mastery.delta.kings_banner";
                 case ActiveSkillType.PowerStrike:
                     return "ui.mastery.delta.power_strike";
                 case ActiveSkillType.DragonPierce:
                     return "ui.mastery.delta.dragon_pierce";
+                case ActiveSkillType.WhiteHorseRescue:
+                    return "ui.mastery.delta.white_horse_rescue";
                 case ActiveSkillType.Volley:
                     return "ui.mastery.delta.volley";
                 case ActiveSkillType.SkyVolley:
                     return "ui.mastery.delta.sky_volley";
+                case ActiveSkillType.CrimsonCrescent:
+                    return "ui.mastery.delta.crimson_crescent";
                 case ActiveSkillType.GreenDragonSlash:
                     return "ui.mastery.delta.green_dragon_slash";
                 case ActiveSkillType.AzureDragonSlash:
                     return "ui.mastery.delta.azure_dragon_slash";
                 case ActiveSkillType.WesternStampede:
                     return "ui.mastery.delta.western_stampede";
+                case ActiveSkillType.StormbreakCharge:
+                    return "ui.mastery.delta.stormbreak_charge";
                 case ActiveSkillType.WarCry:
                     return "ui.mastery.delta.war_cry";
                 case ActiveSkillType.LionWarCry:
                     return "ui.mastery.delta.lion_war_cry";
+                case ActiveSkillType.StonewallChallenge:
+                    return "ui.mastery.delta.stonewall_challenge";
+                case ActiveSkillType.DustDevilSweep:
+                    return "ui.mastery.delta.dust_devil_sweep";
                 case ActiveSkillType.PinningShot:
                     return "ui.mastery.delta.pinning_shot";
                 case ActiveSkillType.FireStratagem:
                     return "ui.mastery.delta.fire_stratagem";
                 case ActiveSkillType.EightTrigramInferno:
                     return "ui.mastery.delta.eight_trigram_inferno";
+                case ActiveSkillType.FeatherFormation:
+                    return "ui.mastery.delta.feather_formation";
                 default:
                     return string.Empty;
             }

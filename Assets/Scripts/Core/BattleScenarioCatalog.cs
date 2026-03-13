@@ -10,8 +10,11 @@ namespace PhalanxChronicle.Core
         public const string ChangbanScenarioId = "scenario.changban_rearguard";
         public const string JiangxiaScenarioId = "scenario.jiangxia_ferry";
         public const string JiamengPassScenarioId = "scenario.jiameng_pass";
+        public const string BaishuiScenarioId = "scenario.baishui_pass_raid";
+        public const string MianzhuScenarioId = "scenario.mianzhu_breakthrough";
         public const string LuochengScenarioId = "scenario.luocheng_siege";
         public const string YangpingScenarioId = "scenario.yangping_pass";
+        public const string TiandangScenarioId = "scenario.tiandang_raid";
         public const string HanshuiScenarioId = "scenario.hanshui";
         public const string DingjunScenarioId = "scenario.dingjun_mountain";
 
@@ -20,8 +23,12 @@ namespace PhalanxChronicle.Core
         public const string ChangbanFlankersArrivedFlag = "flag.changban.flankers_arrived";
         public const string JiangxiaBridgesCutFlag = "flag.jiangxia.bridges_cut";
         public const string JiamengBossArrivedFlag = "flag.jiameng.boss_arrived";
+        public const string BaishuiBridgeCutFlag = "flag.baishui.bridge_cut";
+        public const string MianzhuBreachFlag = "flag.mianzhu.breach";
         public const string LuochengGateBreachedFlag = "flag.luocheng.gate_breached";
         public const string YangpingRockslideFlag = "flag.yangping.rockslide";
+        public const string TiandangAlarmFlag = "flag.tiandang.alarm";
+        public const string TiandangSignalsSecuredFlag = "flag.tiandang.signals_secured";
         public const string HanshuiCounterattackFlag = "flag.hanshui.counterattack";
         public const string DingjunBossArrivedFlag = "flag.dingjun.boss_arrived";
 
@@ -37,10 +44,16 @@ namespace PhalanxChronicle.Core
                     return CreateJiangxiaFerry();
                 case JiamengPassScenarioId:
                     return CreateJiamengPass();
+                case BaishuiScenarioId:
+                    return CreateBaishuiPassRaid();
+                case MianzhuScenarioId:
+                    return CreateMianzhuBreakthrough();
                 case LuochengScenarioId:
                     return CreateLuochengSiege();
                 case YangpingScenarioId:
                     return CreateYangpingPass();
+                case TiandangScenarioId:
+                    return CreateTiandangRaid();
                 case HanshuiScenarioId:
                     return CreateHanshui();
                 case DingjunScenarioId:
@@ -901,6 +914,355 @@ namespace PhalanxChronicle.Core
                 new RewardBundle(220, 3, "jiameng-oath-banner", new[] { "player-ma-chao" }));
         }
 
+        public static BattleScenarioData CreateBaishuiPassRaid()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
+            AddCoreSquad(
+                openingSpawns,
+                new GridPosition(1, 4),
+                new GridPosition(2, 5),
+                new GridPosition(2, 3),
+                new GridPosition(1, 6));
+            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(0, 4)));
+            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(1, 2)));
+            openingSpawns.Add(SpawnPlayerMaChao(new GridPosition(1, 7)));
+            openingSpawns.Add(SpawnEnemy("enemy-baishui-bridge-captain", "Baishui Bridge Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 33, 10, 6, 2, 1, new GridPosition(7, 6), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-baishui-bow-chief", "Baishui Bow Chief", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 26, 10, 3, 3, 2, new GridPosition(7, 2), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-baishui-pass-guard", "Pass Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(8, 3), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-baishui-lancer", "Baishui Lancer", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 27, 10, 3, 4, 1, new GridPosition(8, 7), AiProfileType.Aggressor));
+
+            List<GridPosition> blockedCells = new List<GridPosition>();
+            for (int y = 0; y < 10; y++)
+            {
+                if (y == 2 || y == 6)
+                {
+                    continue;
+                }
+
+                blockedCells.Add(new GridPosition(5, y));
+                blockedCells.Add(new GridPosition(6, y));
+            }
+
+            blockedCells.Add(new GridPosition(9, 1));
+            blockedCells.Add(new GridPosition(9, 8));
+
+            List<TerrainTileData> terrainTiles = new List<TerrainTileData>
+            {
+                new TerrainTileData(new GridPosition(5, 2), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(6, 2), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(5, 6), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(6, 6), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(3, 1), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(3, 2), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(3, 7), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(3, 8), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(9, 4), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(10, 4), TerrainType.Hazard),
+            };
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Baishui Pass Raid",
+                "stage.baishui_pass_raid",
+                12,
+                10,
+                openingSpawns,
+                blockedCells,
+                terrainTiles);
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.baishui.opening",
+                "Break the bridge captain and bow chief before Baishui closes its lower crossing.",
+                "objective.baishui.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.baishui.final",
+                "Defeat the Baishui commandant after the lower bridge is cut.",
+                "objective.baishui.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            BattlefieldMutation bridgeCutMutation = new BattlefieldMutation(
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 6), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(6, 6), TerrainType.Hazard),
+                },
+                new List<BlockedCellStateChange>
+                {
+                    new BlockedCellStateChange(new GridPosition(5, 6), true),
+                    new BlockedCellStateChange(new GridPosition(6, 6), true),
+                });
+
+            List<ScenarioDirective> bridgeCutDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(BaishuiBridgeCutFlag),
+                ScenarioDirective.ApplyBattlefieldMutation(bridgeCutMutation),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-baishui-commandant", "Baishui Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 35, 11, 5, 3, 1, new GridPosition(10, 4), AiProfileType.Boss),
+                    SpawnEnemy("enemy-baishui-rider-a", "Bridge Pursuer", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 10, 3, 4, 1, new GridPosition(0, 8), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-baishui-rider-b", "Bridge Pursuer", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 26, 10, 3, 4, 1, new GridPosition(1, 9), AiProfileType.Aggressor),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.enemy_baishui_commandant", "Baishui Commandant", "dialogue.baishui.mid.1", "Cut the lower bridge and squeeze them against the upper pass. No one slips through Baishui today."),
+                    Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.baishui.mid.2", "The lower crossing is gone. We press the upper lane before their riders close our rear."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.baishui.mid.3", "Forward through the upper pass. Break the command post before the trap fully tightens."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "baishui-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.baishui.opening.1", "Baishui gives us two crossings, but only one will remain when their signal drops."),
+                            Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.baishui.opening.2", "Then I break the lower line fast and keep the column moving."),
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.baishui.opening.3", "Take the outer captain and bow chief first. Do not let the pass close around us."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "baishui-bridge-cut-kill",
+                    ScenarioCheckpoint.ActionResolved,
+                    bridgeCutDirectives,
+                    requiredDefeatedUnitIds: new List<string> { "enemy-baishui-bridge-captain", "enemy-baishui-bow-chief" },
+                    exclusivityGroupId: "baishui-bridge"),
+                new ScenarioTrigger(
+                    "baishui-bridge-cut-round",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    bridgeCutDirectives,
+                    minimumRoundNumber: 4,
+                    exclusivityGroupId: "baishui-bridge"),
+                new ScenarioTrigger(
+                    "baishui-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "baishui-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-baishui-commandant" },
+                    requiredFlags: new List<string> { BaishuiBridgeCutFlag }),
+                new ScenarioTrigger(
+                    "baishui-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.baishui.victory.1", "Baishui's choke point is ours. Their bridge trap broke the moment we outran the collapse."),
+                            Line("unit.player_zhao_yun", "Zhao Yun", "dialogue.baishui.victory.2", "Then we keep pressing. A pass taken at speed should never be handed back."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+                new ScenarioTrigger(
+                    "baishui-defeat-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("speaker.narrator", "Narrator", "dialogue.baishui.defeat.1", "The bridge falls, the pass seals, and Baishui closes like a fist around Liu Bei's vanguard."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Enemy),
+            };
+
+            return new BattleScenarioData(
+                BaishuiScenarioId,
+                "Baishui Pass Raid",
+                "scenario.baishui_pass_raid",
+                stage,
+                triggers,
+                6,
+                101,
+                35,
+                new RewardBundle(228, 3, "baishui-signal-spear"));
+        }
+
+        public static BattleScenarioData CreateMianzhuBreakthrough()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
+            AddCoreSquad(
+                openingSpawns,
+                new GridPosition(6, 1),
+                new GridPosition(7, 1),
+                new GridPosition(5, 1),
+                new GridPosition(8, 1));
+            openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(6, 0)));
+            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(4, 1)));
+            openingSpawns.Add(SpawnPlayerMaChao(new GridPosition(9, 1)));
+            openingSpawns.Add(SpawnEnemy("enemy-mianzhu-gate-captain", "Mianzhu Gate Captain", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 33, 10, 6, 2, 1, new GridPosition(6, 4), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-mianzhu-oil-bow-chief", "Oil Bow Chief", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 26, 10, 3, 3, 2, new GridPosition(8, 4), AiProfileType.Support));
+            openingSpawns.Add(SpawnEnemy("enemy-mianzhu-front-guard-a", "Front Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(5, 4), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-mianzhu-front-guard-b", "Front Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(7, 4), AiProfileType.Protector));
+            openingSpawns.Add(SpawnEnemy("enemy-mianzhu-outer-rider", "Outer Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 27, 10, 3, 4, 1, new GridPosition(9, 3), AiProfileType.Aggressor));
+
+            List<GridPosition> blockedCells = new List<GridPosition>();
+            for (int x = 3; x <= 10; x++)
+            {
+                blockedCells.Add(new GridPosition(x, 5));
+            }
+
+            blockedCells.Add(new GridPosition(2, 6));
+            blockedCells.Add(new GridPosition(2, 7));
+            blockedCells.Add(new GridPosition(11, 6));
+            blockedCells.Add(new GridPosition(11, 7));
+
+            List<TerrainTileData> terrainTiles = new List<TerrainTileData>
+            {
+                new TerrainTileData(new GridPosition(4, 5), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(5, 5), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(6, 5), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(7, 5), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(8, 5), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(9, 5), TerrainType.Fort),
+                new TerrainTileData(new GridPosition(5, 3), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(6, 3), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(7, 3), TerrainType.Hazard),
+                new TerrainTileData(new GridPosition(10, 3), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(4, 7), TerrainType.Forest),
+                new TerrainTileData(new GridPosition(9, 7), TerrainType.Forest),
+            };
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Mianzhu Breakthrough",
+                "stage.mianzhu_breakthrough",
+                14,
+                10,
+                openingSpawns,
+                blockedCells,
+                terrainTiles);
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.mianzhu.opening",
+                "Break the front line and breach the Mianzhu gate.",
+                "objective.mianzhu.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.mianzhu.final",
+                "Push through the breach and defeat the Mianzhu commandant.",
+                "objective.mianzhu.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            BattlefieldMutation breachMutation = new BattlefieldMutation(
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(6, 5), TerrainType.Plain),
+                    new TerrainTileData(new GridPosition(7, 5), TerrainType.Plain),
+                    new TerrainTileData(new GridPosition(6, 6), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(7, 6), TerrainType.Hazard),
+                },
+                new List<BlockedCellStateChange>
+                {
+                    new BlockedCellStateChange(new GridPosition(6, 5), false),
+                    new BlockedCellStateChange(new GridPosition(7, 5), false),
+                });
+
+            List<ScenarioDirective> breachDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(MianzhuBreachFlag),
+                ScenarioDirective.ApplyBattlefieldMutation(breachMutation),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-mianzhu-commandant", "Mianzhu Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 36, 11, 5, 3, 1, new GridPosition(6, 8), AiProfileType.Boss),
+                    SpawnEnemy("enemy-mianzhu-inner-guard-a", "Inner Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 5, 2, 1, new GridPosition(5, 7), AiProfileType.Protector),
+                    SpawnEnemy("enemy-mianzhu-inner-guard-b", "Inner Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 5, 2, 1, new GridPosition(8, 7), AiProfileType.Protector),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.mianzhu.mid.1", "The gate is open, but they lit the center lane. Push through before the fire line hardens."),
+                    Line("unit.zhang_fei", "Zhang Fei", "dialogue.mianzhu.mid.2", "Good. Burning planks are still softer than a closed gate."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.mianzhu.mid.3", "Take the breach and end their command inside the wall."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "mianzhu-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.mianzhu.opening.1", "Mianzhu's front is layered. Break the first line and the gate becomes the only thing left between us and the city road."),
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.mianzhu.opening.2", "Watch the oil jars at center. Once the gate cracks, they will try to turn the breach into a fire trap."),
+                            Line("unit.player_ma_chao", "Ma Chao", "dialogue.mianzhu.opening.3", "Then we strike through before the flames can own the lane."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "mianzhu-breach-kill",
+                    ScenarioCheckpoint.ActionResolved,
+                    breachDirectives,
+                    requiredDefeatedUnitIds: new List<string> { "enemy-mianzhu-gate-captain", "enemy-mianzhu-oil-bow-chief" },
+                    exclusivityGroupId: "mianzhu-breach"),
+                new ScenarioTrigger(
+                    "mianzhu-breach-round",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    breachDirectives,
+                    minimumRoundNumber: 4,
+                    exclusivityGroupId: "mianzhu-breach"),
+                new ScenarioTrigger(
+                    "mianzhu-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "mianzhu-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-mianzhu-commandant" },
+                    requiredFlags: new List<string> { MianzhuBreachFlag }),
+                new ScenarioTrigger(
+                    "mianzhu-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.mianzhu.victory.1", "Mianzhu's breach is ours. The gate never recovered once the first line broke."),
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.mianzhu.victory.2", "Then we press inland before the next wall can learn from this one."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+                new ScenarioTrigger(
+                    "mianzhu-defeat-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("speaker.narrator", "Narrator", "dialogue.mianzhu.defeat.1", "Mianzhu's fire line holds, and the breach closes under smoke and shouting."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Enemy),
+            };
+
+            return new BattleScenarioData(
+                MianzhuScenarioId,
+                "Mianzhu Breakthrough",
+                "scenario.mianzhu_breakthrough",
+                stage,
+                triggers,
+                7,
+                110,
+                38,
+                new RewardBundle(240, 4, "mianzhu-feather-sigil"));
+        }
+
         public static BattleScenarioData CreateLuochengSiege()
         {
             List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>();
@@ -1214,6 +1576,204 @@ namespace PhalanxChronicle.Core
                 114,
                 40,
                 new RewardBundle(245, 4, "yangping-stone-route"));
+        }
+
+        public static BattleScenarioData CreateTiandangRaid()
+        {
+            List<UnitSpawnData> openingSpawns = new List<UnitSpawnData>
+            {
+                SpawnPlayerLiuBei(new GridPosition(1, 8)),
+                SpawnPlayerGuanYu(new GridPosition(2, 9)),
+                SpawnPlayerZhangFei(new GridPosition(2, 7)),
+                SpawnPlayerHuangZhong(new GridPosition(1, 10)),
+                SpawnPlayerZhugeLiang(new GridPosition(0, 8)),
+                SpawnPlayerZhaoYun(new GridPosition(1, 6)),
+                SpawnPlayerMaChao(new GridPosition(1, 11)),
+                SpawnEnemy("enemy-tiandang-left-warden", "Left Beacon Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 32, 10, 6, 2, 1, new GridPosition(5, 4), AiProfileType.Protector),
+                SpawnEnemy("enemy-tiandang-right-warden", "Right Beacon Warden", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 26, 10, 3, 3, 2, new GridPosition(8, 4), AiProfileType.Support),
+                SpawnEnemy("enemy-tiandang-camp-bow-chief", "Camp Bow Chief", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 25, 9, 3, 3, 2, new GridPosition(7, 2), AiProfileType.Support),
+                SpawnEnemy("enemy-tiandang-front-guard", "Front Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 29, 9, 5, 2, 1, new GridPosition(6, 3), AiProfileType.Protector),
+            };
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Tiandang Raid",
+                "stage.tiandang_raid",
+                12,
+                12,
+                openingSpawns,
+                new List<GridPosition>
+                {
+                    new GridPosition(3, 5),
+                    new GridPosition(3, 6),
+                    new GridPosition(4, 5),
+                    new GridPosition(4, 6),
+                    new GridPosition(4, 7),
+                    new GridPosition(6, 5),
+                    new GridPosition(6, 6),
+                    new GridPosition(6, 7),
+                    new GridPosition(7, 6),
+                    new GridPosition(7, 7),
+                    new GridPosition(9, 4),
+                    new GridPosition(9, 5),
+                    new GridPosition(9, 6),
+                    new GridPosition(9, 7),
+                    new GridPosition(9, 8),
+                    new GridPosition(10, 5),
+                    new GridPosition(10, 6),
+                },
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(8, 4), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(2, 4), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(3, 4), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(8, 8), TerrainType.Forest),
+                    new TerrainTileData(new GridPosition(5, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 2), TerrainType.Hazard),
+                });
+
+            ObjectiveState openingObjective = new ObjectiveState(
+                "objective.tiandang.opening",
+                "Secure both signal beacons before the Tiandang camp can raise the alarm.",
+                "objective.tiandang.failure",
+                "Liu Bei falls or all allies are defeated.");
+            ObjectiveState finalObjective = new ObjectiveState(
+                "objective.tiandang.final",
+                "Defeat the Tiandang commandant before the camp regains control of the ridge.",
+                "objective.tiandang.failure",
+                "Liu Bei falls or all allies are defeated.");
+
+            BattlefieldMutation alarmMutation = new BattlefieldMutation(
+                new List<TerrainTileData>
+                {
+                    new TerrainTileData(new GridPosition(5, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(8, 2), TerrainType.Hazard),
+                    new TerrainTileData(new GridPosition(9, 7), TerrainType.Fort),
+                    new TerrainTileData(new GridPosition(9, 8), TerrainType.Fort),
+                },
+                new List<BlockedCellStateChange>
+                {
+                    new BlockedCellStateChange(new GridPosition(9, 7), false),
+                    new BlockedCellStateChange(new GridPosition(9, 8), false),
+                });
+
+            List<ScenarioDirective> securedDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(TiandangSignalsSecuredFlag),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-tiandang-commandant", "Tiandang Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 36, 11, 5, 3, 1, new GridPosition(10, 2), AiProfileType.Boss),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.huang_zhong", "Huang Zhong", "dialogue.tiandang.mid.secured.1", "Both beacons are dark. Their camp has lost the ridge before the alarm could travel."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.tiandang.mid.secured.2", "Good. Strike the command tent now and end the raid cleanly."),
+                }),
+            };
+
+            List<ScenarioDirective> alarmDirectives = new List<ScenarioDirective>
+            {
+                ScenarioDirective.SetFlag(TiandangAlarmFlag),
+                ScenarioDirective.ApplyBattlefieldMutation(alarmMutation),
+                ScenarioDirective.SpawnUnits(new List<UnitSpawnData>
+                {
+                    SpawnEnemy("enemy-tiandang-commandant", "Tiandang Commandant", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 36, 11, 5, 3, 1, new GridPosition(10, 2), AiProfileType.Boss),
+                    SpawnEnemy("enemy-tiandang-flank-rider-a", "Alarm Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 27, 10, 3, 4, 1, new GridPosition(10, 8), AiProfileType.Aggressor),
+                    SpawnEnemy("enemy-tiandang-flank-rider-b", "Alarm Rider", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.None, 27, 10, 3, 4, 1, new GridPosition(11, 8), AiProfileType.Aggressor),
+                }),
+                ScenarioDirective.UpdateObjective(finalObjective),
+                ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                {
+                    Line("unit.enemy_tiandang_commandant", "Tiandang Commandant", "dialogue.tiandang.mid.alarm.1", "Beacon fire to the flank! Open the ridge path and ride them down."),
+                    Line("unit.player_ma_chao", "Ma Chao", "dialogue.tiandang.mid.alarm.2", "They opened the side lane themselves. Good. I'll meet the riders there."),
+                    Line("unit.liu_bei", "Liu Bei", "dialogue.tiandang.mid.alarm.3", "Hold the ridge and cut down the commandant before the alarm becomes a full counterattack."),
+                }),
+            };
+
+            List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
+            {
+                new ScenarioTrigger(
+                    "tiandang-intro",
+                    ScenarioCheckpoint.BattleStart,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.UpdateObjective(openingObjective),
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.player_zhuge_liang", "Zhuge Liang", "dialogue.tiandang.opening.1", "Tiandang's ridge is held by its beacons. If both fires go dark, the camp loses its timing."),
+                            Line("unit.huang_zhong", "Huang Zhong", "dialogue.tiandang.opening.2", "Then we silence the signal towers before their command can spread across the slope."),
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.tiandang.opening.3", "Take the beacons first. If the alarm rises, this raid turns into a grind on the ridge."),
+                        }),
+                    }),
+                new ScenarioTrigger(
+                    "tiandang-signals-secured",
+                    ScenarioCheckpoint.ActionResolved,
+                    securedDirectives,
+                    requiredDefeatedUnitIds: new List<string> { "enemy-tiandang-left-warden", "enemy-tiandang-right-warden" },
+                    exclusivityGroupId: "tiandang-resolution"),
+                new ScenarioTrigger(
+                    "tiandang-alarm",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    alarmDirectives,
+                    minimumRoundNumber: 4,
+                    exclusivityGroupId: "tiandang-resolution"),
+                new ScenarioTrigger(
+                    "tiandang-liu-bei-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
+                    requiredDefeatedUnitIds: new List<string> { "player-liu-bei" }),
+                new ScenarioTrigger(
+                    "tiandang-boss-falls",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-tiandang-commandant" },
+                    requiredFlags: new List<string> { TiandangAlarmFlag },
+                    exclusivityGroupId: "tiandang-victory"),
+                new ScenarioTrigger(
+                    "tiandang-boss-falls-silent",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Player) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-tiandang-commandant" },
+                    requiredFlags: new List<string> { TiandangSignalsSecuredFlag },
+                    exclusivityGroupId: "tiandang-victory"),
+                new ScenarioTrigger(
+                    "tiandang-victory-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("unit.liu_bei", "Liu Bei", "dialogue.tiandang.victory.1", "Tiandang's ridge is ours. Whether by silence or alarm, their camp lost the mountain tonight."),
+                            Line("unit.huang_zhong", "Huang Zhong", "dialogue.tiandang.victory.2", "Good. The next strike into Hanzhong will land with their eyes still turned the wrong way."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Player),
+                new ScenarioTrigger(
+                    "tiandang-defeat-dialogue",
+                    ScenarioCheckpoint.PreBattleOutcome,
+                    new List<ScenarioDirective>
+                    {
+                        ScenarioDirective.QueueDialogue(new List<ScenarioDialogueLine>
+                        {
+                            Line("speaker.narrator", "Narrator", "dialogue.tiandang.defeat.1", "Signal fires leap from ridge to ridge, and the Tiandang raid dies beneath the answering alarm."),
+                        }),
+                    },
+                    requiresBattleEnded: true,
+                    requiredWinningSide: TurnSide.Enemy),
+            };
+
+            return new BattleScenarioData(
+                TiandangScenarioId,
+                "Tiandang Raid",
+                "scenario.tiandang_raid",
+                stage,
+                triggers,
+                8,
+                116,
+                40,
+                new RewardBundle(252, 4, "tiandang-falcon-badge"));
         }
 
         public static BattleScenarioData CreateHanshui()

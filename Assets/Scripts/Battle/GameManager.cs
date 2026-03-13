@@ -7,6 +7,7 @@ using PhalanxChronicle.Localization;
 using PhalanxChronicle.UI;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.U2D;
 
 namespace PhalanxChronicle.Battle
 {
@@ -85,15 +86,28 @@ namespace PhalanxChronicle.Battle
 
         private void EnsureCamera()
         {
-            if (Camera.main != null)
+            Camera cameraComponent = Camera.main;
+            if (cameraComponent == null)
             {
-                return;
+                GameObject cameraObject = new GameObject("Main Camera");
+                cameraObject.tag = "MainCamera";
+                cameraComponent = cameraObject.AddComponent<Camera>();
             }
 
-            GameObject cameraObject = new GameObject("Main Camera");
-            cameraObject.tag = "MainCamera";
-            Camera cameraComponent = cameraObject.AddComponent<Camera>();
             cameraComponent.orthographic = true;
+            PixelPerfectCamera pixelPerfect = cameraComponent.GetComponent<PixelPerfectCamera>();
+            if (pixelPerfect == null)
+            {
+                pixelPerfect = cameraComponent.gameObject.AddComponent<PixelPerfectCamera>();
+            }
+
+            pixelPerfect.assetsPPU = 64;
+            pixelPerfect.refResolutionX = 1280;
+            pixelPerfect.refResolutionY = 720;
+            pixelPerfect.cropFrameX = false;
+            pixelPerfect.cropFrameY = false;
+            pixelPerfect.upscaleRT = false;
+            pixelPerfect.pixelSnapping = true;
         }
 
         private void EnsureEventSystem()
@@ -1290,10 +1304,16 @@ namespace PhalanxChronicle.Battle
                     return LocalizationService.Text("campaign.stage.theme.jiangxia", "戰場定位：三橋渡河強攻");
                 case BattleScenarioCatalog.JiamengPassScenarioId:
                     return LocalizationService.Text("campaign.stage.theme.jiameng", "戰場定位：關隘門線守勢");
+                case BattleScenarioCatalog.BaishuiScenarioId:
+                    return LocalizationService.Text("campaign.stage.theme.baishui", "戰場定位：雙渡口與斷橋壓迫");
+                case BattleScenarioCatalog.MianzhuScenarioId:
+                    return LocalizationService.Text("campaign.stage.theme.mianzhu", "戰場定位：雙層門線與火場突破");
                 case BattleScenarioCatalog.LuochengScenarioId:
                     return LocalizationService.Text("campaign.stage.theme.luocheng", "戰場定位：破門後的城街絞殺");
                 case BattleScenarioCatalog.YangpingScenarioId:
                     return LocalizationService.Text("campaign.stage.theme.yangping", "戰場定位：山隘與落石陷阱");
+                case BattleScenarioCatalog.TiandangScenarioId:
+                    return LocalizationService.Text("campaign.stage.theme.tiandang", "戰場定位：雙信標夜襲與側翼警報");
                 case BattleScenarioCatalog.HanshuiScenarioId:
                     return LocalizationService.Text("campaign.stage.theme.hanshui", "戰場定位：河岸反擊戰");
                 case BattleScenarioCatalog.DingjunScenarioId:
@@ -1311,8 +1331,14 @@ namespace PhalanxChronicle.Battle
                     return LocalizationService.Text("campaign.stage.risk.guangzong", "風險：中央火線與後段兩翼包夾。");
                 case BattleScenarioCatalog.JiangxiaScenarioId:
                     return LocalizationService.Text("campaign.stage.risk.jiangxia", "風險：橋頭卡位與兩岸交叉火力。");
+                case BattleScenarioCatalog.BaishuiScenarioId:
+                    return LocalizationService.Text("campaign.stage.risk.baishui", "風險：下橋一斷就會被後追騎兵逼出上路。");
+                case BattleScenarioCatalog.MianzhuScenarioId:
+                    return LocalizationService.Text("campaign.stage.risk.mianzhu", "風險：破門後中央會立刻變成火線殺區。");
                 case BattleScenarioCatalog.LuochengScenarioId:
                     return LocalizationService.Text("campaign.stage.risk.luocheng", "風險：城門殺區之後還有第二層街巷防線。");
+                case BattleScenarioCatalog.TiandangScenarioId:
+                    return LocalizationService.Text("campaign.stage.risk.tiandang", "風險：若信標沒先壓掉，敵軍側翼會被整段打開。");
                 case BattleScenarioCatalog.ChangbanScenarioId:
                     return LocalizationService.Text("campaign.stage.risk.changban", "風險：保護後隊的同時敵軍壓力會越滾越快。");
                 default:
