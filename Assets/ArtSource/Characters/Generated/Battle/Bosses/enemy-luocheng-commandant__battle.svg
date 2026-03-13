@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#867065" />
+      <stop offset="100%" stop-color="#654B3F" />
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#DAD2CA" />
+      <stop offset="100%" stop-color="#A59E97" />
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="60" r="40" fill="#DDAE87" fill-opacity="0.08" />
+  <g transform="translate(92 8) rotate(16) scale(1 1)"><path d="M 0.0 -8.0 L 5.0 12.0 L 0.0 28.0 L -5.0 12.0 Z" fill="#D7CEC6" opacity="0.92" /><rect x="-3" y="24" width="6" height="94" rx="3" fill="#252F39" opacity="0.82" /><rect x="-12" y="26" width="24" height="5" rx="2" fill="#D08C55" opacity="0.62" /></g>
+  <path d="M 34.0 122.0 L 40.0 76.0 L 48.0 48.0 L 64.0 32.0 L 80.0 46.0 L 90.0 78.0 L 96.0 122.0 L 72.0 116.0 L 64.0 90.0 L 56.0 116.0 Z" fill="url(#body)" stroke="#171210" stroke-width="3" stroke-opacity="0.14" />
+  <path d="M 48.0 70.0 L 62.0 66.0 L 82.0 72.0 L 74.0 84.0 L 54.0 82.0 Z" fill="#D08C55" fill-opacity="0.42" />
+  <path d="M 50.0 52.0 L 64.0 48.0 L 78.0 52.0 L 74.0 66.0 L 54.0 66.0 Z" fill="#D49563" fill-opacity="0.36" />
+  <circle cx="64" cy="34" r="15" fill="#DAAE86" />
+  <path d="M 49.0 39.0 L 52.0 24.0 L 60.0 16.0 L 68.0 15.0 L 76.0 18.0 L 80.0 28.0 L 79.0 40.0 L 72.0 33.0 L 62.0 30.0 L 54.0 34.0 Z" fill="#1D1614" />
+  <path d="M 50.0 24.0 L 54.0 14.0 L 64.0 8.0 L 74.0 12.0 L 78.0 24.0 L 70.0 24.0 L 64.0 22.0 L 54.0 24.0 Z" fill="#D7CEC6" fill-opacity="0.9" />
+  <path d="M 56.0 40.0 L 64.0 44.0 L 72.0 40.0 L 64.0 48.0 Z" fill="#1D1614" fill-opacity="0.82" />
+  <path d="M 58 35 Q 64 38 70 35" fill="none" stroke="#171210" stroke-width="2.3" stroke-linecap="round" stroke-opacity="0.55" />
+  <path d="M 56 29 Q 60 26 64 28" fill="none" stroke="#171210" stroke-width="2" stroke-linecap="round" stroke-opacity="0.65" />
+  <path d="M 64 28 Q 68 26 72 29" fill="none" stroke="#171210" stroke-width="2" stroke-linecap="round" stroke-opacity="0.65" />
+  
+</svg>
