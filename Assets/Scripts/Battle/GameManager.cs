@@ -271,6 +271,19 @@ namespace PhalanxChronicle.Battle
                 LocalizationService.Format("campaign.stage.variant", "戰場變體：{0}", FormatScenarioVariantTag(scenario.ScenarioVariantTag)),
                 BuildStageBattlefieldLabel(stage.ScenarioId),
             };
+            foreach (BonusRewardDefinition bonusReward in scenario.BonusRewards.Where(reward =>
+                         reward != null &&
+                         !campaignSaveData.Progress.IsBonusRewardClaimed(reward.RewardId)).Take(2))
+            {
+                ItemDefinition bonusItem = ItemCatalog.Get(bonusReward.RewardItemId);
+                detailLines.Add(LocalizationService.Format(
+                    "campaign.stage.bonus_objective",
+                    "次要目標：{0} -> {1}",
+                    LocalizationService.Text(bonusReward.ObjectiveKey, bonusReward.ObjectiveFallback),
+                    bonusItem != null
+                        ? LocalizationService.Text(bonusItem.NameKey, bonusItem.NameFallback)
+                        : bonusReward.RewardItemId));
+            }
             string rewardPreview = rewardItem != null && !campaignSaveData.Progress.IsRewardClaimed(stage.ScenarioId)
                 ? LocalizationService.Format("campaign.stage.reward_preview", "首通寶物：{0}", LocalizationService.Text(rewardItem.NameKey, rewardItem.NameFallback))
                 : LocalizationService.Text("campaign.replay.reward_info", "此章節首通獎勵已領取，回放仍可獲得戰鬥經驗。");
@@ -288,6 +301,7 @@ namespace PhalanxChronicle.Battle
                 TerrainLabel = BuildStageBattlefieldLabel(stage.ScenarioId),
                 RiskLabel = BuildStageRiskLabel(stage.ScenarioId),
                 RewardLabel = rewardPreview,
+                RewardIconItemId = rewardItem != null ? rewardItem.ItemId : string.Empty,
                 PrimaryActionLabel = LocalizationService.Text("ui.button.begin_battle", "開始戰鬥"),
                 SecondaryActionLabel = LocalizationService.Text("ui.button.back_to_camp", "返回軍營"),
             };
@@ -490,6 +504,7 @@ namespace PhalanxChronicle.Battle
                 {
                     OptionId = "weapon|" + unit.UnitId + "|" + item.ItemId,
                     IconGlyph = BuildItemGlyph(item),
+                    IconItemId = item.ItemId,
                     Title = LocalizationService.Text(item.NameKey, item.NameFallback),
                     Status = string.Equals(unit.EquipmentLoadout.WeaponId, item.ItemId, StringComparison.Ordinal)
                         ? LocalizationService.Text("camp.equip.current", "已裝備")
@@ -507,6 +522,7 @@ namespace PhalanxChronicle.Battle
                 {
                     OptionId = "armor|" + unit.UnitId + "|" + item.ItemId,
                     IconGlyph = BuildItemGlyph(item),
+                    IconItemId = item.ItemId,
                     Title = LocalizationService.Text(item.NameKey, item.NameFallback),
                     Status = string.Equals(unit.EquipmentLoadout.ArmorId, item.ItemId, StringComparison.Ordinal)
                         ? LocalizationService.Text("camp.equip.current", "已裝備")
@@ -524,6 +540,7 @@ namespace PhalanxChronicle.Battle
                 {
                     OptionId = "mount|" + unit.UnitId + "|" + item.ItemId,
                     IconGlyph = BuildItemGlyph(item),
+                    IconItemId = item.ItemId,
                     Title = LocalizationService.Text(item.NameKey, item.NameFallback),
                     Status = string.Equals(unit.EquipmentLoadout.MountId, item.ItemId, StringComparison.Ordinal)
                         ? LocalizationService.Text("camp.equip.current", "已裝備")
@@ -628,7 +645,8 @@ namespace PhalanxChronicle.Battle
             return new CampaignOptionEntryModel
             {
                 OptionId = "buy|" + offer.ItemId,
-                IconGlyph = "商",
+                IconGlyph = BuildItemGlyph(item),
+                IconItemId = item != null ? item.ItemId : string.Empty,
                 Title = LocalizationService.Text(item.NameKey, item.NameFallback),
                 Status = renownUnlocked
                     ? LocalizationService.Format("camp.shop.cost", "花費 {0} 軍資", offer.SuppliesCost)
@@ -677,6 +695,7 @@ namespace PhalanxChronicle.Battle
                     {
                         OptionId = string.Empty,
                         IconGlyph = BuildItemGlyph(definition),
+                        IconItemId = definition != null ? definition.ItemId : string.Empty,
                         Title = definition != null ? LocalizationService.Text(definition.NameKey, definition.NameFallback) : entry.ItemId,
                         Status = LocalizationService.Format("camp.inventory.count", "x{0}", entry.Quantity),
                         MetricLine = BuildInventoryMetricLine(definition, entry.Quantity),
@@ -760,6 +779,7 @@ namespace PhalanxChronicle.Battle
                 RewardLabel = rewardItem != null
                     ? LocalizationService.Format("campaign.stage.reward_preview", "首通寶物：{0}", LocalizationService.Text(rewardItem.NameKey, rewardItem.NameFallback))
                     : string.Empty,
+                RewardIconItemId = rewardItem != null ? rewardItem.ItemId : string.Empty,
                 DurationLabel = BuildStageDurationLabel(scenario),
                 IsUnlocked = unlocked,
                 IsCleared = cleared,
@@ -840,23 +860,24 @@ namespace PhalanxChronicle.Battle
                 return string.Empty;
             }
 
-            if (!resolution.GrantedStageReward)
+            List<string> parts = new List<string>();
+            if (resolution.GrantedStageReward)
             {
-                return LocalizationService.Text("campaign.replay.reward_info", "此章節首通獎勵已領取，回放仍可獲得戰鬥經驗。");
+                parts.Add(LocalizationService.Format("campaign.reward.supplies", "軍資 +{0}", resolution.GrantedSupplies));
+                parts.Add(LocalizationService.Format("campaign.reward.renown", "聲望 +{0}", resolution.GrantedRenown));
+                if (!string.IsNullOrWhiteSpace(resolution.GrantedItemId))
+                {
+                    ItemDefinition item = ItemCatalog.Get(resolution.GrantedItemId);
+                    parts.Add(LocalizationService.Format(
+                        "campaign.reward.item",
+                        "寶物：{0}",
+                        item != null ? LocalizationService.Text(item.NameKey, item.NameFallback) : resolution.GrantedItemId));
+                }
             }
 
-            List<string> parts = new List<string>
+            if (resolution.GrantedBonusRewardLines != null && resolution.GrantedBonusRewardLines.Count > 0)
             {
-                LocalizationService.Format("campaign.reward.supplies", "軍資 +{0}", resolution.GrantedSupplies),
-                LocalizationService.Format("campaign.reward.renown", "聲望 +{0}", resolution.GrantedRenown),
-            };
-            if (!string.IsNullOrWhiteSpace(resolution.GrantedItemId))
-            {
-                ItemDefinition item = ItemCatalog.Get(resolution.GrantedItemId);
-                parts.Add(LocalizationService.Format(
-                    "campaign.reward.item",
-                    "寶物：{0}",
-                    item != null ? LocalizationService.Text(item.NameKey, item.NameFallback) : resolution.GrantedItemId));
+                parts.AddRange(resolution.GrantedBonusRewardLines);
             }
 
             if (resolution.RecruitedUnitIds != null && resolution.RecruitedUnitIds.Count > 0)
@@ -865,6 +886,11 @@ namespace PhalanxChronicle.Battle
                     "campaign.reward.recruit",
                     "加入麾下：{0}",
                     string.Join("、", resolution.RecruitedUnitIds.Select(GetUnitDisplayName))));
+            }
+
+            if (parts.Count == 0)
+            {
+                return LocalizationService.Text("campaign.replay.reward_info", "此章節首通獎勵已領取，回放仍可獲得戰鬥經驗。");
             }
 
             return string.Join(" | ", parts);

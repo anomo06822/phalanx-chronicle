@@ -82,6 +82,8 @@ namespace PhalanxChronicle.UI
         public string Rationale { get; set; } = string.Empty;
 
         public BattleIntentPreview Preview { get; set; }
+
+        public string SpecialHintText { get; set; } = string.Empty;
     }
 
     public sealed class BattleHudDecisionContextModel
@@ -166,6 +168,8 @@ namespace PhalanxChronicle.UI
         public string InstructionText { get; set; } = string.Empty;
 
         public string SecondaryInstructionText { get; set; } = string.Empty;
+
+        public IReadOnlyList<string> SecondaryObjectiveLines { get; set; } = new List<string>();
 
         public IReadOnlyList<HudFactModel> HeaderFacts { get; set; } = new List<HudFactModel>();
 
@@ -359,7 +363,22 @@ namespace PhalanxChronicle.UI
 
         public IReadOnlyList<string> RewardLines { get; set; } = new List<string>();
 
+        public IReadOnlyList<string> SpecialLines { get; set; } = new List<string>();
+
+        public IReadOnlyList<BattleRewardEntryModel> RewardEntries { get; set; } = new List<BattleRewardEntryModel>();
+
         public IReadOnlyList<string> UnitLines { get; set; } = new List<string>();
+    }
+
+    public sealed class BattleRewardEntryModel
+    {
+        public string Label { get; set; } = string.Empty;
+
+        public string IconItemId { get; set; } = string.Empty;
+
+        public string AccentRole { get; set; } = string.Empty;
+
+        public bool IsPrimaryReward { get; set; }
     }
 
     public sealed class CampaignStageSelectModel
@@ -392,6 +411,8 @@ namespace PhalanxChronicle.UI
         public string BattlefieldLabel { get; set; } = string.Empty;
 
         public string RewardLabel { get; set; } = string.Empty;
+
+        public string RewardIconItemId { get; set; } = string.Empty;
 
         public string DurationLabel { get; set; } = string.Empty;
 
@@ -436,6 +457,8 @@ namespace PhalanxChronicle.UI
 
         public string RewardLabel { get; set; } = string.Empty;
 
+        public string RewardIconItemId { get; set; } = string.Empty;
+
         public string PrimaryActionLabel { get; set; } = string.Empty;
 
         public string SecondaryActionLabel { get; set; } = string.Empty;
@@ -475,6 +498,8 @@ namespace PhalanxChronicle.UI
         public string Description { get; set; } = string.Empty;
 
         public string IconGlyph { get; set; } = string.Empty;
+
+        public string IconItemId { get; set; } = string.Empty;
 
         public string MetricLine { get; set; } = string.Empty;
 

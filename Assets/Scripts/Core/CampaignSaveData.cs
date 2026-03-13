@@ -316,7 +316,7 @@ namespace PhalanxChronicle.Core
             CampaignProgress progress,
             CampaignInventoryState inventory,
             IReadOnlyList<CampaignUnitState> units,
-            int version = 4)
+            int version = 5)
         {
             CampaignId = campaignId ?? string.Empty;
             Progress = progress ?? new CampaignProgress();

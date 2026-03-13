@@ -12,6 +12,13 @@ using Text = TMPro.TextMeshProUGUI;
 
 namespace PhalanxChronicle.UI
 {
+    internal enum BattleHudOverlayGate
+    {
+        SuppressUnitInfo,
+        BlockInteraction,
+        PauseAutoMode,
+    }
+
     public enum BattleHudUiVisibilityMode
     {
         Normal,
@@ -33,15 +40,13 @@ namespace PhalanxChronicle.UI
         private BattleRosterSidebarView rosterSidebarView;
         private CampaignOverlayView campaignOverlayView;
 
-        private Text selectedNameLabel;
-        private Text campaignBodyLabel;
-        private Button campaignPrimaryButton;
-
         private Text resultTitleLabel;
         private Text resultSummaryLabel;
         private Text resultRewardLabel;
+        private Text resultSpecialLabel;
         private Text resultUnitsLabel;
         private Text resultContinueLabel;
+        private Transform resultRewardEntriesRoot;
         private Text dialogueSpeakerLabel;
         private Text dialogueBodyLabel;
         private Text dialogueContinueLabel;
@@ -74,6 +79,12 @@ namespace PhalanxChronicle.UI
 
         public bool IsConfirmDialogVisible => confirmDialogOverlay != null && confirmDialogOverlay.activeSelf;
 
+        public bool IsAnyBlockingOverlayVisible => IsOverlayGateActive(BattleHudOverlayGate.SuppressUnitInfo);
+
+        public bool HasBlockingInteractionOverlay => IsOverlayGateActive(BattleHudOverlayGate.BlockInteraction);
+
+        public bool HasAutoModePauseOverlay => IsOverlayGateActive(BattleHudOverlayGate.PauseAutoMode);
+
         public string CurrentObjectiveText => rosterSidebarView != null ? rosterSidebarView.CurrentObjectiveText : string.Empty;
 
         public IReadOnlyList<string> FeedEntries => feedEntries;
@@ -94,7 +105,6 @@ namespace PhalanxChronicle.UI
 
             selectedUnitView = new BattleSelectedUnitView();
             selectedUnitView.Initialize(canvasRoot);
-            selectedNameLabel = selectedUnitView.NameLabel;
 
             rosterSidebarView = new BattleRosterSidebarView();
             rosterSidebarView.Initialize(canvasRoot, onEndTurn, onReroll, onAutoModeRequested, FeedLimit);
@@ -109,8 +119,6 @@ namespace PhalanxChronicle.UI
 
             campaignOverlayView = new CampaignOverlayView();
             campaignOverlayView.Initialize(canvasRoot);
-            campaignBodyLabel = campaignOverlayView.BodyLabel;
-            campaignPrimaryButton = campaignOverlayView.PrimaryButton;
 
             BindOverview(new BattleOverviewModel());
             BindSelectedUnit(new BattleSelectedUnitModel());
@@ -153,7 +161,8 @@ namespace PhalanxChronicle.UI
 
         public void ClearForecast()
         {
-            ClearContext();
+            currentForecast = null;
+            ApplyContextRibbon();
         }
 
         public void ClearContext()
@@ -161,6 +170,11 @@ namespace PhalanxChronicle.UI
             currentDecisionContext = new BattleHudDecisionContextModel();
             currentForecast = null;
             ApplyContextRibbon();
+        }
+
+        public bool ShouldSuppressUnitInfo()
+        {
+            return IsOverlayGateActive(BattleHudOverlayGate.SuppressUnitInfo);
         }
 
         public void SetUiVisibilityMode(BattleHudUiVisibilityMode mode)
@@ -207,12 +221,18 @@ namespace PhalanxChronicle.UI
             BattleResultModel battleResult = model ?? new BattleResultModel();
             resultTitleLabel.text = battleResult.Title;
             resultSummaryLabel.text = battleResult.Summary;
-            resultRewardLabel.text = battleResult.RewardLines != null && battleResult.RewardLines.Count > 0
+            bool hasStructuredRewardEntries = battleResult.RewardEntries != null && battleResult.RewardEntries.Count > 0;
+            resultRewardLabel.text = !hasStructuredRewardEntries && battleResult.RewardLines != null && battleResult.RewardLines.Count > 0
                 ? string.Join("\n", battleResult.RewardLines)
                 : string.Empty;
+            resultSpecialLabel.text = battleResult.SpecialLines != null && battleResult.SpecialLines.Count > 0
+                ? string.Join("\n", battleResult.SpecialLines)
+                : string.Empty;
+            resultSpecialLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(resultSpecialLabel.text));
             resultUnitsLabel.text = battleResult.UnitLines != null && battleResult.UnitLines.Count > 0
                 ? string.Join("\n", battleResult.UnitLines)
                 : string.Empty;
+            RebuildResultRewardEntries(battleResult.RewardEntries);
         }
 
         public void HideResult()
@@ -221,6 +241,74 @@ namespace PhalanxChronicle.UI
             {
                 resultPanel.SetActive(false);
             }
+        }
+
+        private void RebuildResultRewardEntries(IReadOnlyList<BattleRewardEntryModel> rewardEntries)
+        {
+            if (resultRewardEntriesRoot == null)
+            {
+                return;
+            }
+
+            for (int index = resultRewardEntriesRoot.childCount - 1; index >= 0; index--)
+            {
+                Destroy(resultRewardEntriesRoot.GetChild(index).gameObject);
+            }
+
+            foreach (BattleRewardEntryModel entry in rewardEntries ?? Array.Empty<BattleRewardEntryModel>())
+            {
+                CreateResultRewardEntry(resultRewardEntriesRoot, entry);
+            }
+        }
+
+        private static void CreateResultRewardEntry(Transform parent, BattleRewardEntryModel entry)
+        {
+            if (parent == null || entry == null || string.IsNullOrWhiteSpace(entry.Label))
+            {
+                return;
+            }
+
+            GameObject row = new GameObject("ResultRewardEntry", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            row.transform.SetParent(parent, false);
+            LayoutElement rowLayout = row.GetComponent<LayoutElement>();
+            rowLayout.preferredHeight = 30f;
+
+            HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+            layout.spacing = 10f;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = false;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+
+            Sprite iconSprite = RuntimeSpriteLibrary.GetItemIcon(entry.IconItemId);
+            if (iconSprite != null)
+            {
+                GameObject badge = BattleHudFactory.CreateInsetPanel("ResultRewardBadge", row.transform, 28f, entry.IsPrimaryReward ? BattleUiTheme.PanelReward : BattleUiTheme.PanelGhost);
+                LayoutElement badgeLayout = badge.GetComponent<LayoutElement>();
+                badgeLayout.preferredWidth = 28f;
+                badgeLayout.preferredHeight = 28f;
+                badgeLayout.flexibleWidth = 0f;
+                badgeLayout.flexibleHeight = 0f;
+
+                GameObject iconObject = new GameObject("ResultRewardIcon", typeof(RectTransform), typeof(Image));
+                iconObject.transform.SetParent(badge.transform, false);
+                RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+                iconRect.anchorMin = Vector2.zero;
+                iconRect.anchorMax = Vector2.one;
+                iconRect.offsetMin = new Vector2(5f, 5f);
+                iconRect.offsetMax = new Vector2(-5f, -5f);
+                Image iconImage = iconObject.GetComponent<Image>();
+                iconImage.sprite = iconSprite;
+                iconImage.preserveAspect = true;
+                iconImage.color = Color.white;
+            }
+
+            Text label = BattleHudFactory.CreateText(row.transform, entry.Label, 13, FontStyle.Bold, TextAnchor.MiddleLeft, entry.IsPrimaryReward ? BattleUiTheme.TextGold : BattleUiTheme.TextSecondary);
+            LayoutElement labelLayout = label.GetComponent<LayoutElement>();
+            labelLayout.flexibleWidth = 1f;
+            labelLayout.preferredHeight = 22f;
+            BattleHudFactory.SetOverflow(label, TextOverflowModes.Truncate, false);
         }
 
         public void ShowDialogue(string speaker, string body)
@@ -338,6 +426,29 @@ namespace PhalanxChronicle.UI
             contextRibbonView.Bind(model);
         }
 
+        private bool IsOverlayGateActive(BattleHudOverlayGate gate)
+        {
+            switch (gate)
+            {
+                case BattleHudOverlayGate.BlockInteraction:
+                    return IsCampaignOverlayVisible ||
+                           IsResultVisible ||
+                           IsConfirmDialogVisible;
+                case BattleHudOverlayGate.PauseAutoMode:
+                    return IsCampaignOverlayVisible ||
+                           IsDialogueVisible ||
+                           IsResultVisible ||
+                           IsOnboardingVisible ||
+                           IsConfirmDialogVisible;
+                default:
+                    return IsCampaignOverlayVisible ||
+                           IsDialogueVisible ||
+                           IsResultVisible ||
+                           IsOnboardingVisible ||
+                           IsConfirmDialogVisible;
+            }
+        }
+
         private void SetBattleShellVisible(bool visible)
         {
             contextRibbonView?.SetVisible(visible);
@@ -353,7 +464,7 @@ namespace PhalanxChronicle.UI
                 new Vector2(0.5f, 0f),
                 new Vector2(0.5f, 0f),
                 new Vector2(0f, 24f),
-                new Vector2(720f, 340f),
+                new Vector2(720f, 392f),
                 new Color(0.06f, 0.07f, 0.1f, 0.9f));
             resultAdvanceButton = resultPanel.AddComponent<Button>();
             resultAdvanceButton.transition = Selectable.Transition.ColorTint;
@@ -364,10 +475,26 @@ namespace PhalanxChronicle.UI
             resultColors.disabledColor = new Color(1f, 1f, 1f, 0f);
             resultAdvanceButton.colors = resultColors;
             resultAdvanceButton.onClick.AddListener(() => onResultAdvance?.Invoke());
-            resultTitleLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 282f), new Vector2(-20f, -20f), string.Empty, 30, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
-            resultSummaryLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 214f), new Vector2(-20f, -78f), string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            resultRewardLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 136f), new Vector2(-20f, -148f), string.Empty, 14, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            resultUnitsLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 34f), new Vector2(-20f, -224f), string.Empty, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            resultTitleLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 334f), new Vector2(-20f, -20f), string.Empty, 30, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+            resultSummaryLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 262f), new Vector2(-20f, -82f), string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            GameObject rewardEntriesObject = new GameObject("ResultRewardEntries", typeof(RectTransform), typeof(VerticalLayoutGroup));
+            rewardEntriesObject.transform.SetParent(resultPanel.transform, false);
+            RectTransform rewardEntriesRect = rewardEntriesObject.GetComponent<RectTransform>();
+            rewardEntriesRect.anchorMin = Vector2.zero;
+            rewardEntriesRect.anchorMax = Vector2.one;
+            rewardEntriesRect.offsetMin = new Vector2(20f, 146f);
+            rewardEntriesRect.offsetMax = new Vector2(-20f, -132f);
+            VerticalLayoutGroup rewardEntriesLayout = rewardEntriesObject.GetComponent<VerticalLayoutGroup>();
+            rewardEntriesLayout.spacing = 6f;
+            rewardEntriesLayout.childControlHeight = true;
+            rewardEntriesLayout.childControlWidth = true;
+            rewardEntriesLayout.childForceExpandHeight = false;
+            rewardEntriesLayout.childForceExpandWidth = true;
+            resultRewardEntriesRoot = rewardEntriesObject.transform;
+            resultRewardLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 112f), new Vector2(-20f, -176f), string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            resultSpecialLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 78f), new Vector2(-20f, -218f), string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+            resultSpecialLabel.gameObject.SetActive(false);
+            resultUnitsLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 34f), new Vector2(-20f, -270f), string.Empty, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
             resultContinueLabel = BattleHudFactory.CreateAbsoluteText(
                 resultPanel.transform,
                 new Vector2(20f, 10f),
@@ -875,6 +1002,7 @@ namespace PhalanxChronicle.UI
         private Text skillReadyLabel;
         private Text objectivePrimaryLabel;
         private Text objectiveFailureLabel;
+        private Text secondaryObjectivesLabel;
         private Text instructionLabel;
         private Text secondaryInstructionLabel;
         private Button endTurnButton;
@@ -957,7 +1085,7 @@ namespace PhalanxChronicle.UI
             readyLabel.verticalOverflow = VerticalWrapMode.Truncate;
             skillReadyLabel.verticalOverflow = VerticalWrapMode.Truncate;
 
-            GameObject objectivePanel = BattleHudFactory.CreateInsetPanel("ObjectivePanel", rootObject.transform, 112f, BattleUiTheme.PanelCommand);
+            GameObject objectivePanel = BattleHudFactory.CreateInsetPanel("ObjectivePanel", rootObject.transform, 148f, BattleUiTheme.PanelCommand);
             Transform objectiveRoot = BattleHudFactory.CreateInsetContentRoot(objectivePanel.transform, 12f);
             VerticalLayoutGroup objectiveLayout = objectiveRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             objectiveLayout.spacing = 5f;
@@ -970,6 +1098,9 @@ namespace PhalanxChronicle.UI
             objectiveFailureLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
             objectiveFailureLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
             objectiveFailureLabel.verticalOverflow = VerticalWrapMode.Truncate;
+            secondaryObjectivesLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 11, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+            secondaryObjectivesLabel.GetComponent<LayoutElement>().preferredHeight = 34f;
+            secondaryObjectivesLabel.verticalOverflow = VerticalWrapMode.Truncate;
             instructionLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
             instructionLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
             instructionLabel.verticalOverflow = VerticalWrapMode.Truncate;
@@ -1060,6 +1191,10 @@ namespace PhalanxChronicle.UI
             skillReadyLabel.text = overview.SkillReadyLabel;
             objectivePrimaryLabel.text = overview.ObjectivePrimary;
             objectiveFailureLabel.text = overview.ObjectiveFailure;
+            secondaryObjectivesLabel.text = overview.SecondaryObjectiveLines != null && overview.SecondaryObjectiveLines.Count > 0
+                ? string.Join("\n", overview.SecondaryObjectiveLines.Take(2))
+                : string.Empty;
+            secondaryObjectivesLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(secondaryObjectivesLabel.text));
             instructionLabel.text = overview.InstructionText;
             secondaryInstructionLabel.text = overview.SecondaryInstructionText;
             secondaryInstructionLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(overview.SecondaryInstructionText));

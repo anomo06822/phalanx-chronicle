@@ -9,6 +9,7 @@ namespace PhalanxChronicle.Core
     {
         private readonly HashSet<string> clearedScenarioIds;
         private readonly HashSet<string> claimedRewardScenarioIds;
+        private readonly HashSet<string> claimedBonusRewardIds;
         private readonly Dictionary<string, int> scenarioClearCounts;
 
         public CampaignProgress(
@@ -16,6 +17,7 @@ namespace PhalanxChronicle.Core
             IReadOnlyList<string> clearedScenarioIds = null,
             BattleResultSummary lastBattleResult = null,
             IReadOnlyList<string> claimedRewardScenarioIds = null,
+            IReadOnlyList<string> claimedBonusRewardIds = null,
             IReadOnlyDictionary<string, int> scenarioClearCounts = null,
             bool hasSeenFirstLaunchIntro = false,
             bool hasCompletedFirstBattleOnboarding = false,
@@ -24,6 +26,7 @@ namespace PhalanxChronicle.Core
             UnlockedStageIndex = Math.Max(0, unlockedStageIndex);
             this.clearedScenarioIds = new HashSet<string>(clearedScenarioIds ?? Array.Empty<string>());
             this.claimedRewardScenarioIds = new HashSet<string>(claimedRewardScenarioIds ?? Array.Empty<string>());
+            this.claimedBonusRewardIds = new HashSet<string>(claimedBonusRewardIds ?? Array.Empty<string>());
             this.scenarioClearCounts = new Dictionary<string, int>(StringComparer.Ordinal);
             if (scenarioClearCounts != null)
             {
@@ -57,6 +60,8 @@ namespace PhalanxChronicle.Core
         public IReadOnlyList<string> ClearedScenarioIds => clearedScenarioIds.OrderBy(id => id).ToList();
 
         public IReadOnlyList<string> ClaimedRewardScenarioIds => claimedRewardScenarioIds.OrderBy(id => id).ToList();
+
+        public IReadOnlyList<string> ClaimedBonusRewardIds => claimedBonusRewardIds.OrderBy(id => id).ToList();
 
         public IReadOnlyDictionary<string, int> ScenarioClearCounts => new Dictionary<string, int>(scenarioClearCounts);
 
@@ -109,6 +114,21 @@ namespace PhalanxChronicle.Core
             }
 
             claimedRewardScenarioIds.Add(scenarioId);
+        }
+
+        public bool IsBonusRewardClaimed(string rewardId)
+        {
+            return !string.IsNullOrEmpty(rewardId) && claimedBonusRewardIds.Contains(rewardId);
+        }
+
+        public void MarkBonusRewardClaimed(string rewardId)
+        {
+            if (string.IsNullOrEmpty(rewardId))
+            {
+                return;
+            }
+
+            claimedBonusRewardIds.Add(rewardId);
         }
 
         public void SetLastBattleResult(BattleResultSummary summary)

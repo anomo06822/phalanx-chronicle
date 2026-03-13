@@ -38,6 +38,7 @@ namespace PhalanxChronicle.Battle
         private GridPosition selectedUnitOrigin;
         private bool hasSelectedUnitOrigin;
         private CombatResult pendingCombatResult;
+        private DuelResult pendingDuelResult;
         private SkillResult pendingSkillResult;
         private bool initialized;
         private GameObject unitRoot;
@@ -48,6 +49,7 @@ namespace PhalanxChronicle.Battle
         private bool battleRewardsGranted;
         private string battleResultSummaryText = string.Empty;
         private readonly List<string> battleResultRewardLines = new List<string>();
+        private readonly List<string> battleResultSpecialLines = new List<string>();
         private readonly List<string> battleResultUnitLines = new List<string>();
         private bool enableFirstBattleOnboarding;
         private Action<bool> firstBattleOnboardingResolvedHandler;
@@ -355,15 +357,12 @@ namespace PhalanxChronicle.Battle
             }
 
             ApplyMovePreview(selected, preview);
-            BindDecisionContext(
-                new BattleDecisionContext
-                {
-                    SourceState = BattleDecisionContextSource.MoveHover,
-                    ActorUnitId = selected.Id,
-                    TargetUnitId = string.Empty,
-                    Rationale = preview.BlockReason,
-                    Preview = preview,
-                });
+            BuildAndBindDecisionContext(
+                BattleDecisionContextSource.MoveHover,
+                selected,
+                null,
+                preview,
+                preview.BlockReason);
         }
 
         public void ShowAttackRangeForSelection()
@@ -396,28 +395,25 @@ namespace PhalanxChronicle.Battle
 
         public void ShowActionMenu()
         {
-            BindDecisionContext(
-                new BattleDecisionContext
-                {
-                    SourceState = BattleDecisionContextSource.ActionMenu,
-                    ActorUnitId = GetSelectedUnit()?.Id,
-                    TargetUnitId = string.Empty,
-                    Rationale = string.Empty,
-                    Preview = null,
-                });
-
-            BattleHudDecisionContextModel decisionContextModel = BuildDecisionContextModel();
+            BattleHudDecisionContextModel decisionContextModel = BuildAndBindDecisionContext(
+                BattleDecisionContextSource.ActionMenu,
+                GetSelectedUnit(),
+                null,
+                null,
+                string.Empty);
             actionMenuPanel.Show(
                 decisionContextModel.ActionMenuModel,
                 HandleAttackRequested,
                 HandleSkillRequested,
                 HandleWaitRequested,
                 HandleBackRequested);
+            SyncUnitInfoVisibility();
         }
 
         public void HideActionMenu()
         {
             actionMenuPanel.Hide();
+            SyncUnitInfoVisibility();
         }
 
         public bool HasAttackTargetsForSelection()
@@ -507,7 +503,22 @@ namespace PhalanxChronicle.Battle
                 return false;
             }
 
+            pendingDuelResult = null;
             pendingSkillResult = null;
+            DuelSceneDefinition duelScene = scenarioDirector != null
+                ? scenarioDirector.TryMatchDuel(selected.Id, targetUnitId, simulation.Context)
+                : null;
+            if (duelScene != null)
+            {
+                pendingCombatResult = null;
+                pendingDuelResult = DuelSystem.Resolve(simulation.Context, duelScene);
+                if (pendingDuelResult != null)
+                {
+                    scenarioDirector.RecordDuelTriggered(pendingDuelResult.DuelId, pendingDuelResult.SetFlags);
+                    return true;
+                }
+            }
+
             pendingCombatResult = simulation.TryAttack(selected.Id, targetUnitId);
             return pendingCombatResult != null;
         }
@@ -547,6 +558,7 @@ namespace PhalanxChronicle.Battle
                 return false;
             }
 
+            pendingDuelResult = null;
             pendingCombatResult = null;
             pendingSkillResult = simulation.TryUseSkill(selected.Id, targetUnitId);
             return pendingSkillResult != null;
@@ -566,8 +578,25 @@ namespace PhalanxChronicle.Battle
             return result;
         }
 
+        public DuelResult ConsumePendingDuelResult()
+        {
+            DuelResult result = pendingDuelResult;
+            pendingDuelResult = null;
+            return result;
+        }
+
         public IEnumerator ExecutePendingPlayerAction()
         {
+            DuelResult duelResult = ConsumePendingDuelResult();
+            if (duelResult != null)
+            {
+                yield return PlayDuelSequence(duelResult, TurnSide.Player);
+                onboardingController?.MarkPlayerActionResolved(true);
+                onboardingController?.DismissObjectiveUpdate();
+                ResolvePlayerAction(BuildDuelLog(duelResult));
+                yield break;
+            }
+
             CombatResult combatResult = ConsumePendingCombatResult();
             if (combatResult != null)
             {
@@ -1277,10 +1306,7 @@ namespace PhalanxChronicle.Battle
             return isAutoConfirmVisible ||
                    currentState is ScenarioDialogueState ||
                    onboardingController != null && onboardingController.IsActive ||
-                   battleHUD != null && (battleHUD.IsCampaignOverlayVisible ||
-                                         battleHUD.IsResultVisible ||
-                                         battleHUD.IsDialogueVisible ||
-                                         battleHUD.IsConfirmDialogVisible);
+                   battleHUD != null && battleHUD.HasAutoModePauseOverlay;
         }
 
         private bool IsPlayerManualControlState()
@@ -1296,6 +1322,7 @@ namespace PhalanxChronicle.Battle
         private void PrepareAutoModeTakeover()
         {
             pendingCombatResult = null;
+            pendingDuelResult = null;
             pendingSkillResult = null;
             HideActionMenu();
             ClearDecisionContext();
@@ -1348,11 +1375,11 @@ namespace PhalanxChronicle.Battle
             return unitViews.TryGetValue(unitId, out Unit unitView) ? unitView : null;
         }
 
-        private void UpdateHudModels()
+        private BattleHudDecisionContextModel UpdateHudModels()
         {
             if (battleHUD == null || simulation == null)
             {
-                return;
+                return new BattleHudDecisionContextModel();
             }
 
             BattleThreatProjection threatProjection = null;
@@ -1369,9 +1396,11 @@ namespace PhalanxChronicle.Battle
                 BuildRosterEntries(UnitFaction.Player, threatProjection),
                 BuildRosterEntries(UnitFaction.Enemy, threatProjection),
                 HandleHudUnitRequested);
-            battleHUD.BindDecisionContextModel(BuildDecisionContextModel());
+            BattleHudDecisionContextModel decisionContextModel = BuildDecisionContextModel();
+            battleHUD.BindDecisionContextModel(decisionContextModel);
             RefreshAutoModeUi();
             RefreshOnboardingPrompt();
+            return decisionContextModel;
         }
 
         private IEnumerator PlaySkillSequence(SkillResult skillResult, TurnSide actingSide)
@@ -1383,6 +1412,17 @@ namespace PhalanxChronicle.Battle
                 skillResult,
                 actingSide,
                 GetSkillBarkText,
+                RefreshAllVisuals);
+        }
+
+        private IEnumerator PlayDuelSequence(DuelResult duelResult, TurnSide actingSide)
+        {
+            yield return presentationController.PlayDuelSequence(
+                simulation,
+                battleHUD,
+                GetUnitView,
+                duelResult,
+                actingSide,
                 RefreshAllVisuals);
         }
 
@@ -1400,6 +1440,11 @@ namespace PhalanxChronicle.Battle
         private string BuildCombatLog(CombatResult combatResult)
         {
             return hudModelBuilder.BuildCombatLog(simulation, combatResult);
+        }
+
+        private string BuildDuelLog(DuelResult duelResult)
+        {
+            return hudModelBuilder.BuildDuelLog(simulation, duelResult);
         }
 
         private string BuildSkillLog(SkillResult skillResult)
@@ -1472,15 +1517,13 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            BindDecisionContext(
-                new BattleDecisionContext
-                {
-                    SourceState = BattleDecisionContextSource.AttackHover,
-                    ActorUnitId = selected.Id,
-                    TargetUnitId = target.Id,
-                    Rationale = preview.BlockReason,
-                    Preview = preview,
-                });
+            BuildAndBindDecisionContext(
+                BattleDecisionContextSource.AttackHover,
+                selected,
+                target,
+                preview,
+                preview.BlockReason,
+                GetDuelPreviewHint(selected.Id, target.Id));
         }
 
         public void PreviewQuickAttackTarget(Unit unitView, bool isHovered)
@@ -1513,15 +1556,13 @@ namespace PhalanxChronicle.Battle
             }
 
             ApplyQuickAttackPreview(selected, target, preview);
-            BindDecisionContext(
-                new BattleDecisionContext
-                {
-                    SourceState = BattleDecisionContextSource.AttackHover,
-                    ActorUnitId = selected.Id,
-                    TargetUnitId = target.Id,
-                    Rationale = preview.BlockReason,
-                    Preview = preview,
-                });
+            BuildAndBindDecisionContext(
+                BattleDecisionContextSource.AttackHover,
+                selected,
+                target,
+                preview,
+                preview.BlockReason,
+                GetDuelPreviewHint(selected.Id, target.Id));
         }
 
         public void PreviewSkillTarget(Unit unitView, bool isHovered)
@@ -1557,15 +1598,12 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            BindDecisionContext(
-                new BattleDecisionContext
-                {
-                    SourceState = BattleDecisionContextSource.SkillHover,
-                    ActorUnitId = selected.Id,
-                    TargetUnitId = target.Id,
-                    Rationale = preview.BlockReason,
-                    Preview = preview,
-                });
+            BuildAndBindDecisionContext(
+                BattleDecisionContextSource.SkillHover,
+                selected,
+                target,
+                preview,
+                preview.BlockReason);
             RefreshSkillTargetPreview(selected, target);
         }
 
@@ -1642,6 +1680,34 @@ namespace PhalanxChronicle.Battle
                 : unitId;
         }
 
+        private List<string> EvaluateAchievedBonusRewardLines(BattleResultSummary summary)
+        {
+            List<string> lines = new List<string>();
+            if (summary == null || summary.WinningSide != TurnSide.Player || scenarioData?.BonusRewards == null)
+            {
+                return lines;
+            }
+
+            foreach (BonusRewardDefinition reward in scenarioData.BonusRewards.Where(reward => reward != null))
+            {
+                if (!reward.IsSatisfied(summary))
+                {
+                    continue;
+                }
+
+                ItemDefinition itemDefinition = ItemCatalog.Get(reward.RewardItemId);
+                lines.Add(LocalizationService.Format(
+                    "ui.result.special_line",
+                    "{0} -> {1}",
+                    LocalizationService.Text(reward.SummaryKey, reward.SummaryFallback),
+                    itemDefinition != null
+                        ? LocalizationService.Text(itemDefinition.NameKey, itemDefinition.NameFallback)
+                        : reward.RewardItemId));
+            }
+
+            return lines;
+        }
+
         private string GetSkillBarkText(string unitId, ActiveSkillType skillType)
         {
             string unitSpecificKey = "skill_bark." + unitId + "." + skillType;
@@ -1656,6 +1722,16 @@ namespace PhalanxChronicle.Battle
             return string.Equals(generic, genericKey, StringComparison.Ordinal) ? string.Empty : generic;
         }
 
+        private string GetDuelPreviewHint(string attackerUnitId, string defenderUnitId)
+        {
+            DuelSceneDefinition duelScene = scenarioDirector != null
+                ? scenarioDirector.TryMatchDuel(attackerUnitId, defenderUnitId, simulation != null ? simulation.Context : null)
+                : null;
+            return duelScene != null
+                ? LocalizationService.Text("ui.duel.preview_ready", "一騎可觸發")
+                : string.Empty;
+        }
+
         private BattleResultSummary BuildBattleResultSummary()
         {
             IReadOnlyList<string> survivingUnitIds = simulation.Context.GetUnits(UnitFaction.Player)
@@ -1666,7 +1742,9 @@ namespace PhalanxChronicle.Battle
                 scenarioData != null ? scenarioData.ScenarioId : string.Empty,
                 simulation.Context.WinningSide,
                 simulation.Context.RoundNumber,
-                survivingUnitIds);
+                survivingUnitIds,
+                scenarioDirector != null ? scenarioDirector.ActiveFlags : Array.Empty<string>(),
+                scenarioDirector != null ? scenarioDirector.TriggeredDuelIds : Array.Empty<string>());
         }
 
         private void ChangeState(Type stateType)
@@ -1728,7 +1806,8 @@ namespace PhalanxChronicle.Battle
                 scenarioDirector,
                 title,
                 battleResultRewardLines,
-                battleResultUnitLines);
+                battleResultUnitLines,
+                battleResultSpecialLines);
         }
 
         private void GrantBattleRewards()
@@ -1748,8 +1827,9 @@ namespace PhalanxChronicle.Battle
 
             battleRewardsGranted = true;
             battleResultRewardLines.Clear();
+            battleResultSpecialLines.Clear();
             battleResultUnitLines.Clear();
-            BuildBattleRewardSections(objectiveReward, battleResultRewardLines, battleResultUnitLines);
+            BuildBattleRewardSections(objectiveReward, battleResultRewardLines, battleResultSpecialLines, battleResultUnitLines);
             battleResultSummaryText = BuildBattleRewardSummary(objectiveReward);
         }
 
@@ -1757,13 +1837,14 @@ namespace PhalanxChronicle.Battle
         {
             List<string> lines = new List<string>();
             lines.AddRange(battleResultRewardLines);
+            lines.AddRange(battleResultSpecialLines);
             lines.AddRange(battleResultUnitLines);
             return string.Join("\n", lines);
         }
 
-        private void BuildBattleRewardSections(int objectiveReward, List<string> rewardLines, List<string> unitLines)
+        private void BuildBattleRewardSections(int objectiveReward, List<string> rewardLines, List<string> specialLines, List<string> unitLines)
         {
-            if (rewardLines == null || unitLines == null)
+            if (rewardLines == null || specialLines == null || unitLines == null)
             {
                 return;
             }
@@ -1781,6 +1862,14 @@ namespace PhalanxChronicle.Battle
                     "Rewards: Supplies {0}  Renown {1}",
                     scenarioData.RewardBundle.Supplies,
                     scenarioData.RewardBundle.Renown));
+            }
+
+            BattleResultSummary summary = BuildBattleResultSummary();
+            List<string> achievedBonusLines = EvaluateAchievedBonusRewardLines(summary);
+            if (achievedBonusLines.Count > 0)
+            {
+                specialLines.Add(LocalizationService.Text("ui.result.section.special", "Special Achievements"));
+                specialLines.AddRange(achievedBonusLines);
             }
 
             unitLines.Add(LocalizationService.Text("ui.result.section.units", "Officer Progress"));
@@ -1899,19 +1988,12 @@ namespace PhalanxChronicle.Battle
             return isAutoModeRunning ||
                    isAutoConfirmVisible ||
                    currentState is ScenarioDialogueState ||
-                   battleHUD != null && (battleHUD.IsCampaignOverlayVisible ||
-                                         battleHUD.IsResultVisible ||
-                                         battleHUD.IsConfirmDialogVisible);
+                   battleHUD != null && battleHUD.HasBlockingInteractionOverlay;
         }
 
         private bool ShouldSuppressUnitInfo()
         {
-            return battleHUD != null &&
-                   (battleHUD.IsCampaignOverlayVisible ||
-                    battleHUD.IsDialogueVisible ||
-                    battleHUD.IsResultVisible ||
-                    battleHUD.IsOnboardingVisible ||
-                    battleHUD.IsConfirmDialogVisible);
+            return (battleHUD != null && battleHUD.ShouldSuppressUnitInfo()) || IsActionMenuVisible;
         }
 
         private void SyncUnitInfoVisibility()
@@ -2002,19 +2084,47 @@ namespace PhalanxChronicle.Battle
             return TryEnterScenarioDialogue(defaultResumeStateType);
         }
 
-        private void BindDecisionContext(BattleDecisionContext context)
+        private BattleHudDecisionContextModel BindDecisionContext(BattleDecisionContext context)
         {
             currentDecisionContext = context ?? new BattleDecisionContext();
-            UpdateHudModels();
+            return UpdateHudModels();
         }
 
         private void ClearDecisionContext()
         {
             currentDecisionContext = new BattleDecisionContext();
-            if (battleHUD != null)
+            if (battleHUD == null)
+            {
+                return;
+            }
+
+            if (simulation == null)
             {
                 battleHUD.ClearContext();
+                return;
             }
+
+            UpdateHudModels();
+        }
+
+        private BattleHudDecisionContextModel BuildAndBindDecisionContext(
+            BattleDecisionContextSource sourceState,
+            UnitRuntimeState actor,
+            UnitRuntimeState target,
+            BattleIntentPreview preview,
+            string rationale,
+            string specialHintText = "")
+        {
+            return BindDecisionContext(
+                new BattleDecisionContext
+                {
+                    SourceState = sourceState,
+                    ActorUnitId = actor != null ? actor.Id : string.Empty,
+                    TargetUnitId = target != null ? target.Id : string.Empty,
+                    Rationale = rationale ?? string.Empty,
+                    Preview = preview,
+                    SpecialHintText = specialHintText ?? string.Empty,
+                });
         }
 
         private BattleHudDecisionContextModel BuildDecisionContextModel()

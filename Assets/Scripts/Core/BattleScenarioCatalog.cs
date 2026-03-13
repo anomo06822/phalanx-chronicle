@@ -19,11 +19,18 @@ namespace PhalanxChronicle.Core
         public const string DingjunScenarioId = "scenario.dingjun_mountain";
 
         public const string GuangzongReinforcementsArrivedFlag = "flag.guangzong.reinforcements_arrived";
+        public const string GuangzongRapidSealSecuredFlag = "flag.guangzong.rapid_seal_secured";
+        public const string GuangzongRapidSealFailedFlag = "flag.guangzong.rapid_seal_failed";
         public const string BowangpoFireTrapSprungFlag = "flag.bowangpo.fire_trap_sprung";
         public const string ChangbanFlankersArrivedFlag = "flag.changban.flankers_arrived";
         public const string JiangxiaBridgesCutFlag = "flag.jiangxia.bridges_cut";
         public const string JiamengBossArrivedFlag = "flag.jiameng.boss_arrived";
+        public const string JiamengDuelWindowAdvancedFlag = "flag.jiameng.duel_window_advanced";
+        public const string JiamengDuelExpiredFlag = "flag.jiameng.duel_expired";
+        public const string JiamengDuelWonFlag = "flag.jiameng.duel_won";
         public const string BaishuiBridgeCutFlag = "flag.baishui.bridge_cut";
+        public const string BaishuiBridgeCutByKillFlag = "flag.baishui.bridge_cut_by_kill";
+        public const string BaishuiBridgeCutByTimerFlag = "flag.baishui.bridge_cut_by_timer";
         public const string MianzhuBreachFlag = "flag.mianzhu.breach";
         public const string LuochengGateBreachedFlag = "flag.luocheng.gate_breached";
         public const string YangpingRockslideFlag = "flag.yangping.rockslide";
@@ -189,11 +196,23 @@ namespace PhalanxChronicle.Core
                     requiredDefeatedUnitIds: new List<string> { "enemy-yellow_turban_raider", "enemy-armored_zealot" },
                     exclusivityGroupId: "guangzong-reinforcements"),
                 new ScenarioTrigger(
+                    "guangzong-bonus-window-cleared",
+                    ScenarioCheckpoint.ActionResolved,
+                    new List<ScenarioDirective> { ScenarioDirective.SetFlag(GuangzongRapidSealSecuredFlag) },
+                    requiredDefeatedUnitIds: new List<string> { "enemy-yellow_turban_raider", "enemy-armored_zealot" },
+                    excludedFlags: new List<string> { GuangzongRapidSealFailedFlag }),
+                new ScenarioTrigger(
                     "guangzong-reinforcements-round",
                     ScenarioCheckpoint.EnemyTurnStart,
                     reinforcementDirectives,
                     minimumRoundNumber: 3,
                     exclusivityGroupId: "guangzong-reinforcements"),
+                new ScenarioTrigger(
+                    "guangzong-bonus-window-failed",
+                    ScenarioCheckpoint.EnemyTurnStart,
+                    new List<ScenarioDirective> { ScenarioDirective.SetFlag(GuangzongRapidSealFailedFlag) },
+                    minimumRoundNumber: 3,
+                    excludedFlags: new List<string> { GuangzongRapidSealSecuredFlag }),
                 new ScenarioTrigger(
                     "guangzong-liu-bei-falls",
                     ScenarioCheckpoint.ActionResolved,
@@ -241,7 +260,8 @@ namespace PhalanxChronicle.Core
                 1,
                 60,
                 24,
-                new RewardBundle(120, 1, "yellow-turban-signet"));
+                new RewardBundle(120, 1, "yellow-turban-signet"),
+                bonusRewards: CreateGuangzongBonusRewards());
         }
 
         public static BattleScenarioData CreateBowangpo()
@@ -437,6 +457,7 @@ namespace PhalanxChronicle.Core
                 new GridPosition(2, 5),
                 new GridPosition(2, 3),
                 new GridPosition(1, 6));
+            openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(0, 4)));
             openingSpawns.Add(SpawnEnemy("enemy-pursuit_commander", "Pursuit Commander", UnitRole.Commander, PassiveSkillType.CommandAura, ActiveSkillType.PowerStrike, 32, 10, 4, 3, 1, new GridPosition(9, 4), AiProfileType.Boss));
             openingSpawns.Add(SpawnEnemy("enemy-tiger_guard", "Tiger Guard", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 30, 9, 6, 2, 1, new GridPosition(10, 5), AiProfileType.Protector));
             openingSpawns.Add(SpawnEnemy("enemy-wei_bow_captain", "Wei Bow Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 24, 9, 3, 3, 2, new GridPosition(9, 6), AiProfileType.Support));
@@ -576,7 +597,9 @@ namespace PhalanxChronicle.Core
                 3,
                 85,
                 30,
-                new RewardBundle(180, 2, "changban-scout-map", new[] { "player-zhao-yun" }));
+                new RewardBundle(180, 2, "changban-scout-map", new[] { "player-zhao-yun" }),
+                bonusRewards: CreateChangbanBonusRewards(),
+                duelScenes: CreateChangbanDuelScenes());
         }
 
         public static BattleScenarioData CreateJiangxiaFerry()
@@ -766,6 +789,7 @@ namespace PhalanxChronicle.Core
                 new GridPosition(2, 1));
             openingSpawns.Add(SpawnPlayerZhugeLiang(new GridPosition(6, 1)));
             openingSpawns.Add(SpawnPlayerZhaoYun(new GridPosition(4, 3)));
+            openingSpawns.Add(SpawnPlayerMaChao(new GridPosition(7, 2)));
             openingSpawns.Add(SpawnEnemy("enemy-jiameng-gatewarden", "Gate Warden", UnitRole.Guardian, PassiveSkillType.ShieldWall, ActiveSkillType.None, 32, 10, 6, 2, 1, new GridPosition(4, 10), AiProfileType.Protector));
             openingSpawns.Add(SpawnEnemy("enemy-jiameng-bow-captain", "Bow Captain", UnitRole.Ranger, PassiveSkillType.LongShot, ActiveSkillType.Volley, 25, 9, 3, 3, 2, new GridPosition(5, 11), AiProfileType.Support));
             openingSpawns.Add(SpawnEnemy("enemy-jiameng-lancer", "Pass Lancer", UnitRole.Raider, PassiveSkillType.RapidMarch, ActiveSkillType.PowerStrike, 26, 10, 3, 4, 1, new GridPosition(4, 12), AiProfileType.Aggressor));
@@ -865,6 +889,18 @@ namespace PhalanxChronicle.Core
                     minimumRoundNumber: 4,
                     exclusivityGroupId: "jiameng-boss"),
                 new ScenarioTrigger(
+                    "jiameng-duel-window-advance",
+                    ScenarioCheckpoint.PlayerTurnStart,
+                    new List<ScenarioDirective> { ScenarioDirective.SetFlag(JiamengDuelWindowAdvancedFlag) },
+                    requiredFlags: new List<string> { JiamengBossArrivedFlag },
+                    excludedFlags: new List<string> { JiamengDuelWindowAdvancedFlag, JiamengDuelExpiredFlag, JiamengDuelWonFlag }),
+                new ScenarioTrigger(
+                    "jiameng-duel-window-expire",
+                    ScenarioCheckpoint.PlayerTurnStart,
+                    new List<ScenarioDirective> { ScenarioDirective.SetFlag(JiamengDuelExpiredFlag) },
+                    requiredFlags: new List<string> { JiamengBossArrivedFlag, JiamengDuelWindowAdvancedFlag },
+                    excludedFlags: new List<string> { JiamengDuelExpiredFlag, JiamengDuelWonFlag }),
+                new ScenarioTrigger(
                     "jiameng-liu-bei-falls",
                     ScenarioCheckpoint.ActionResolved,
                     new List<ScenarioDirective> { ScenarioDirective.SetBattleOutcome(TurnSide.Enemy) },
@@ -911,7 +947,9 @@ namespace PhalanxChronicle.Core
                 5,
                 95,
                 34,
-                new RewardBundle(220, 3, "jiameng-oath-banner", new[] { "player-ma-chao" }));
+                new RewardBundle(220, 3, "jiameng-oath-banner", new[] { "player-ma-chao" }),
+                bonusRewards: CreateJiamengBonusRewards(),
+                duelScenes: CreateJiamengDuelScenes());
         }
 
         public static BattleScenarioData CreateBaishuiPassRaid()
@@ -1010,6 +1048,10 @@ namespace PhalanxChronicle.Core
                     Line("unit.liu_bei", "Liu Bei", "dialogue.baishui.mid.3", "Forward through the upper pass. Break the command post before the trap fully tightens."),
                 }),
             };
+            List<ScenarioDirective> bridgeCutKillDirectives = new List<ScenarioDirective> { ScenarioDirective.SetFlag(BaishuiBridgeCutByKillFlag) };
+            bridgeCutKillDirectives.AddRange(bridgeCutDirectives);
+            List<ScenarioDirective> bridgeCutRoundDirectives = new List<ScenarioDirective> { ScenarioDirective.SetFlag(BaishuiBridgeCutByTimerFlag) };
+            bridgeCutRoundDirectives.AddRange(bridgeCutDirectives);
 
             List<ScenarioTrigger> triggers = new List<ScenarioTrigger>
             {
@@ -1029,13 +1071,13 @@ namespace PhalanxChronicle.Core
                 new ScenarioTrigger(
                     "baishui-bridge-cut-kill",
                     ScenarioCheckpoint.ActionResolved,
-                    bridgeCutDirectives,
+                    bridgeCutKillDirectives,
                     requiredDefeatedUnitIds: new List<string> { "enemy-baishui-bridge-captain", "enemy-baishui-bow-chief" },
                     exclusivityGroupId: "baishui-bridge"),
                 new ScenarioTrigger(
                     "baishui-bridge-cut-round",
                     ScenarioCheckpoint.EnemyTurnStart,
-                    bridgeCutDirectives,
+                    bridgeCutRoundDirectives,
                     minimumRoundNumber: 4,
                     exclusivityGroupId: "baishui-bridge"),
                 new ScenarioTrigger(
@@ -1085,7 +1127,9 @@ namespace PhalanxChronicle.Core
                 6,
                 101,
                 35,
-                new RewardBundle(228, 3, "baishui-signal-spear"));
+                new RewardBundle(228, 3, "baishui-signal-spear"),
+                bonusRewards: CreateBaishuiBonusRewards(),
+                duelScenes: CreateBaishuiDuelScenes());
         }
 
         public static BattleScenarioData CreateMianzhuBreakthrough()
@@ -1773,7 +1817,8 @@ namespace PhalanxChronicle.Core
                 8,
                 116,
                 40,
-                new RewardBundle(252, 4, "tiandang-falcon-badge"));
+                new RewardBundle(252, 4, "tiandang-falcon-badge"),
+                bonusRewards: CreateTiandangBonusRewards());
         }
 
         public static BattleScenarioData CreateHanshui()
@@ -1937,7 +1982,8 @@ namespace PhalanxChronicle.Core
                 8,
                 104,
                 36,
-                new RewardBundle(230, 3, "hanshui-command-seal"));
+                new RewardBundle(230, 3, "hanshui-command-seal"),
+                duelScenes: CreateHanshuiDuelScenes());
         }
 
         public static BattleScenarioData CreateDingjunMountain()
@@ -2088,7 +2134,234 @@ namespace PhalanxChronicle.Core
                 9,
                 118,
                 40,
-                new RewardBundle(260, 4, "dingjun-war-banner"));
+                new RewardBundle(260, 4, "dingjun-war-banner"),
+                bonusRewards: CreateDingjunBonusRewards(),
+                duelScenes: CreateDingjunDuelScenes());
+        }
+
+        private static IReadOnlyList<BonusRewardDefinition> CreateGuangzongBonusRewards()
+        {
+            return new List<BonusRewardDefinition>
+            {
+                new BonusRewardDefinition(
+                    "bonus.guangzong.rally_seal",
+                    "guangzong-rally-seal",
+                    "bonus.guangzong.objective",
+                    "第 2 回合結束前擊破外線兩名守將，且劉備、關羽、張飛、黃忠全員存活。",
+                    "bonus.guangzong.summary",
+                    "兩名外線守將在亂軍收束前被迅速擊破。",
+                    requiredFlags: new List<string> { GuangzongRapidSealSecuredFlag },
+                    excludedFlags: new List<string> { GuangzongRapidSealFailedFlag },
+                    requiredAliveUnitIds: new List<string> { "player-liu-bei", "player-guan-yu", "player-zhang-fei", "player-huang-zhong" }),
+            };
+        }
+
+        private static IReadOnlyList<BonusRewardDefinition> CreateChangbanBonusRewards()
+        {
+            return new List<BonusRewardDefinition>
+            {
+                new BonusRewardDefinition(
+                    "bonus.changban.white_plume",
+                    "changban-white-plume",
+                    "bonus.changban.objective",
+                    "劉備存活，並由趙雲在長坂發動一騎收束追擊主將。",
+                    "bonus.changban.summary",
+                    "趙雲在長坂親自截斷追軍鋒頭。",
+                    requiredAliveUnitIds: new List<string> { "player-liu-bei" },
+                    requiredTriggeredDuelIds: new List<string> { "duel.changban.zhao_yun" }),
+            };
+        }
+
+        private static IReadOnlyList<BonusRewardDefinition> CreateJiamengBonusRewards()
+        {
+            return new List<BonusRewardDefinition>
+            {
+                new BonusRewardDefinition(
+                    "bonus.jiameng.iron_girth",
+                    "jiameng-iron-girth",
+                    "bonus.jiameng.objective",
+                    "葭萌主將登場後兩回合內，由馬超發動一騎擊潰守關主將。",
+                    "bonus.jiameng.summary",
+                    "馬超在葭萌關前以騎陣對騎陣壓垮守軍主將。",
+                    requiredFlags: new List<string> { JiamengDuelWonFlag },
+                    excludedFlags: new List<string> { JiamengDuelExpiredFlag },
+                    requiredTriggeredDuelIds: new List<string> { "duel.jiameng.ma_chao" }),
+            };
+        }
+
+        private static IReadOnlyList<BonusRewardDefinition> CreateBaishuiBonusRewards()
+        {
+            return new List<BonusRewardDefinition>
+            {
+                new BonusRewardDefinition(
+                    "bonus.baishui.rapid_order",
+                    "baishui-rapid-order",
+                    "bonus.baishui.objective",
+                    "下橋必須由擊破條件截斷，且趙雲在白水關發動一騎斬落守關主將。",
+                    "bonus.baishui.summary",
+                    "白水下橋在敵方來不及保底收束前就被反手奪下節奏。",
+                    requiredFlags: new List<string> { BaishuiBridgeCutByKillFlag },
+                    excludedFlags: new List<string> { BaishuiBridgeCutByTimerFlag },
+                    requiredTriggeredDuelIds: new List<string> { "duel.baishui.zhao_yun" }),
+            };
+        }
+
+        private static IReadOnlyList<BonusRewardDefinition> CreateTiandangBonusRewards()
+        {
+            return new List<BonusRewardDefinition>
+            {
+                new BonusRewardDefinition(
+                    "bonus.tiandang.night_token",
+                    "tiandang-night-token",
+                    "bonus.tiandang.objective",
+                    "先熄滅兩座信標、全程未觸發警報，且我方無人陣亡。",
+                    "bonus.tiandang.summary",
+                    "天蕩山在完全未驚動全營的情況下被夜襲拿下。",
+                    requiredFlags: new List<string> { TiandangSignalsSecuredFlag },
+                    excludedFlags: new List<string> { TiandangAlarmFlag },
+                    requiredAliveUnitIds: new List<string>
+                    {
+                        "player-liu-bei",
+                        "player-guan-yu",
+                        "player-zhang-fei",
+                        "player-huang-zhong",
+                        "player-zhuge-liang",
+                        "player-zhao-yun",
+                        "player-ma-chao",
+                    }),
+            };
+        }
+
+        private static IReadOnlyList<BonusRewardDefinition> CreateDingjunBonusRewards()
+        {
+            return new List<BonusRewardDefinition>
+            {
+                new BonusRewardDefinition(
+                    "bonus.dingjun.gold_spur",
+                    "dingjun-gold-spur",
+                    "bonus.dingjun.objective",
+                    "由黃忠在定軍山發動一騎親手收束夏侯淵，且場上名將全員存活。",
+                    "bonus.dingjun.summary",
+                    "黃忠在定軍山前以一騎定勝負，夏侯淵就此折陣。",
+                    requiredAliveUnitIds: new List<string>
+                    {
+                        "player-liu-bei",
+                        "player-guan-yu",
+                        "player-huang-zhong",
+                        "player-zhao-yun",
+                        "player-zhuge-liang",
+                        "player-ma-chao",
+                    },
+                    requiredTriggeredDuelIds: new List<string> { "duel.dingjun.huang_zhong" }),
+            };
+        }
+
+        private static IReadOnlyList<DuelSceneDefinition> CreateChangbanDuelScenes()
+        {
+            return new List<DuelSceneDefinition>
+            {
+                new DuelSceneDefinition(
+                    "duel.changban.zhao_yun",
+                    "player-zhao-yun",
+                    "enemy-pursuit_commander",
+                    "duel.changban.title",
+                    "長坂一騎",
+                    minimumRoundNumber: 3,
+                    targetHpPercentAtMost: 50,
+                    outcome: new DuelOutcomeDefinition(
+                        defeatTarget: true,
+                        applyStatusesToCaster: new List<StatusEffectDurationDefinition>
+                        {
+                            new StatusEffectDurationDefinition(StatusEffectType.Guarded, 2),
+                            new StatusEffectDurationDefinition(StatusEffectType.Inspired, 2),
+                        }))
+            };
+        }
+
+        private static IReadOnlyList<DuelSceneDefinition> CreateBaishuiDuelScenes()
+        {
+            return new List<DuelSceneDefinition>
+            {
+                new DuelSceneDefinition(
+                    "duel.baishui.zhao_yun",
+                    "player-zhao-yun",
+                    "enemy-baishui-commandant",
+                    "duel.baishui.title",
+                    "白水一騎",
+                    requiredFlags: new List<string> { BaishuiBridgeCutFlag },
+                    targetHpPercentAtMost: 50,
+                    outcome: new DuelOutcomeDefinition(
+                        defeatTarget: true,
+                        applyStatusesToCaster: new List<StatusEffectDurationDefinition>
+                        {
+                            new StatusEffectDurationDefinition(StatusEffectType.Guarded, 2),
+                        }))
+            };
+        }
+
+        private static IReadOnlyList<DuelSceneDefinition> CreateJiamengDuelScenes()
+        {
+            return new List<DuelSceneDefinition>
+            {
+                new DuelSceneDefinition(
+                    "duel.jiameng.ma_chao",
+                    "player-ma-chao",
+                    "enemy-jiameng-commandant",
+                    "duel.jiameng.title",
+                    "葭萌關一騎",
+                    requiredFlags: new List<string> { JiamengBossArrivedFlag },
+                    excludedFlags: new List<string> { JiamengDuelExpiredFlag },
+                    targetHpPercentAtMost: 50,
+                    outcome: new DuelOutcomeDefinition(
+                        defeatTarget: true,
+                        applyStatusesToCaster: new List<StatusEffectDurationDefinition>
+                        {
+                            new StatusEffectDurationDefinition(StatusEffectType.Inspired, 2),
+                        },
+                        applyStatusesToNearbyEnemies: new List<StatusEffectDurationDefinition>
+                        {
+                            new StatusEffectDurationDefinition(StatusEffectType.Intimidated, 2),
+                        },
+                        setFlags: new List<string> { JiamengDuelWonFlag }))
+            };
+        }
+
+        private static IReadOnlyList<DuelSceneDefinition> CreateHanshuiDuelScenes()
+        {
+            return new List<DuelSceneDefinition>
+            {
+                new DuelSceneDefinition(
+                    "duel.hanshui.huang_zhong",
+                    "player-huang-zhong",
+                    "enemy-hanshui-commander",
+                    "duel.hanshui.title",
+                    "漢水一騎",
+                    requiredFlags: new List<string> { HanshuiCounterattackFlag },
+                    targetHpPercentAtMost: 50,
+                    outcome: new DuelOutcomeDefinition(
+                        defeatTarget: true,
+                        applyStatusesToNearbyEnemies: new List<StatusEffectDurationDefinition>
+                        {
+                            new StatusEffectDurationDefinition(StatusEffectType.Intimidated, 2),
+                        },
+                        nearbyEnemyRadius: 2))
+            };
+        }
+
+        private static IReadOnlyList<DuelSceneDefinition> CreateDingjunDuelScenes()
+        {
+            return new List<DuelSceneDefinition>
+            {
+                new DuelSceneDefinition(
+                    "duel.dingjun.huang_zhong",
+                    "player-huang-zhong",
+                    "enemy-xiahou-yuan",
+                    "duel.dingjun.title",
+                    "定軍山一騎",
+                    requiredFlags: new List<string> { DingjunBossArrivedFlag },
+                    targetHpPercentAtMost: 50,
+                    outcome: new DuelOutcomeDefinition(defeatTarget: true))
+            };
         }
 
         private static void AddCoreSquad(

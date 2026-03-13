@@ -64,6 +64,7 @@ namespace PhalanxChronicle.Battle
             string failureObjective = objective != null
                 ? LocalizationService.Text(objective.FailureConditionKey, objective.FailureConditionFallback)
                 : "-";
+            IReadOnlyList<string> secondaryObjectives = BuildSecondaryObjectiveLines(context, scenarioData, scenarioDirector);
 
             return new BattleOverviewModel
             {
@@ -90,6 +91,7 @@ namespace PhalanxChronicle.Battle
                 SecondaryInstructionText = skillReadyUnits > 0
                     ? LocalizationService.Text("ui.overview.secondary_instruction_skill", "本回合至少有一名友軍能用技能打開節奏。")
                     : LocalizationService.Text("ui.overview.secondary_instruction_form", "如果沒有穩定擊殺線，先保陣形與站位。"),
+                SecondaryObjectiveLines = secondaryObjectives,
                 HeaderFacts = new List<HudFactModel>
                 {
                     new HudFactModel
@@ -176,6 +178,10 @@ namespace PhalanxChronicle.Battle
             BattleForecastModel forecastModel = safeContext.Preview != null
                 ? BuildIntentForecastModel(simulation, safeContext.Preview)
                 : BuildNeutralForecastModel(overview, feedEntries);
+            if (!string.IsNullOrWhiteSpace(safeContext.SpecialHintText))
+            {
+                forecastModel.CommitChip = support.CreatePositiveChip(safeContext.SpecialHintText);
+            }
 
             return new BattleHudDecisionContextModel
             {
@@ -201,6 +207,11 @@ namespace PhalanxChronicle.Battle
             return forecastModelBuilder.BuildCombatResultForecastModel(simulation, combatResult);
         }
 
+        public BattleForecastModel BuildDuelResultForecastModel(BattleSimulation simulation, DuelResult duelResult)
+        {
+            return forecastModelBuilder.BuildDuelResultForecastModel(simulation, duelResult);
+        }
+
         public BattleForecastModel BuildSkillResultForecastModel(BattleSimulation simulation, SkillResult skillResult)
         {
             return forecastModelBuilder.BuildSkillResultForecastModel(simulation, skillResult);
@@ -209,6 +220,11 @@ namespace PhalanxChronicle.Battle
         public string BuildCombatLog(BattleSimulation simulation, CombatResult combatResult)
         {
             return resultModelBuilder.BuildCombatLog(simulation, combatResult);
+        }
+
+        public string BuildDuelLog(BattleSimulation simulation, DuelResult duelResult)
+        {
+            return resultModelBuilder.BuildDuelLog(simulation, duelResult);
         }
 
         public string BuildSkillLog(BattleSimulation simulation, SkillResult skillResult)
@@ -222,9 +238,42 @@ namespace PhalanxChronicle.Battle
             ScenarioDirector scenarioDirector,
             string title,
             IReadOnlyList<string> rewardLines,
-            IReadOnlyList<string> unitLines)
+            IReadOnlyList<string> unitLines,
+            IReadOnlyList<string> specialLines = null)
         {
-            return resultModelBuilder.BuildBattleResultModel(simulation, scenarioData, scenarioDirector, title, rewardLines, unitLines);
+            return resultModelBuilder.BuildBattleResultModel(simulation, scenarioData, scenarioDirector, title, rewardLines, unitLines, specialLines);
+        }
+
+        private static IReadOnlyList<string> BuildSecondaryObjectiveLines(BattleContext context, BattleScenarioData scenarioData, ScenarioDirector scenarioDirector)
+        {
+            if (context == null || scenarioData?.BonusRewards == null || scenarioData.BonusRewards.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            HashSet<string> activeFlags = scenarioDirector != null
+                ? new HashSet<string>(scenarioDirector.ActiveFlags, StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
+            HashSet<string> triggeredDuels = scenarioDirector != null
+                ? new HashSet<string>(scenarioDirector.TriggeredDuelIds, StringComparer.Ordinal)
+                : new HashSet<string>(StringComparer.Ordinal);
+            List<string> lines = new List<string>();
+            foreach (BonusRewardDefinition reward in scenarioData.BonusRewards.Where(reward => reward != null))
+            {
+                BonusRewardProgressState progress = reward.EvaluateProgress(context, scenarioData.DuelScenes, activeFlags, triggeredDuels);
+                string progressLabel = progress == BonusRewardProgressState.Completed
+                    ? LocalizationService.Text("ui.objective.secondary.completed", "已完成")
+                    : progress == BonusRewardProgressState.Failed
+                        ? LocalizationService.Text("ui.objective.secondary.failed", "已失敗")
+                        : LocalizationService.Text("ui.objective.secondary.in_progress", "進行中");
+                lines.Add(LocalizationService.Format(
+                    "ui.objective.secondary_line",
+                    "[{0}] {1}",
+                    progressLabel,
+                    LocalizationService.Text(reward.ObjectiveKey, reward.ObjectiveFallback)));
+            }
+
+            return lines;
         }
     }
 
@@ -601,6 +650,7 @@ namespace PhalanxChronicle.Battle
 
     public sealed class BattleActionMenuModelBuilder
     {
+        private const int MaxMetricChipCount = 4;
         private readonly BattleHudModelSupport support;
 
         public BattleActionMenuModelBuilder(BattleHudModelSupport support = null)
@@ -805,7 +855,7 @@ namespace PhalanxChronicle.Battle
                 chips.Add(support.CreateWarningChip(LocalizationService.Text("ui.forecast.attack.ko_short", "KO")));
             }
 
-            return chips;
+            return chips.Take(MaxMetricChipCount).ToList();
         }
     }
 
@@ -925,6 +975,70 @@ namespace PhalanxChronicle.Battle
                     ? new[] { support.FormatExpGainText(combatResult.AttackerExpGained) }
                     : Array.Empty<string>(),
                 AccentColor = new Color(0.96f, 0.42f, 0.26f, 1f),
+            };
+
+            return FinalizeModel(model);
+        }
+
+        public BattleForecastModel BuildDuelResultForecastModel(BattleSimulation simulation, DuelResult duelResult)
+        {
+            if (simulation == null || duelResult == null || duelResult.DefenderEffect == null)
+            {
+                return new BattleForecastModel();
+            }
+
+            string attackerName = support.GetUnitDisplayName(simulation, duelResult.AttackerUnitId);
+            string defenderName = support.GetUnitDisplayName(simulation, duelResult.DefenderUnitId);
+            List<string> secondaryLines = new List<string>();
+            if (duelResult.CasterStatuses.Count > 0)
+            {
+                secondaryLines.Add(LocalizationService.Format(
+                    "ui.duel.caster_statuses",
+                    "我方加成：{0}",
+                    string.Join(", ", duelResult.CasterStatuses.Select(support.FormatStatusApplication))));
+            }
+
+            if (duelResult.NearbyEnemyEffects.Count > 0)
+            {
+                secondaryLines.Add(LocalizationService.Format(
+                    "ui.duel.nearby_effects",
+                    "波及敵軍：{0}",
+                    duelResult.NearbyEnemyEffects.Count));
+            }
+
+            BattleForecastModel model = new BattleForecastModel
+            {
+                Mode = BattleForecastMode.ResultConfirm,
+                Header = LocalizationService.Text("ui.duel.header", "一騎對決"),
+                Title = LocalizationService.Text(duelResult.TitleKey, duelResult.TitleFallback),
+                OutcomeFacts = new List<HudFactModel>
+                {
+                    new HudFactModel
+                    {
+                        Label = LocalizationService.Text("ui.forecast.fact.damage", "傷害"),
+                        Value = duelResult.DefenderEffect.Amount.ToString(),
+                        AccentColor = BattleUiTheme.AccentRed,
+                    },
+                    new HudFactModel
+                    {
+                        Label = LocalizationService.Text("ui.forecast.fact.outcome", "結果"),
+                        Value = duelResult.DefenderEffect.UnitDied
+                            ? LocalizationService.Text("ui.forecast.attack.ko_short", "KO")
+                            : LocalizationService.Format("ui.forecast.attack.remaining_short", "{0} HP", duelResult.DefenderEffect.RemainingHp),
+                        AccentColor = duelResult.DefenderEffect.UnitDied ? BattleUiTheme.AccentGold : BattleUiTheme.AccentBlue,
+                    },
+                    new HudFactModel
+                    {
+                        Label = LocalizationService.Text("ui.exp.short", "EXP"),
+                        Value = duelResult.AttackerExpGained > 0 ? "+" + duelResult.AttackerExpGained : string.Empty,
+                        AccentColor = BattleUiTheme.AccentGreen,
+                    },
+                }.Where(fact => !string.IsNullOrWhiteSpace(fact.Value)).ToList(),
+                PrimaryLine = LocalizationService.Format("ui.duel.primary_line", "{0} -> {1}", attackerName, defenderName),
+                SecondaryLines = secondaryLines,
+                RiskChip = support.CreateWarningChip(LocalizationService.Text("ui.duel.risk_chip", "劇情收束")),
+                CommitChip = support.CreatePositiveChip(LocalizationService.Text("ui.duel.commit_chip", "一騎已觸發")),
+                AccentColor = new Color(0.94f, 0.72f, 0.32f, 1f),
             };
 
             return FinalizeModel(model);
@@ -1157,7 +1271,8 @@ namespace PhalanxChronicle.Battle
             ScenarioDirector scenarioDirector,
             string title,
             IReadOnlyList<string> rewardLines,
-            IReadOnlyList<string> unitLines)
+            IReadOnlyList<string> unitLines,
+            IReadOnlyList<string> specialLines = null)
         {
             if (simulation == null || scenarioData == null || simulation.Context == null || !simulation.Context.BattleEnded)
             {
@@ -1169,6 +1284,7 @@ namespace PhalanxChronicle.Battle
             string objectiveText = scenarioDirector != null && scenarioDirector.CurrentObjective != null
                 ? LocalizationService.Text(scenarioDirector.CurrentObjective.PrimaryObjectiveKey, scenarioDirector.CurrentObjective.PrimaryObjectiveFallback)
                 : LocalizationService.Text("ui.objective.none", "Objective complete.");
+            List<BattleRewardEntryModel> rewardEntries = BuildRewardEntries(simulation, scenarioData);
 
             return new BattleResultModel
             {
@@ -1179,8 +1295,59 @@ namespace PhalanxChronicle.Battle
                     LocalizationService.Format("ui.result.summary.survivors", "Allied survivors: {0}/{1}", survivingPlayers, totalPlayers),
                     LocalizationService.Format("ui.result.summary.objective", "Objective: {0}", objectiveText)),
                 RewardLines = rewardLines ?? new List<string>(),
+                SpecialLines = specialLines ?? new List<string>(),
+                RewardEntries = rewardEntries,
                 UnitLines = unitLines ?? new List<string>(),
             };
+        }
+
+        private static List<BattleRewardEntryModel> BuildRewardEntries(BattleSimulation simulation, BattleScenarioData scenarioData)
+        {
+            List<BattleRewardEntryModel> entries = new List<BattleRewardEntryModel>();
+            if (simulation == null || simulation.Context == null || simulation.Context.WinningSide != TurnSide.Player)
+            {
+                return entries;
+            }
+
+            entries.Add(new BattleRewardEntryModel
+            {
+                Label = LocalizationService.Text("ui.result.objective_reward.title", "目標獎勵經驗"),
+                AccentRole = "exp",
+                IsPrimaryReward = false,
+            });
+
+            if (scenarioData == null || scenarioData.RewardBundle == null || !scenarioData.RewardBundle.HasAnyReward)
+            {
+                return entries;
+            }
+
+            entries.Add(new BattleRewardEntryModel
+            {
+                Label = LocalizationService.Format(
+                    "ui.result.rewards",
+                    "Rewards: Supplies {0}  Renown {1}",
+                    scenarioData.RewardBundle.Supplies,
+                    scenarioData.RewardBundle.Renown),
+                AccentRole = "resource",
+                IsPrimaryReward = false,
+            });
+
+            if (!string.IsNullOrWhiteSpace(scenarioData.RewardBundle.RewardItemId))
+            {
+                ItemDefinition item = ItemCatalog.Get(scenarioData.RewardBundle.RewardItemId);
+                entries.Add(new BattleRewardEntryModel
+                {
+                    Label = LocalizationService.Format(
+                        "campaign.reward.item",
+                        "寶物：{0}",
+                        item != null ? LocalizationService.Text(item.NameKey, item.NameFallback) : scenarioData.RewardBundle.RewardItemId),
+                    IconItemId = item != null ? item.ItemId : scenarioData.RewardBundle.RewardItemId,
+                    AccentRole = item != null && item.IsTreasure ? "treasure" : "item",
+                    IsPrimaryReward = true,
+                });
+            }
+
+            return entries;
         }
 
         public string BuildCombatLog(BattleSimulation simulation, CombatResult combatResult)
@@ -1190,6 +1357,15 @@ namespace PhalanxChronicle.Battle
             return combatResult.DefenderDied
                 ? LocalizationService.Format("ui.combat.log.ko", "{0} defeated {1}.", attackerName, defenderName)
                 : LocalizationService.Format("ui.combat.log.damage", "{0} dealt {1} damage to {2}.", attackerName, combatResult.Damage, defenderName);
+        }
+
+        public string BuildDuelLog(BattleSimulation simulation, DuelResult duelResult)
+        {
+            string attackerName = support.GetUnitDisplayName(simulation, duelResult.AttackerUnitId);
+            string defenderName = support.GetUnitDisplayName(simulation, duelResult.DefenderUnitId);
+            return duelResult.DefenderDefeated
+                ? LocalizationService.Format("ui.duel.log.defeat", "{0} won the duel and struck down {1}.", attackerName, defenderName)
+                : LocalizationService.Format("ui.duel.log.damage", "{0} broke through {1} in a duel.", attackerName, defenderName);
         }
 
         public string BuildSkillLog(BattleSimulation simulation, SkillResult skillResult)
@@ -1204,6 +1380,8 @@ namespace PhalanxChronicle.Battle
 
     public sealed class BattleHudModelSupport
     {
+        private const int MaxRosterTagCount = 2;
+
         public HudChipModel CreateInfoChip(string text)
         {
             return new HudChipModel
@@ -1688,7 +1866,7 @@ namespace PhalanxChronicle.Battle
             return tags
                 .Distinct()
                 .OrderBy(GetRosterTagPriority)
-                .Take(2)
+                .Take(MaxRosterTagCount)
                 .ToList();
         }
 

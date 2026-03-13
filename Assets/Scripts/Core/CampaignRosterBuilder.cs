@@ -243,6 +243,8 @@ namespace PhalanxChronicle.Core
                 baseScenario.VictoryExpReward,
                 baseScenario.DefeatExpReward,
                 rewardBundle,
+                baseScenario.BonusRewards.ToList(),
+                baseScenario.DuelScenes.ToList(),
                 baseScenario.ReplayDifficultyTier,
                 baseScenario.ScenarioVariantTag);
         }

@@ -30,7 +30,7 @@ namespace PhalanxChronicle.Battle
             {
                 CampaignSaveFileDto dto = JsonUtility.FromJson<CampaignSaveFileDto>(File.ReadAllText(savePath));
                 if (dto == null ||
-                    (dto.version != 1 && dto.version != 2 && dto.version != 3 && dto.version != 4) ||
+                    (dto.version != 1 && dto.version != 2 && dto.version != 3 && dto.version != 4 && dto.version != 5) ||
                     (!string.IsNullOrWhiteSpace(expectedCampaignId) && dto.campaignId != expectedCampaignId))
                 {
                     return false;
@@ -38,7 +38,7 @@ namespace PhalanxChronicle.Battle
 
                 saveData = ToModel(dto);
                 bool normalized = progressionService.NormalizeSave(saveData);
-                if (normalized || dto.version < 4)
+                if (normalized || dto.version < 5)
                 {
                     Save(saveData);
                 }
@@ -105,9 +105,12 @@ namespace PhalanxChronicle.Battle
                         dto.progress.lastBattleResult.scenarioId,
                         (TurnSide)dto.progress.lastBattleResult.winningSide,
                         dto.progress.lastBattleResult.roundCount,
-                        dto.progress.lastBattleResult.survivingUnitIds ?? new List<string>())
+                        dto.progress.lastBattleResult.survivingUnitIds ?? new List<string>(),
+                        dto.progress.lastBattleResult.achievedScenarioFlags ?? new List<string>(),
+                        dto.progress.lastBattleResult.triggeredDuelIds ?? new List<string>())
                     : null,
                 dto.progress != null ? dto.progress.claimedRewardScenarioIds : Array.Empty<string>(),
+                dto.progress != null ? dto.progress.claimedBonusRewardIds : Array.Empty<string>(),
                 dto.progress != null && dto.progress.scenarioClearCounts != null
                     ? dto.progress.scenarioClearCounts
                         .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.scenarioId))
@@ -155,7 +158,7 @@ namespace PhalanxChronicle.Battle
                 .ToList()
                 : new List<CampaignUnitState>();
 
-            return new CampaignSaveData(dto.campaignId, progress, inventory, units, dto.version < 4 ? 4 : dto.version);
+            return new CampaignSaveData(dto.campaignId, progress, inventory, units, dto.version < 5 ? 5 : dto.version);
         }
 
         private static CampaignSaveFileDto ToDto(CampaignSaveData saveData)
@@ -169,6 +172,7 @@ namespace PhalanxChronicle.Battle
                     unlockedStageIndex = saveData.Progress.UnlockedStageIndex,
                     clearedScenarioIds = saveData.Progress.ClearedScenarioIds.ToList(),
                     claimedRewardScenarioIds = saveData.Progress.ClaimedRewardScenarioIds.ToList(),
+                    claimedBonusRewardIds = saveData.Progress.ClaimedBonusRewardIds.ToList(),
                     scenarioClearCounts = saveData.Progress.ScenarioClearCounts
                         .OrderBy(entry => entry.Key, StringComparer.Ordinal)
                         .Select(entry => new ScenarioClearCountDto
@@ -188,6 +192,8 @@ namespace PhalanxChronicle.Battle
                             winningSide = (int)saveData.Progress.LastBattleResult.WinningSide,
                             roundCount = saveData.Progress.LastBattleResult.RoundCount,
                             survivingUnitIds = saveData.Progress.LastBattleResult.SurvivingUnitIds.ToList(),
+                            achievedScenarioFlags = saveData.Progress.LastBattleResult.AchievedScenarioFlags.ToList(),
+                            triggeredDuelIds = saveData.Progress.LastBattleResult.TriggeredDuelIds.ToList(),
                         },
                 },
                 inventory = new CampaignInventoryDto
@@ -250,6 +256,7 @@ namespace PhalanxChronicle.Battle
             public int unlockedStageIndex;
             public List<string> clearedScenarioIds;
             public List<string> claimedRewardScenarioIds;
+            public List<string> claimedBonusRewardIds;
             public List<ScenarioClearCountDto> scenarioClearCounts;
             public bool hasSeenFirstLaunchIntro;
             public bool hasCompletedFirstBattleOnboarding;
@@ -271,6 +278,8 @@ namespace PhalanxChronicle.Battle
             public int winningSide;
             public int roundCount;
             public List<string> survivingUnitIds;
+            public List<string> achievedScenarioFlags;
+            public List<string> triggeredDuelIds;
         }
 
         [Serializable]

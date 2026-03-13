@@ -30,11 +30,11 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
-        public void CampaignSaveData_DefaultsToVersionFour()
+        public void CampaignSaveData_DefaultsToVersionFive()
         {
             CampaignSaveData save = new CampaignSaveData("test-campaign", null, null, null);
 
-            Assert.Equal(4, save.Version);
+            Assert.Equal(5, save.Version);
         }
     }
 }

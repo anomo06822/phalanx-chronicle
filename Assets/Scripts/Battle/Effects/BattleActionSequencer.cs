@@ -174,5 +174,25 @@ namespace PhalanxChronicle.Battle.Effects
                     return profile.PostActionHold;
             }
         }
+
+        public BattlePresentationProfile GetDuelProfile(TurnSide actingSide)
+        {
+            return actingSide == TurnSide.Enemy
+                ? BattlePresentationProfile.EnemyFastResolve
+                : BattlePresentationProfile.PlayerReadable;
+        }
+
+        public float GetPostDuelHold(TurnSide actingSide, DuelResult duelResult)
+        {
+            BattlePresentationProfile profile = GetDuelProfile(actingSide);
+            if (duelResult == null)
+            {
+                return profile.PostCombatHold;
+            }
+
+            return duelResult.DefenderDefeated
+                ? profile.PostCombatHold + 0.08f
+                : profile.PostCombatHold + 0.02f;
+        }
     }
 }

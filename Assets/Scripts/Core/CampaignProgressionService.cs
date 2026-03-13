@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PhalanxChronicle.Localization;
 
 namespace PhalanxChronicle.Core
 {
@@ -11,13 +12,17 @@ namespace PhalanxChronicle.Core
             int grantedSupplies,
             int grantedRenown,
             string grantedItemId,
-            IReadOnlyList<string> recruitedUnitIds = null)
+            IReadOnlyList<string> recruitedUnitIds = null,
+            IReadOnlyList<string> grantedBonusItemIds = null,
+            IReadOnlyList<string> grantedBonusRewardLines = null)
         {
             GrantedStageReward = grantedStageReward;
             GrantedSupplies = grantedSupplies < 0 ? 0 : grantedSupplies;
             GrantedRenown = grantedRenown < 0 ? 0 : grantedRenown;
             GrantedItemId = grantedItemId ?? string.Empty;
             RecruitedUnitIds = recruitedUnitIds ?? Array.Empty<string>();
+            GrantedBonusItemIds = grantedBonusItemIds ?? Array.Empty<string>();
+            GrantedBonusRewardLines = grantedBonusRewardLines ?? Array.Empty<string>();
         }
 
         public bool GrantedStageReward { get; }
@@ -29,6 +34,10 @@ namespace PhalanxChronicle.Core
         public string GrantedItemId { get; }
 
         public IReadOnlyList<string> RecruitedUnitIds { get; }
+
+        public IReadOnlyList<string> GrantedBonusItemIds { get; }
+
+        public IReadOnlyList<string> GrantedBonusRewardLines { get; }
     }
 
     public sealed class CampaignProgressionService
@@ -102,6 +111,8 @@ namespace PhalanxChronicle.Core
                                       scenario.RewardBundle.HasAnyReward &&
                                       !saveData.Progress.IsRewardClaimed(summary.ScenarioId);
             IReadOnlyList<string> recruitedUnitIds = Array.Empty<string>();
+            List<string> grantedBonusItemIds = new List<string>();
+            List<string> grantedBonusRewardLines = new List<string>();
             if (grantedStageReward)
             {
                 saveData.Inventory.AddSupplies(scenario.RewardBundle.Supplies);
@@ -113,6 +124,34 @@ namespace PhalanxChronicle.Core
 
                 recruitedUnitIds = rosterBuilder.AddRecruitsIfMissing(saveData, scenario.RewardBundle);
                 saveData.Progress.MarkRewardClaimed(summary.ScenarioId);
+            }
+
+            if (summary.WinningSide == TurnSide.Player && scenario?.BonusRewards != null)
+            {
+                foreach (BonusRewardDefinition bonusReward in scenario.BonusRewards.Where(reward => reward != null))
+                {
+                    if (string.IsNullOrWhiteSpace(bonusReward.RewardId) ||
+                        saveData.Progress.IsBonusRewardClaimed(bonusReward.RewardId) ||
+                        !bonusReward.IsSatisfied(summary))
+                    {
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(bonusReward.RewardItemId))
+                    {
+                        saveData.Inventory.AddItem(bonusReward.RewardItemId);
+                        grantedBonusItemIds.Add(bonusReward.RewardItemId);
+                        ItemDefinition itemDefinition = ItemCatalog.Get(bonusReward.RewardItemId);
+                        grantedBonusRewardLines.Add(LocalizationService.Format(
+                            "campaign.reward.bonus_item",
+                            "條件寶物：{0}",
+                            itemDefinition != null
+                                ? LocalizationService.Text(itemDefinition.NameKey, itemDefinition.NameFallback)
+                                : bonusReward.RewardItemId));
+                    }
+
+                    saveData.Progress.MarkBonusRewardClaimed(bonusReward.RewardId);
+                }
             }
 
             if (playerUnits != null)
@@ -145,7 +184,9 @@ namespace PhalanxChronicle.Core
                 grantedStageReward && scenario != null ? scenario.RewardBundle.Supplies : 0,
                 grantedStageReward && scenario != null ? scenario.RewardBundle.Renown : 0,
                 grantedStageReward && scenario != null ? scenario.RewardBundle.RewardItemId : string.Empty,
-                recruitedUnitIds);
+                recruitedUnitIds,
+                grantedBonusItemIds,
+                grantedBonusRewardLines);
         }
 
         public IReadOnlyList<ShopOfferDefinition> GetShopOffers()
@@ -391,6 +432,8 @@ namespace PhalanxChronicle.Core
                     scenario.VictoryExpReward,
                     scenario.DefeatExpReward,
                     scenario.RewardBundle,
+                    scenario.BonusRewards,
+                    scenario.DuelScenes,
                     0,
                     variantTag);
             }
@@ -420,6 +463,8 @@ namespace PhalanxChronicle.Core
                 scenario.VictoryExpReward,
                 scenario.DefeatExpReward,
                 scenario.RewardBundle,
+                scenario.BonusRewards,
+                scenario.DuelScenes,
                 replayTier,
                 variantTag);
         }

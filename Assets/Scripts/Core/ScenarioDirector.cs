@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace PhalanxChronicle.Core
 {
@@ -8,6 +9,7 @@ namespace PhalanxChronicle.Core
         private readonly HashSet<string> firedTriggerIds = new HashSet<string>();
         private readonly HashSet<string> consumedGroupIds = new HashSet<string>();
         private readonly HashSet<string> activeFlags = new HashSet<string>();
+        private readonly HashSet<string> triggeredDuelIds = new HashSet<string>();
         private readonly Queue<ScenarioDialogueLine> pendingDialogue = new Queue<ScenarioDialogueLine>();
 
         public ScenarioDirector(BattleScenarioData scenario)
@@ -24,6 +26,10 @@ namespace PhalanxChronicle.Core
             return !string.IsNullOrEmpty(flagName) && activeFlags.Contains(flagName);
         }
 
+        public IReadOnlyList<string> ActiveFlags => activeFlags.OrderBy(flag => flag).ToList();
+
+        public IReadOnlyList<string> TriggeredDuelIds => triggeredDuelIds.OrderBy(id => id).ToList();
+
         public ScenarioDialogueLine PeekDialogue()
         {
             return pendingDialogue.Count > 0 ? pendingDialogue.Peek() : null;
@@ -38,6 +44,43 @@ namespace PhalanxChronicle.Core
 
             pendingDialogue.Dequeue();
             return pendingDialogue.Count > 0;
+        }
+
+        public DuelSceneDefinition TryMatchDuel(string attackerUnitId, string defenderUnitId, BattleContext context, bool playerInitiated = true)
+        {
+            if (scenario?.DuelScenes == null || context == null)
+            {
+                return null;
+            }
+
+            foreach (DuelSceneDefinition duelScene in scenario.DuelScenes)
+            {
+                if (duelScene != null &&
+                    duelScene.Matches(attackerUnitId, defenderUnitId, context, activeFlags, triggeredDuelIds, playerInitiated))
+                {
+                    return duelScene;
+                }
+            }
+
+            return null;
+        }
+
+        public void RecordDuelTriggered(string duelId, IReadOnlyList<string> newFlags = null)
+        {
+            if (!string.IsNullOrWhiteSpace(duelId))
+            {
+                triggeredDuelIds.Add(duelId);
+            }
+
+            if (newFlags == null)
+            {
+                return;
+            }
+
+            foreach (string flag in newFlags.Where(flag => !string.IsNullOrWhiteSpace(flag)))
+            {
+                activeFlags.Add(flag);
+            }
         }
 
         public ScenarioEvaluationResult Evaluate(ScenarioCheckpoint checkpoint, BattleContext context)

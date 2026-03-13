@@ -218,6 +218,39 @@ namespace PhalanxChronicle.Headless.Tests
             }
         }
 
+        [Fact]
+        public void TraditionalChineseTable_CoversBonusRewardAndDuelKeys()
+        {
+            IReadOnlyDictionary<string, string> table = GetLocaleTable(GameLocale.TraditionalChinese);
+
+            string[] keys =
+            {
+                "campaign.reward.bonus_item",
+                "ui.objective.secondary.in_progress",
+                "ui.objective.secondary.completed",
+                "ui.objective.secondary.failed",
+                "ui.duel.header",
+                "ui.duel.preview_ready",
+                "ui.duel.result.breakthrough",
+                "duel.changban.title",
+                "duel.jiameng.title",
+                "bonus.guangzong.objective",
+                "bonus.changban.summary",
+                "bonus.dingjun.objective",
+                "item.guangzong_rally_seal.name",
+                "item.changban_white_plume.name",
+                "item.baishui_rapid_order.name",
+                "item.jiameng_iron_girth.name",
+                "item.tiandang_night_token.name",
+                "item.dingjun_gold_spur.name",
+            };
+
+            foreach (string key in keys)
+            {
+                Assert.True(table.ContainsKey(key), $"Missing zh-TW localization for '{key}'.");
+            }
+        }
+
         private static IReadOnlyDictionary<string, string> GetLocaleTable(GameLocale locale)
         {
             FieldInfo tablesField = typeof(LocalizationService).GetField("Tables", BindingFlags.Static | BindingFlags.NonPublic);

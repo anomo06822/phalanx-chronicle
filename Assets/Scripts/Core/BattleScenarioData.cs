@@ -14,6 +14,8 @@ namespace PhalanxChronicle.Core
             int victoryExpReward = 45,
             int defeatExpReward = 20,
             RewardBundle rewardBundle = null,
+            IReadOnlyList<BonusRewardDefinition> bonusRewards = null,
+            IReadOnlyList<DuelSceneDefinition> duelScenes = null,
             int replayDifficultyTier = 0,
             string scenarioVariantTag = "")
         {
@@ -26,6 +28,8 @@ namespace PhalanxChronicle.Core
             VictoryExpReward = victoryExpReward < 0 ? 0 : victoryExpReward;
             DefeatExpReward = defeatExpReward < 0 ? 0 : defeatExpReward;
             RewardBundle = rewardBundle ?? new RewardBundle(0, 0);
+            BonusRewards = bonusRewards ?? new List<BonusRewardDefinition>();
+            DuelScenes = duelScenes ?? new List<DuelSceneDefinition>();
             ReplayDifficultyTier = replayDifficultyTier < 0 ? 0 : replayDifficultyTier;
             ScenarioVariantTag = scenarioVariantTag ?? string.Empty;
         }
@@ -47,6 +51,10 @@ namespace PhalanxChronicle.Core
         public int DefeatExpReward { get; }
 
         public RewardBundle RewardBundle { get; }
+
+        public IReadOnlyList<BonusRewardDefinition> BonusRewards { get; }
+
+        public IReadOnlyList<DuelSceneDefinition> DuelScenes { get; }
 
         public int ReplayDifficultyTier { get; }
 
