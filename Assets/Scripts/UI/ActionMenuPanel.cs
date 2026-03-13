@@ -14,10 +14,6 @@ namespace PhalanxChronicle.UI
     {
         private const float MaxDockWidth = 1120f;
         private const float MinDockWidth = 540f;
-        private const float LeftPanelWidthEstimate = 292f;
-        private const float RightPanelWidthEstimate = 318f;
-        private const float DockHorizontalReserve = 56f;
-        private const float ActionDockHeight = 292f;
 
         protected GameObject rootObject;
         protected Text modeLabel;
@@ -42,7 +38,9 @@ namespace PhalanxChronicle.UI
             RectTransform canvasRect = canvasRoot as RectTransform;
             if (canvasRect != null && canvasRect.rect.width > 0f)
             {
-                float reservedWidth = LeftPanelWidthEstimate + RightPanelWidthEstimate + DockHorizontalReserve;
+                float reservedWidth = BattleHudLayoutPolicy.SelectedPanelWidth +
+                                      BattleHudLayoutPolicy.RosterSidebarWidth +
+                                      BattleHudLayoutPolicy.ActionDockHorizontalReserve;
                 dockWidth = Mathf.Clamp(canvasRect.rect.width - reservedWidth, MinDockWidth, MaxDockWidth);
             }
 
@@ -51,8 +49,8 @@ namespace PhalanxChronicle.UI
                 canvasRoot,
                 new Vector2(0.5f, 0f),
                 new Vector2(0.5f, 0f),
-                new Vector2(0f, 14f),
-                new Vector2(dockWidth, ActionDockHeight));
+                new Vector2(0f, BattleHudLayoutPolicy.ActionDockBottomMargin),
+                new Vector2(dockWidth, BattleHudLayoutPolicy.ActionDockHeight));
 
             VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
             layout.spacing = BattleUiTheme.Space8;

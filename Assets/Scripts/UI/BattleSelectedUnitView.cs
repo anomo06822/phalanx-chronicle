@@ -13,12 +13,6 @@ namespace PhalanxChronicle.UI
 {
     internal sealed class BattleSelectedUnitView
     {
-        private const float BasePanelHeight = 836f;
-        private const float ActionDockHeight = 292f;
-        private const float ActionDockBottomMargin = 14f;
-        private const float SidePanelBottomMargin = 16f;
-        private const float SidePanelTopMargin = 22f;
-
         private GameObject rootObject;
         private Image portraitImage;
         private Image portraitBacking;
@@ -48,15 +42,15 @@ namespace PhalanxChronicle.UI
         public void Initialize(Transform canvasRoot)
         {
             RectTransform canvasRect = canvasRoot as RectTransform;
-            float panelHeight = CalculatePanelHeight(canvasRect);
-            float anchoredY = CalculateSafeAnchoredY(canvasRect, panelHeight);
+            float panelHeight = BattleHudLayoutPolicy.CalculatePanelHeight(canvasRect);
+            float anchoredY = BattleHudLayoutPolicy.CalculateSafeAnchoredY(canvasRect, panelHeight);
             rootObject = BattleHudFactory.CreatePanel(
                 "SelectedUnitPanel",
                 canvasRoot,
                 new Vector2(0f, 0.5f),
                 new Vector2(0f, 0.5f),
                 new Vector2(18f, anchoredY),
-                new Vector2(292f, panelHeight),
+                new Vector2(BattleHudLayoutPolicy.SelectedPanelWidth, panelHeight),
                 BattleUiTheme.PanelSurface);
             RectTransform rootRect = rootObject.GetComponent<RectTransform>();
             rootRect.pivot = new Vector2(0f, 0.5f);
@@ -249,34 +243,6 @@ namespace PhalanxChronicle.UI
 
             SetDetailsExpanded(false);
             Bind(new BattleSelectedUnitModel());
-        }
-
-        private static float CalculatePanelHeight(RectTransform canvasRect)
-        {
-            if (canvasRect == null || canvasRect.rect.height <= 0f)
-            {
-                return BasePanelHeight;
-            }
-
-            float reservedBottom = ActionDockBottomMargin + ActionDockHeight + SidePanelBottomMargin;
-            float usableHeight = canvasRect.rect.height - reservedBottom - SidePanelTopMargin;
-            if (usableHeight < 260f)
-            {
-                usableHeight = 260f;
-            }
-
-            return Mathf.Min(BasePanelHeight, usableHeight);
-        }
-
-        private static float CalculateSafeAnchoredY(RectTransform canvasRect, float panelHeight)
-        {
-            if (canvasRect == null || canvasRect.rect.height <= 0f)
-            {
-                return 0f;
-            }
-
-            float reservedBottom = ActionDockBottomMargin + ActionDockHeight + SidePanelBottomMargin;
-            return reservedBottom + panelHeight * 0.5f - canvasRect.rect.height * 0.5f;
         }
 
         public void SetVisible(bool visible)

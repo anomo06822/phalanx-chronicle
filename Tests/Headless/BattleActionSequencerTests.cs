@@ -71,6 +71,25 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void PlayerLowSignalSkill_KeepsReadableInterEffectDelay()
+        {
+            BattleActionSequencer sequencer = new BattleActionSequencer();
+            SkillResult skillResult = new SkillResult(
+                "player-buffer",
+                ActiveSkillType.WarCry,
+                "player-1",
+                new List<SkillEffectResult>
+                {
+                    new SkillEffectResult("player-1", 0, 20, false, false),
+                },
+                0,
+                0);
+
+            Assert.Equal(BattlePresentationProfile.PlayerReadable.InterEffectDelay, sequencer.GetInterEffectDelay(TurnSide.Player, skillResult));
+            Assert.True(sequencer.ShouldShowSkillForecast(TurnSide.Player, skillResult));
+        }
+
+        [Fact]
         public void EnemyLowSignalMultiTargetSkill_BatchesImpact()
         {
             BattleActionSequencer sequencer = new BattleActionSequencer();

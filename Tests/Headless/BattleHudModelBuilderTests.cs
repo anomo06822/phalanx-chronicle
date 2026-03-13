@@ -46,6 +46,18 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void ActionMenuBuilder_SkillMetrics_AreCappedForStableCards()
+        {
+            BattleSimulation simulation = CreateAdjacentCombatSimulation(activeSkill: ActiveSkillType.PinningShot);
+            BattleActionMenuModelBuilder builder = new BattleActionMenuModelBuilder();
+
+            BattleActionMenuModel model = builder.BuildActionMenuModel(simulation, simulation.Context.GetUnit("player-1"), moved: false);
+            BattleActionDescriptor skill = model.Actions.Single(action => action.Type == BattleActionDescriptorType.Skill);
+
+            Assert.True(skill.MetricChips.Count <= 4);
+        }
+
+        [Fact]
         public void RosterBuilder_OrdersSelectedPlayerBeforeDoneAndMarksThreateningEnemy()
         {
             BattleSimulation simulation = CreateSimulation();
@@ -203,6 +215,21 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal(BattleDecisionContextSource.None, contextModel.SourceState);
             Assert.Equal(string.Empty, contextModel.Rationale);
             Assert.NotEmpty(contextModel.ActionMenuModel.Actions);
+        }
+
+        [Fact]
+        public void CombatResultForecast_FinalizesSummaryAndPrimaryEffectConsistently()
+        {
+            BattleSimulation simulation = CreateAdjacentCombatSimulation();
+            BattleForecastModelBuilder builder = new BattleForecastModelBuilder();
+            CombatResult combatResult = new CombatResult("player-1", "enemy-1", 8, 12, false, 10, 0);
+
+            BattleForecastModel model = builder.BuildCombatResultForecastModel(simulation, combatResult);
+
+            Assert.Equal(BattleForecastMode.ResultConfirm, model.Mode);
+            Assert.Equal(model.PrimaryLine, model.PrimaryEffect);
+            Assert.Equal(model.SecondaryLines, model.SecondaryEffects);
+            Assert.Contains("8", model.OutcomeSummary);
         }
 
         [Fact]

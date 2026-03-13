@@ -257,6 +257,11 @@ namespace PhalanxChronicle.UI
                     narrativeBlocks.Add((highlight, 22f));
                 }
 
+                if (!string.IsNullOrWhiteSpace(interludeModel.RewardLabel))
+                {
+                    CreateRewardRow(narrativeRoot, interludeModel.RewardIconItemId, interludeModel.RewardLabel, true);
+                }
+
                 if (!string.IsNullOrWhiteSpace(interludeModel.RiskLabel))
                 {
                     Text risk = BattleHudFactory.CreateText(narrativeRoot, interludeModel.RiskLabel, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
@@ -269,6 +274,11 @@ namespace PhalanxChronicle.UI
                 foreach ((Text text, float minHeight) block in narrativeBlocks)
                 {
                     panelHeight += BattleHudFactory.RefreshAutoHeight(block.text, block.minHeight);
+                }
+
+                if (!string.IsNullOrWhiteSpace(interludeModel.RewardLabel))
+                {
+                    panelHeight += 44f;
                 }
 
                 if (narrativeBlocks.Count > 1)
@@ -451,11 +461,16 @@ namespace PhalanxChronicle.UI
                 ClampText(description, 34f, TextOverflowModes.Truncate);
             }
 
-            string metrics = string.Join("  ", new[] { model.BattlefieldLabel, model.DurationLabel, model.RewardLabel }.Where(line => !string.IsNullOrWhiteSpace(line)));
+            string metrics = string.Join("  ", new[] { model.BattlefieldLabel, model.DurationLabel }.Where(line => !string.IsNullOrWhiteSpace(line)));
             if (!string.IsNullOrWhiteSpace(metrics))
             {
                 Text metricLabel = BattleHudFactory.CreateText(content, metrics, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
                 ClampText(metricLabel, 18f, TextOverflowModes.Truncate);
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.RewardLabel))
+            {
+                CreateRewardRow(content, model.RewardIconItemId, model.RewardLabel, true);
             }
 
             if (!string.IsNullOrWhiteSpace(model.RecommendedReason))
@@ -496,9 +511,7 @@ namespace PhalanxChronicle.UI
             glyphLayout.preferredHeight = 56f;
             glyphLayout.flexibleWidth = 0f;
             glyphLayout.flexibleHeight = 0f;
-            Text glyph = BattleHudFactory.CreateAbsoluteText(glyphPanel.transform, Vector2.zero, Vector2.zero, model.IconGlyph, 22, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextGold);
-            BattleHudFactory.EnableBestFit(glyph, 14, 22, false);
-            BattleHudFactory.SetOverflow(glyph, TextOverflowModes.Truncate, false);
+            PopulateBadgeContent(glyphPanel.transform, model.IconItemId, model.IconGlyph);
 
             GameObject textColumn = new GameObject("TextColumn", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
             textColumn.transform.SetParent(content, false);
@@ -613,6 +626,60 @@ namespace PhalanxChronicle.UI
             Image dividerImage = divider.GetComponent<Image>();
             dividerImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
             dividerImage.color = BattleUiTheme.Divider;
+        }
+
+        private static void PopulateBadgeContent(Transform parent, string iconItemId, string iconGlyph)
+        {
+            Sprite iconSprite = RuntimeSpriteLibrary.GetItemIcon(iconItemId);
+            if (iconSprite != null)
+            {
+                GameObject imageRoot = new GameObject("IconImage", typeof(RectTransform), typeof(Image));
+                imageRoot.transform.SetParent(parent, false);
+                RectTransform rect = imageRoot.GetComponent<RectTransform>();
+                rect.anchorMin = Vector2.zero;
+                rect.anchorMax = Vector2.one;
+                rect.offsetMin = new Vector2(8f, 8f);
+                rect.offsetMax = new Vector2(-8f, -8f);
+                Image image = imageRoot.GetComponent<Image>();
+                image.sprite = iconSprite;
+                image.type = Image.Type.Simple;
+                image.preserveAspect = true;
+                image.color = Color.white;
+                return;
+            }
+
+            Text glyph = BattleHudFactory.CreateAbsoluteText(parent, Vector2.zero, Vector2.zero, iconGlyph, 22, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextGold);
+            BattleHudFactory.EnableBestFit(glyph, 14, 22, false);
+            BattleHudFactory.SetOverflow(glyph, TextOverflowModes.Truncate, false);
+        }
+
+        private static GameObject CreateRewardRow(Transform parent, string iconItemId, string label, bool emphasized)
+        {
+            GameObject row = new GameObject("RewardRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            row.transform.SetParent(parent, false);
+            LayoutElement rowLayout = row.GetComponent<LayoutElement>();
+            rowLayout.preferredHeight = 44f;
+            HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+            layout.spacing = 10f;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = false;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+
+            GameObject badgePanel = BattleHudFactory.CreateInsetPanel("RewardBadge", row.transform, 40f, emphasized ? BattleUiTheme.PanelReward : BattleUiTheme.PanelGhost);
+            LayoutElement badgeLayout = badgePanel.GetComponent<LayoutElement>();
+            badgeLayout.preferredWidth = 40f;
+            badgeLayout.preferredHeight = 40f;
+            badgeLayout.flexibleWidth = 0f;
+            badgeLayout.flexibleHeight = 0f;
+            PopulateBadgeContent(badgePanel.transform, iconItemId, "賞");
+
+            Text rewardLabel = BattleHudFactory.CreateText(row.transform, label, 13, FontStyle.Bold, TextAnchor.MiddleLeft, emphasized ? BattleUiTheme.TextGold : BattleUiTheme.TextSecondary);
+            LayoutElement labelLayout = rewardLabel.GetComponent<LayoutElement>();
+            labelLayout.flexibleWidth = 1f;
+            ClampText(rewardLabel, 24f, TextOverflowModes.Truncate);
+            return row;
         }
     }
 }

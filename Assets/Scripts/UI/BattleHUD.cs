@@ -46,6 +46,11 @@ namespace PhalanxChronicle.UI
         private Text resultSpecialLabel;
         private Text resultUnitsLabel;
         private Text resultContinueLabel;
+        private LayoutElement resultSummaryLayout;
+        private LayoutElement resultRewardLayout;
+        private LayoutElement resultRewardEntriesLayout;
+        private LayoutElement resultSpecialLayout;
+        private LayoutElement resultUnitsLayout;
         private Transform resultRewardEntriesRoot;
         private Text dialogueSpeakerLabel;
         private Text dialogueBodyLabel;
@@ -228,11 +233,11 @@ namespace PhalanxChronicle.UI
             resultSpecialLabel.text = battleResult.SpecialLines != null && battleResult.SpecialLines.Count > 0
                 ? string.Join("\n", battleResult.SpecialLines)
                 : string.Empty;
-            resultSpecialLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(resultSpecialLabel.text));
             resultUnitsLabel.text = battleResult.UnitLines != null && battleResult.UnitLines.Count > 0
                 ? string.Join("\n", battleResult.UnitLines)
                 : string.Empty;
             RebuildResultRewardEntries(battleResult.RewardEntries);
+            RefreshResultLayout(hasStructuredRewardEntries);
         }
 
         public void HideResult()
@@ -461,10 +466,10 @@ namespace PhalanxChronicle.UI
             resultPanel = BattleHudFactory.CreatePanel(
                 "ResultPanel",
                 canvasRoot,
-                new Vector2(0.5f, 0f),
-                new Vector2(0.5f, 0f),
-                new Vector2(0f, 24f),
-                new Vector2(720f, 392f),
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero,
+                new Vector2(720f, 456f),
                 new Color(0.06f, 0.07f, 0.1f, 0.9f));
             resultAdvanceButton = resultPanel.AddComponent<Button>();
             resultAdvanceButton.transition = Selectable.Transition.ColorTint;
@@ -475,36 +480,110 @@ namespace PhalanxChronicle.UI
             resultColors.disabledColor = new Color(1f, 1f, 1f, 0f);
             resultAdvanceButton.colors = resultColors;
             resultAdvanceButton.onClick.AddListener(() => onResultAdvance?.Invoke());
-            resultTitleLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 334f), new Vector2(-20f, -20f), string.Empty, 30, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
-            resultSummaryLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 262f), new Vector2(-20f, -82f), string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            GameObject rewardEntriesObject = new GameObject("ResultRewardEntries", typeof(RectTransform), typeof(VerticalLayoutGroup));
-            rewardEntriesObject.transform.SetParent(resultPanel.transform, false);
+            resultTitleLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 388f), new Vector2(-20f, -20f), string.Empty, 30, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+
+            GameObject contentRoot = new GameObject("ResultContentRoot", typeof(RectTransform), typeof(VerticalLayoutGroup));
+            contentRoot.transform.SetParent(resultPanel.transform, false);
+            RectTransform contentRect = contentRoot.GetComponent<RectTransform>();
+            contentRect.anchorMin = Vector2.zero;
+            contentRect.anchorMax = Vector2.one;
+            contentRect.offsetMin = new Vector2(20f, 52f);
+            contentRect.offsetMax = new Vector2(-20f, -74f);
+            VerticalLayoutGroup contentLayout = contentRoot.GetComponent<VerticalLayoutGroup>();
+            contentLayout.padding = new RectOffset(0, 0, 0, 0);
+            contentLayout.spacing = 8f;
+            contentLayout.childControlHeight = true;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childForceExpandWidth = true;
+
+            resultSummaryLabel = BattleHudFactory.CreateText(contentRoot.transform, string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            resultSummaryLayout = resultSummaryLabel.GetComponent<LayoutElement>();
+            resultSummaryLayout.preferredHeight = 86f;
+
+            GameObject rewardEntriesObject = new GameObject("ResultRewardEntries", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            rewardEntriesObject.transform.SetParent(contentRoot.transform, false);
             RectTransform rewardEntriesRect = rewardEntriesObject.GetComponent<RectTransform>();
-            rewardEntriesRect.anchorMin = Vector2.zero;
-            rewardEntriesRect.anchorMax = Vector2.one;
-            rewardEntriesRect.offsetMin = new Vector2(20f, 146f);
-            rewardEntriesRect.offsetMax = new Vector2(-20f, -132f);
+            rewardEntriesRect.anchorMin = new Vector2(0f, 1f);
+            rewardEntriesRect.anchorMax = new Vector2(1f, 1f);
+            rewardEntriesRect.pivot = new Vector2(0.5f, 1f);
+            rewardEntriesRect.sizeDelta = new Vector2(0f, 0f);
             VerticalLayoutGroup rewardEntriesLayout = rewardEntriesObject.GetComponent<VerticalLayoutGroup>();
             rewardEntriesLayout.spacing = 6f;
             rewardEntriesLayout.childControlHeight = true;
             rewardEntriesLayout.childControlWidth = true;
             rewardEntriesLayout.childForceExpandHeight = false;
             rewardEntriesLayout.childForceExpandWidth = true;
+            resultRewardEntriesLayout = rewardEntriesObject.GetComponent<LayoutElement>();
+            resultRewardEntriesLayout.preferredHeight = 0f;
             resultRewardEntriesRoot = rewardEntriesObject.transform;
-            resultRewardLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 112f), new Vector2(-20f, -176f), string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            resultSpecialLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 78f), new Vector2(-20f, -218f), string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+            resultRewardLabel = BattleHudFactory.CreateText(contentRoot.transform, string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            resultRewardLayout = resultRewardLabel.GetComponent<LayoutElement>();
+            resultRewardLayout.preferredHeight = 0f;
+            resultSpecialLabel = BattleHudFactory.CreateText(contentRoot.transform, string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+            resultSpecialLayout = resultSpecialLabel.GetComponent<LayoutElement>();
+            resultSpecialLayout.preferredHeight = 0f;
             resultSpecialLabel.gameObject.SetActive(false);
-            resultUnitsLabel = BattleHudFactory.CreateAbsoluteText(resultPanel.transform, new Vector2(20f, 34f), new Vector2(-20f, -270f), string.Empty, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            resultUnitsLabel = BattleHudFactory.CreateText(contentRoot.transform, string.Empty, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            resultUnitsLayout = resultUnitsLabel.GetComponent<LayoutElement>();
+            resultUnitsLayout.preferredHeight = 0f;
+            BattleHudFactory.SetOverflow(resultUnitsLabel, TextOverflowModes.Ellipsis, true);
             resultContinueLabel = BattleHudFactory.CreateAbsoluteText(
                 resultPanel.transform,
                 new Vector2(20f, 10f),
-                new Vector2(-20f, 24f),
+                new Vector2(-20f, 16f),
                 LocalizationService.Text("ui.result.continue", "點擊任意處繼續"),
                 12,
                 FontStyle.Italic,
                 TextAnchor.LowerRight,
                 BattleUiTheme.TextMuted);
             resultPanel.SetActive(false);
+        }
+
+        private void RefreshResultLayout(bool hasStructuredRewardEntries)
+        {
+            float contentWidth = GetResultContentWidth();
+            SetResultBlockLayout(resultSummaryLabel, resultSummaryLayout, !string.IsNullOrWhiteSpace(resultSummaryLabel.text), contentWidth, 72f);
+            resultRewardEntriesRoot.gameObject.SetActive(hasStructuredRewardEntries && resultRewardEntriesRoot.childCount > 0);
+            resultRewardEntriesLayout.preferredHeight = resultRewardEntriesRoot.gameObject.activeSelf
+                ? (resultRewardEntriesRoot.childCount * 30f) + Mathf.Max(0f, (resultRewardEntriesRoot.childCount - 1) * 6f)
+                : 0f;
+            SetResultBlockLayout(resultRewardLabel, resultRewardLayout, !hasStructuredRewardEntries && !string.IsNullOrWhiteSpace(resultRewardLabel.text), contentWidth, 0f);
+            SetResultBlockLayout(resultSpecialLabel, resultSpecialLayout, !string.IsNullOrWhiteSpace(resultSpecialLabel.text), contentWidth, 0f);
+            SetResultBlockLayout(resultUnitsLabel, resultUnitsLayout, !string.IsNullOrWhiteSpace(resultUnitsLabel.text), contentWidth, 0f, 124f);
+        }
+
+        private float GetResultContentWidth()
+        {
+            RectTransform rectTransform = resultPanel != null ? resultPanel.GetComponent<RectTransform>() : null;
+            float width = rectTransform != null && rectTransform.rect.width > 0f
+                ? rectTransform.rect.width
+                : 720f;
+            return Mathf.Max(280f, width - 40f);
+        }
+
+        private static void SetResultBlockLayout(Text text, LayoutElement layoutElement, bool visible, float width, float minHeight, float maxHeight = 0f)
+        {
+            if (text == null || layoutElement == null)
+            {
+                return;
+            }
+
+            text.gameObject.SetActive(visible);
+            if (!visible)
+            {
+                layoutElement.preferredHeight = 0f;
+                return;
+            }
+
+            Vector2 preferred = text.GetPreferredValues(text.text, width, 0f);
+            float preferredHeight = Mathf.Max(minHeight, preferred.y + 4f);
+            if (maxHeight > 0f)
+            {
+                preferredHeight = Mathf.Min(preferredHeight, maxHeight);
+            }
+
+            layoutElement.preferredHeight = preferredHeight;
         }
 
         private void BuildDialogueOverlay(Transform canvasRoot, Action onDialogueAdvance)

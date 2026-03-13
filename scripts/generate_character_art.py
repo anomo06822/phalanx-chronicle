@@ -1029,11 +1029,9 @@ def load_asset_keys() -> tuple[dict[str, CharacterSpec], list[WeaponSpec]]:
 def generate_character_assets() -> None:
     character_specs, weapon_specs = load_asset_keys()
     ensure_dir(ART_SOURCE_ROOT / "Portraits")
-    ensure_dir(ART_SOURCE_ROOT / "Battle")
     ensure_dir(ART_SOURCE_ROOT / "Weapons")
 
     portrait_count = 0
-    battle_count = 0
     for spec in character_specs.values():
         portrait_svg, portrait_png = portrait_paths_for(spec)
         ensure_dir(portrait_svg.parent)
@@ -1041,13 +1039,6 @@ def generate_character_assets() -> None:
         portrait_svg.write_text(render_portrait_svg(spec), encoding="utf-8")
         convert_svg_to_png(portrait_svg, portrait_png, PORTRAIT_SIZE)
         portrait_count += 1
-
-        battle_svg, battle_png = battle_paths_for(spec)
-        ensure_dir(battle_svg.parent)
-        ensure_dir(battle_png.parent)
-        battle_svg.write_text(render_battle_svg(spec), encoding="utf-8")
-        convert_svg_to_png(battle_svg, battle_png, BATTLE_SIZE)
-        battle_count += 1
 
     icon_count = 0
     for spec in weapon_specs:
@@ -1059,7 +1050,7 @@ def generate_character_assets() -> None:
         icon_count += 1
 
     print(f"Generated portraits: {portrait_count}")
-    print(f"Generated battle sprites: {battle_count}")
+    print("Skipped battle sprites: use scripts/generate_srpg_battle_art.py for the formal SRPG battlefield style.")
     print(f"Generated weapon icons: {icon_count}")
 
 

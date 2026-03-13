@@ -12,6 +12,13 @@ namespace PhalanxChronicle.Battle.Effects
 
     public sealed class BattleActionSequencer
     {
+        private const int LowSignalDamageThreshold = 2;
+        private const int EnemyBatchEffectThreshold = 3;
+        private const float CriticalHoldBonus = 0.02f;
+        private const float EnemyLowSignalResolveHold = 0.02f;
+        private const float EnemyLowSignalActionHold = 0.1f;
+        private const float PlayerLowSignalHoldScale = 0.7f;
+
         public BattlePresentationProfile GetProfile(TurnSide actingSide)
         {
             return actingSide == TurnSide.Enemy
@@ -31,7 +38,7 @@ namespace PhalanxChronicle.Battle.Effects
                 return BattlePresentationImpactTier.Critical;
             }
 
-            return combatResult.Damage <= 2
+            return combatResult.Damage <= LowSignalDamageThreshold
                 ? BattlePresentationImpactTier.LowSignal
                 : BattlePresentationImpactTier.Standard;
         }
@@ -56,22 +63,12 @@ namespace PhalanxChronicle.Battle.Effects
 
         public bool ShouldShowSkillBark(TurnSide actingSide, SkillResult skillResult)
         {
-            if (actingSide != TurnSide.Enemy)
-            {
-                return true;
-            }
-
-            return GetImpactTier(skillResult) != BattlePresentationImpactTier.LowSignal;
+            return !IsEnemyLowSignal(actingSide, GetImpactTier(skillResult));
         }
 
         public bool ShouldShowCombatForecast(TurnSide actingSide, CombatResult combatResult)
         {
-            if (actingSide != TurnSide.Enemy)
-            {
-                return true;
-            }
-
-            return GetImpactTier(combatResult) != BattlePresentationImpactTier.LowSignal;
+            return !IsEnemyLowSignal(actingSide, GetImpactTier(combatResult));
         }
 
         public bool ShouldTakeOverRibbon(TurnSide actingSide, CombatResult combatResult)
@@ -81,12 +78,7 @@ namespace PhalanxChronicle.Battle.Effects
 
         public bool ShouldShowSkillForecast(TurnSide actingSide, SkillResult skillResult)
         {
-            if (actingSide != TurnSide.Enemy)
-            {
-                return true;
-            }
-
-            return GetImpactTier(skillResult) != BattlePresentationImpactTier.LowSignal;
+            return !IsEnemyLowSignal(actingSide, GetImpactTier(skillResult));
         }
 
         public bool ShouldTakeOverRibbon(TurnSide actingSide, SkillResult skillResult)
@@ -96,25 +88,20 @@ namespace PhalanxChronicle.Battle.Effects
 
         public bool ShouldBatchSkillResult(TurnSide actingSide, SkillResult skillResult)
         {
-            if (actingSide != TurnSide.Enemy)
-            {
-                return false;
-            }
-
             if (skillResult == null || skillResult.Effects == null || skillResult.Effects.Count <= 1)
             {
                 return false;
             }
 
-            return GetImpactTier(skillResult) == BattlePresentationImpactTier.LowSignal;
+            return IsEnemyLowSignal(actingSide, GetImpactTier(skillResult));
         }
 
         public float GetInterEffectDelay(TurnSide actingSide, SkillResult skillResult)
         {
             BattlePresentationProfile profile = GetProfile(actingSide);
             if (ShouldBatchSkillResult(actingSide, skillResult) ||
-                (actingSide == TurnSide.Enemy && skillResult != null && skillResult.Effects.Count >= 3) ||
-                GetImpactTier(skillResult) == BattlePresentationImpactTier.LowSignal)
+                ShouldUseEnemyBatchPolicy(actingSide, skillResult) ||
+                IsEnemyLowSignal(actingSide, GetImpactTier(skillResult)))
             {
                 return 0f;
             }
@@ -128,9 +115,9 @@ namespace PhalanxChronicle.Battle.Effects
             switch (GetImpactTier(combatResult))
             {
                 case BattlePresentationImpactTier.Critical:
-                    return profile.PostCombatHold + 0.02f;
+                    return profile.PostCombatHold + CriticalHoldBonus;
                 case BattlePresentationImpactTier.LowSignal:
-                    return actingSide == TurnSide.Enemy ? 0.02f : profile.PostCombatHold * 0.7f;
+                    return actingSide == TurnSide.Enemy ? EnemyLowSignalResolveHold : profile.PostCombatHold * PlayerLowSignalHoldScale;
                 default:
                     return profile.PostCombatHold;
             }
@@ -142,9 +129,9 @@ namespace PhalanxChronicle.Battle.Effects
             switch (GetImpactTier(skillResult))
             {
                 case BattlePresentationImpactTier.Critical:
-                    return profile.PostSkillHold + 0.02f;
+                    return profile.PostSkillHold + CriticalHoldBonus;
                 case BattlePresentationImpactTier.LowSignal:
-                    return actingSide == TurnSide.Enemy ? 0.02f : profile.PostSkillHold * 0.7f;
+                    return actingSide == TurnSide.Enemy ? EnemyLowSignalResolveHold : profile.PostSkillHold * PlayerLowSignalHoldScale;
                 default:
                     return profile.PostSkillHold;
             }
@@ -167,9 +154,9 @@ namespace PhalanxChronicle.Battle.Effects
             switch (tier)
             {
                 case BattlePresentationImpactTier.Critical:
-                    return profile.PostActionHold + 0.02f;
+                    return profile.PostActionHold + CriticalHoldBonus;
                 case BattlePresentationImpactTier.LowSignal:
-                    return 0.1f;
+                    return EnemyLowSignalActionHold;
                 default:
                     return profile.PostActionHold;
             }
@@ -193,6 +180,19 @@ namespace PhalanxChronicle.Battle.Effects
             return duelResult.DefenderDefeated
                 ? profile.PostCombatHold + 0.08f
                 : profile.PostCombatHold + 0.02f;
+        }
+
+        private static bool IsEnemyLowSignal(TurnSide actingSide, BattlePresentationImpactTier impactTier)
+        {
+            return actingSide == TurnSide.Enemy && impactTier == BattlePresentationImpactTier.LowSignal;
+        }
+
+        private static bool ShouldUseEnemyBatchPolicy(TurnSide actingSide, SkillResult skillResult)
+        {
+            return actingSide == TurnSide.Enemy &&
+                   skillResult != null &&
+                   skillResult.Effects != null &&
+                   skillResult.Effects.Count >= EnemyBatchEffectThreshold;
         }
     }
 }

@@ -25,6 +25,7 @@ namespace PhalanxChronicle.Presentation
         private static readonly Dictionary<string, Sprite> unitSprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<string, Sprite> portraitSprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<string, Sprite> weaponSprites = new Dictionary<string, Sprite>();
+        private static readonly Dictionary<string, Sprite> itemSprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<string, Sprite> factionMarkerSprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<string, Sprite> terrainBaseSprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<string, Sprite> terrainOverlaySprites = new Dictionary<string, Sprite>();
@@ -35,6 +36,7 @@ namespace PhalanxChronicle.Presentation
         private static readonly Dictionary<string, Sprite> gradientSprites = new Dictionary<string, Sprite>();
         private static readonly Dictionary<GridOverlayKind, Sprite> gridOverlaySprites = new Dictionary<GridOverlayKind, Sprite>();
         private static readonly Dictionary<string, TMP_FontAsset> tmpFontAssets = new Dictionary<string, TMP_FontAsset>();
+        private static readonly HashSet<string> missingItemIconWarnings = new HashSet<string>();
 
         private static Sprite whiteSprite;
         private static Sprite tileSprite;
@@ -297,6 +299,34 @@ namespace PhalanxChronicle.Presentation
             }
 
             return GetWeaponSprite(profile != null ? profile.Role : UnitRole.Commander, profile != null ? profile.Faction : UnitFaction.Player);
+        }
+
+        public static Sprite GetItemIcon(ItemDefinition item)
+        {
+            return GetItemIcon(item != null ? item.ItemId : string.Empty);
+        }
+
+        public static Sprite GetItemIcon(string itemId)
+        {
+            string normalizedId = itemId ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(normalizedId))
+            {
+                return null;
+            }
+
+            if (itemSprites.TryGetValue(normalizedId, out Sprite sprite))
+            {
+                return sprite;
+            }
+
+            sprite = TryLoadSpriteResource("ItemIcons/" + normalizedId + "__icon");
+            itemSprites[normalizedId] = sprite;
+            if (sprite == null && missingItemIconWarnings.Add(normalizedId))
+            {
+                Debug.LogWarning($"[RuntimeSpriteLibrary] Missing item icon for '{normalizedId}'. Falling back to glyph rendering.");
+            }
+
+            return sprite;
         }
 
         public static Sprite GetFactionMarkerSprite(UnitVisualProfile profile)
@@ -2507,7 +2537,8 @@ namespace PhalanxChronicle.Presentation
                 return GetEssentialTmpFont();
             }
 
-            string cacheKey = roleKey + ":" + sourceFont.name;
+            string sourceFontName = GetSafeFontName(sourceFont, roleKey + " Font");
+            string cacheKey = roleKey + ":" + sourceFontName;
             if (tmpFontAssets.TryGetValue(cacheKey, out TMP_FontAsset cachedFontAsset) && cachedFontAsset != null)
             {
                 return cachedFontAsset;
@@ -2528,7 +2559,7 @@ namespace PhalanxChronicle.Presentation
             }
             catch (System.Exception exception)
             {
-                Debug.LogWarning($"[RuntimeSpriteLibrary] Failed to create TMP font asset for '{sourceFont.name}' ({roleKey}). Falling back to essential TMP font. {exception.Message}");
+                Debug.LogWarning($"[RuntimeSpriteLibrary] Failed to create TMP font asset for '{sourceFontName}' ({roleKey}). Falling back to essential TMP font. {exception.Message}");
             }
 
             if (fontAsset == null)
@@ -2544,11 +2575,28 @@ namespace PhalanxChronicle.Presentation
                 return fontAsset;
             }
 
-            fontAsset.name = sourceFont.name + " " + roleKey + " TMP";
+            fontAsset.name = sourceFontName + " " + roleKey + " TMP";
             fontAsset.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
             tmpFontAssets[cacheKey] = fontAsset;
             EnsureTmpFallbackChain();
             return fontAsset;
+        }
+
+        private static string GetSafeFontName(Font font, string fallback)
+        {
+            if (font == null)
+            {
+                return fallback;
+            }
+
+            try
+            {
+                return string.IsNullOrWhiteSpace(font.name) ? fallback : font.name;
+            }
+            catch
+            {
+                return fallback;
+            }
         }
     }
 }

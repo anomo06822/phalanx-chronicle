@@ -1305,7 +1305,9 @@ namespace PhalanxChronicle.Battle
         {
             return isAutoConfirmVisible ||
                    currentState is ScenarioDialogueState ||
-                   onboardingController != null && onboardingController.IsActive ||
+                   // Onboarding can remain active between scripted steps without rendering a visible prompt.
+                   // Auto mode should only pause for a prompt the player can actually respond to.
+                   BuildCurrentOnboardingModel() != null ||
                    battleHUD != null && battleHUD.HasAutoModePauseOverlay;
         }
 
@@ -1940,19 +1942,7 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            if (onboardingController == null || !onboardingController.IsActive || IsInteractionLocked())
-            {
-                battleHUD.HideOnboarding();
-                SyncUnitInfoVisibility();
-                return;
-            }
-
-            BattleOnboardingModel model = onboardingController.BuildModel(
-                !string.IsNullOrEmpty(selectedUnitId),
-                HasSelectionMoved(),
-                HasAttackTargetsForSelection(),
-                AnyPlayerUnitCanAttack(),
-                AreAllPlayerUnitsDone());
+            BattleOnboardingModel model = BuildCurrentOnboardingModel();
             if (model == null)
             {
                 battleHUD.HideOnboarding();
@@ -1962,6 +1952,21 @@ namespace PhalanxChronicle.Battle
 
             battleHUD.ShowOnboarding(model);
             SyncUnitInfoVisibility();
+        }
+
+        private BattleOnboardingModel BuildCurrentOnboardingModel()
+        {
+            if (onboardingController == null || !onboardingController.IsActive || IsInteractionLocked())
+            {
+                return null;
+            }
+
+            return onboardingController.BuildModel(
+                !string.IsNullOrEmpty(selectedUnitId),
+                HasSelectionMoved(),
+                HasAttackTargetsForSelection(),
+                AnyPlayerUnitCanAttack(),
+                AreAllPlayerUnitsDone());
         }
 
         private bool AnyPlayerUnitCanAttack()

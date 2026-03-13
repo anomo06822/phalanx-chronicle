@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#272A30" />
+      <stop offset="100%" stop-color="#101217" />
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="38%" r="58%">
+      <stop offset="0%" stop-color="#87929D" stop-opacity="0.45" />
+      <stop offset="70%" stop-color="#6D7A87" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#6D7A87" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="bronze" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#CFAC6A" />
+      <stop offset="52%" stop-color="#C59A49" />
+      <stop offset="100%" stop-color="#A27E3C" />
+    </linearGradient>
+  </defs>
+  <path d="M 58.0 22.0 L 198.0 22.0 L 234.0 58.0 L 234.0 198.0 L 198.0 234.0 L 58.0 234.0 L 22.0 198.0 L 22.0 58.0 Z" fill="#111318" />
+  <path d="M 62.0 30.0 L 194.0 30.0 L 226.0 62.0 L 226.0 194.0 L 194.0 226.0 L 62.0 226.0 L 30.0 194.0 L 30.0 62.0 Z" fill="url(#bronze)" opacity="0.98" />
+  <path d="M 72.0 42.0 L 184.0 42.0 L 214.0 72.0 L 214.0 184.0 L 184.0 214.0 L 72.0 214.0 L 42.0 184.0 L 42.0 72.0 Z" fill="url(#panel)" />
+  <circle cx="128" cy="128" r="76" fill="url(#glow)" />
+  <circle cx="128" cy="128" r="66" fill="none" stroke="#CEAC6E" stroke-width="4" stroke-opacity="0.32" />
+  <rect x="42" y="42" width="24" height="172" rx="10" fill="#5E6A75" opacity="0.92" />
+  <rect x="47" y="62" width="14" height="84" rx="7" fill="#798591" opacity="0.88" />
+  <path d="M 54.0 154.0 L 60.0 164.0 L 54.0 174.0 L 48.0 164.0 Z" fill="#E6E1D6" opacity="0.66" />
+  <g><path d="M 92.0 56.0 L 164.0 56.0 L 188.0 100.0 L 178.0 188.0 L 78.0 188.0 L 68.0 100.0 Z" fill="#E6E1D6" /><path d="M 108.0 76.0 L 148.0 76.0 L 160.0 120.0 L 148.0 170.0 L 108.0 170.0 L 96.0 120.0 Z" fill="#6D7A87" opacity="0.32" /><path d="M 128 72 V 176" stroke="#535D67" stroke-width="8" stroke-opacity="0.42" /></g>
+  <circle cx="192" cy="62" r="10" fill="#7F807B" opacity="0.7" />
+  <path d="M 70 206 C 94 222 162 222 186 206" fill="none" stroke="#E6E1D6" stroke-opacity="0.12" stroke-width="4" stroke-linecap="round" />
+</svg>
