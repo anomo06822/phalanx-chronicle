@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using PhalanxChronicle.Localization;
 
 namespace PhalanxChronicle.Core
 {
@@ -10,6 +11,7 @@ namespace PhalanxChronicle.Core
         private readonly CombatSystem combatSystem;
         private readonly SkillSystem skillSystem;
         private readonly AIController aiController;
+        private readonly PlayerAutoController playerAutoController;
         private readonly TurnManager turnManager;
         private EnemyTacticalPlan cachedEnemyTurnPlan;
 
@@ -21,6 +23,7 @@ namespace PhalanxChronicle.Core
             combatSystem = new CombatSystem(rangeCalculator);
             skillSystem = new SkillSystem();
             aiController = new AIController(rangeCalculator, skillSystem);
+            playerAutoController = new PlayerAutoController();
             turnManager = new TurnManager();
             turnManager.BeginTurn(Context, TurnSide.Player);
             Context.EvaluateBattleOutcome();
@@ -138,7 +141,7 @@ namespace PhalanxChronicle.Core
 
             if (!rangeCalculator.TryBuildMovePath(Context, unit, destination, out IReadOnlyList<GridPosition> path, out int moveCost))
             {
-                return CreateInvalidPreview(BattleIntentActionKind.Move, unit, destination, "Destination blocked");
+                return CreateInvalidPreview(BattleIntentActionKind.Move, unit, destination, LocalizationService.Text("ui.preview.invalid.destination_blocked", "Destination blocked"));
             }
 
             return new BattleIntentPreview(
@@ -151,8 +154,8 @@ namespace PhalanxChronicle.Core
                 string.Empty,
                 new List<BattleIntentEffectPreview>(),
                 BattleThreatAnalyzer.AnalyzeProjected(Context, unit, destination),
-                "Move " + moveCost,
-                "Reposition",
+                LocalizationService.Format("ui.move.cost", "Move {0}", moveCost),
+                LocalizationService.Text("ui.move.reposition", "Reposition"),
                 0,
                 true,
                 string.Empty);
@@ -321,18 +324,18 @@ namespace PhalanxChronicle.Core
             GridPosition destination = destinationOverride ?? (attacker != null ? attacker.Position : new GridPosition(0, 0));
             if (!CanControlUnit(attacker) || target == null || !target.IsAlive || attacker.Faction == target.Faction)
             {
-                return CreateInvalidPreview(BattleIntentActionKind.Attack, attacker, destination, "No valid target");
+                return CreateInvalidPreview(BattleIntentActionKind.Attack, attacker, destination, LocalizationService.Text("ui.preview.invalid.no_valid_target", "No valid target"));
             }
 
             if (!TryResolveProjectedOrigin(attacker, destination, out IReadOnlyList<GridPosition> path, out int moveCost))
             {
-                return CreateInvalidPreview(BattleIntentActionKind.Attack, attacker, destination, "Destination blocked");
+                return CreateInvalidPreview(BattleIntentActionKind.Attack, attacker, destination, LocalizationService.Text("ui.preview.invalid.destination_blocked", "Destination blocked"));
             }
 
             int attackRange = PassiveSkillRules.GetAttackRange(attacker);
             if (destination.ManhattanDistance(target.Position) <= 0 || destination.ManhattanDistance(target.Position) > attackRange)
             {
-                return CreateInvalidPreview(BattleIntentActionKind.Attack, attacker, destination, "Target out of range");
+                return CreateInvalidPreview(BattleIntentActionKind.Attack, attacker, destination, LocalizationService.Text("ui.preview.invalid.target_out_of_range", "Target out of range"));
             }
 
             int damage = BattlePreviewCalculator.EstimateAttackDamage(Context, attacker, destination, target);
@@ -355,8 +358,8 @@ namespace PhalanxChronicle.Core
                 target.Id,
                 new[] { effect },
                 BattleThreatAnalyzer.AnalyzeProjected(Context, attacker, destination, effect.Lethal ? new[] { target.Id } : null),
-                "Range " + attackRange,
-                "Single target",
+                LocalizationService.Format("ui.attack.range", "Range {0}", attackRange),
+                LocalizationService.Text("ui.attack.target.single", "Single target"),
                 0,
                 true,
                 string.Empty);
@@ -369,17 +372,17 @@ namespace PhalanxChronicle.Core
             GridPosition destination = destinationOverride ?? (caster != null ? caster.Position : new GridPosition(0, 0));
             if (!CanControlUnit(caster) || primaryTarget == null || !primaryTarget.IsAlive || caster.ActiveSkill == ActiveSkillType.None)
             {
-                return CreateInvalidPreview(BattleIntentActionKind.Skill, caster, destination, "No valid skill target");
+                return CreateInvalidPreview(BattleIntentActionKind.Skill, caster, destination, LocalizationService.Text("ui.preview.invalid.no_valid_skill_target", "No valid skill target"));
             }
 
             if (!TryResolveProjectedOrigin(caster, destination, out IReadOnlyList<GridPosition> path, out int moveCost))
             {
-                return CreateInvalidPreview(BattleIntentActionKind.Skill, caster, destination, "Destination blocked");
+                return CreateInvalidPreview(BattleIntentActionKind.Skill, caster, destination, LocalizationService.Text("ui.preview.invalid.destination_blocked", "Destination blocked"));
             }
 
             if (!skillSystem.GetSkillTargets(Context, caster, destination).Any(unit => unit.Id == primaryTarget.Id))
             {
-                return CreateInvalidPreview(BattleIntentActionKind.Skill, caster, destination, "No valid skill target");
+                return CreateInvalidPreview(BattleIntentActionKind.Skill, caster, destination, LocalizationService.Text("ui.preview.invalid.no_valid_skill_target", "No valid skill target"));
             }
 
             IReadOnlyList<UnitRuntimeState> affectedUnits = skillSystem.GetSkillAffectedUnits(Context, caster, destination, primaryTarget);
@@ -397,7 +400,7 @@ namespace PhalanxChronicle.Core
                 primaryTarget.Id,
                 effects,
                 BattleThreatAnalyzer.AnalyzeProjected(Context, caster, destination, effects.Where(effect => effect.Lethal).Select(effect => effect.UnitId).ToList()),
-                "Range " + ActiveSkillRules.GetRange(caster),
+                LocalizationService.Format("ui.skill.range", "Range {0}", ActiveSkillRules.GetRange(caster)),
                 BuildSkillAreaLabel(caster.ActiveSkill),
                 ActiveSkillRules.GetManaCost(caster.ActiveSkill),
                 true,
@@ -411,7 +414,7 @@ namespace PhalanxChronicle.Core
             BattleQuickAttackPreview preview = GetQuickAttackPreview(attackerUnitId, targetUnitId);
             if (preview == null || attacker == null || target == null)
             {
-                return CreateInvalidPreview(BattleIntentActionKind.QuickAttack, attacker, attacker != null ? attacker.Position : new GridPosition(0, 0), "No quick attack path");
+                return CreateInvalidPreview(BattleIntentActionKind.QuickAttack, attacker, attacker != null ? attacker.Position : new GridPosition(0, 0), LocalizationService.Text("ui.preview.invalid.no_quick_attack_path", "No quick attack path"));
             }
 
             BattleIntentEffectPreview effect = new BattleIntentEffectPreview(
@@ -433,8 +436,8 @@ namespace PhalanxChronicle.Core
                 target.Id,
                 new[] { effect },
                 BattleThreatAnalyzer.AnalyzeProjected(Context, attacker, preview.Destination, effect.Lethal ? new[] { target.Id } : null),
-                "Range " + PassiveSkillRules.GetAttackRange(attacker),
-                "Single target",
+                LocalizationService.Format("ui.attack.range", "Range {0}", PassiveSkillRules.GetAttackRange(attacker)),
+                LocalizationService.Text("ui.attack.target.single", "Single target"),
                 0,
                 true,
                 string.Empty);
@@ -461,6 +464,12 @@ namespace PhalanxChronicle.Core
             UnitRuntimeState enemy = Context.GetUnit(unitId);
             EnemyTacticalPlan plan = cachedEnemyTurnPlan ?? aiController.CreateTacticalPlan(Context);
             return aiController.Decide(Context, enemy, plan);
+        }
+
+        public AiDecision BuildPlayerAutoDecision(string unitId)
+        {
+            UnitRuntimeState playerUnit = Context.GetUnit(unitId);
+            return playerAutoController.Decide(this, playerUnit);
         }
 
         public UnitActionResult ResolveEnemyAction(string unitId)
@@ -498,10 +507,49 @@ namespace PhalanxChronicle.Core
             return new UnitActionResult(enemy.Id, start, enemy.Position, combatResult, skillResult);
         }
 
+        public UnitActionResult ResolvePlayerAutoAction(string unitId)
+        {
+            UnitRuntimeState playerUnit = Context.GetUnit(unitId);
+            if (!CanControlUnit(playerUnit) || playerUnit.HasActed)
+            {
+                return null;
+            }
+
+            GridPosition start = playerUnit.Position;
+            AiDecision decision = playerAutoController.Decide(this, playerUnit);
+            if (decision.Destination != playerUnit.Position)
+            {
+                moveSystem.TryMove(Context, playerUnit, decision.Destination);
+            }
+
+            CombatResult combatResult = null;
+            SkillResult skillResult = null;
+            if (decision.ActionType == AiActionType.Skill && decision.HasTarget)
+            {
+                skillResult = skillSystem.TryUseSkill(Context, playerUnit, Context.GetUnit(decision.TargetUnitId));
+            }
+            else if (decision.ActionType == AiActionType.Attack && decision.HasTarget)
+            {
+                combatResult = combatSystem.TryAttack(Context, playerUnit, Context.GetUnit(decision.TargetUnitId));
+            }
+
+            if (combatResult == null && skillResult == null && !playerUnit.HasActed)
+            {
+                playerUnit.MarkActed();
+            }
+
+            return new UnitActionResult(playerUnit.Id, start, playerUnit.Position, combatResult, skillResult);
+        }
+
         public IReadOnlyList<string> BuildEnemyTurnOrder()
         {
             cachedEnemyTurnPlan = aiController.CreateTacticalPlan(Context);
             return cachedEnemyTurnPlan.OrderedUnitIds;
+        }
+
+        public IReadOnlyList<string> BuildPlayerAutoTurnOrder()
+        {
+            return playerAutoController.BuildTurnOrder(this);
         }
 
         private bool TryResolveProjectedOrigin(UnitRuntimeState unit, GridPosition destination, out IReadOnlyList<GridPosition> path, out int moveCost)
@@ -797,33 +845,33 @@ namespace PhalanxChronicle.Core
             switch (skillType)
             {
                 case ActiveSkillType.RoyalAid:
-                    return "Single ally";
+                    return LocalizationService.Text("ui.skill.impact.single_ally", "1 ally");
                 case ActiveSkillType.ImperialAid:
                 case ActiveSkillType.GuardOrder:
                 case ActiveSkillType.KingsBanner:
                 case ActiveSkillType.FeatherFormation:
-                    return "Ally + adjacent";
+                    return LocalizationService.Text("ui.skill.impact.ally_adjacent", "1 ally + adjacent");
                 case ActiveSkillType.PowerStrike:
                 case ActiveSkillType.PinningShot:
                 case ActiveSkillType.DragonPierce:
                 case ActiveSkillType.WhiteHorseRescue:
-                    return "Single foe";
+                    return LocalizationService.Text("ui.skill.impact.single_enemy", "1 foe");
                 case ActiveSkillType.Volley:
                 case ActiveSkillType.SkyVolley:
                 case ActiveSkillType.FireStratagem:
                 case ActiveSkillType.EightTrigramInferno:
-                    return "Target + adjacent";
+                    return LocalizationService.Text("ui.skill.impact.enemy_adjacent", "1 foe + adjacent");
                 case ActiveSkillType.GreenDragonSlash:
                 case ActiveSkillType.AzureDragonSlash:
                 case ActiveSkillType.WesternStampede:
                 case ActiveSkillType.CrimsonCrescent:
                 case ActiveSkillType.StormbreakCharge:
-                    return "Line cleave";
+                    return LocalizationService.Text("ui.skill.impact.line", "up to 2 foes");
                 case ActiveSkillType.WarCry:
                 case ActiveSkillType.LionWarCry:
                 case ActiveSkillType.StonewallChallenge:
                 case ActiveSkillType.DustDevilSweep:
-                    return "Nearby foes";
+                    return LocalizationService.Text("ui.skill.impact.nearby", "nearby foes");
                 default:
                     return string.Empty;
             }

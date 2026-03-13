@@ -54,6 +54,10 @@ namespace PhalanxChronicle.Battle
         private FirstBattleOnboardingController onboardingController;
         private BattleDecisionContext currentDecisionContext = new BattleDecisionContext();
         private BattleOverviewModel currentOverviewModel = new BattleOverviewModel();
+        private bool isAutoModeEnabled;
+        private bool isAutoModeRunning;
+        private bool isAutoModePausedByOverlay;
+        private bool isAutoConfirmVisible;
 
         public bool IsDialogueVisible => battleHUD != null && battleHUD.IsDialogueVisible;
 
@@ -64,6 +68,8 @@ namespace PhalanxChronicle.Battle
         public bool IsCampaignOverlayVisible => battleHUD != null && battleHUD.IsCampaignOverlayVisible;
 
         public bool IsOnboardingVisible => battleHUD != null && battleHUD.IsOnboardingVisible;
+
+        public bool IsAutoModeEnabled => isAutoModeEnabled;
 
         public bool IsActionMenuVisible => actionMenuPanel != null && actionMenuPanel.IsVisible;
 
@@ -179,12 +185,36 @@ namespace PhalanxChronicle.Battle
 
         public void SetEndTurnEnabled(bool enabled)
         {
-            battleHUD.SetEndTurnEnabled(enabled);
+            battleHUD.SetEndTurnEnabled(enabled && !isAutoModeRunning);
         }
 
         public void SetRerollEnabled(bool enabled)
         {
             battleHUD.SetRerollEnabled(enabled);
+        }
+
+        public bool ShouldEnterAutoModeFromPlayerState()
+        {
+            if (!isAutoModeEnabled ||
+                isAutoModeRunning ||
+                simulation == null ||
+                simulation.Context == null ||
+                simulation.Context.BattleEnded ||
+                simulation.Context.CurrentTurnSide != TurnSide.Player)
+            {
+                return false;
+            }
+
+            if (ShouldPauseAutoMode())
+            {
+                isAutoModePausedByOverlay = true;
+                RefreshAutoModeUi();
+                return false;
+            }
+
+            isAutoModePausedByOverlay = false;
+            RefreshAutoModeUi();
+            return true;
         }
 
         public void ShowResult(string text)
@@ -598,6 +628,86 @@ namespace PhalanxChronicle.Battle
                 : LocalizationService.Text("ui.log.choose_action_hold", "原地可選擇攻擊、技能或待命。");
         }
 
+        public IEnumerator RunAutoBattleLoop()
+        {
+            if (!isAutoModeEnabled ||
+                simulation == null ||
+                simulation.Context == null ||
+                simulation.Context.CurrentTurnSide != TurnSide.Player)
+            {
+                isAutoModeRunning = false;
+                isAutoModePausedByOverlay = false;
+                RefreshAutoModeUi();
+                yield break;
+            }
+
+            if (ShouldPauseAutoMode())
+            {
+                isAutoModeRunning = false;
+                isAutoModePausedByOverlay = true;
+                RefreshAutoModeUi();
+                ChangeState<UnitSelectionState>();
+                yield break;
+            }
+
+            IReadOnlyList<string> orderedPlayerIds = simulation.BuildPlayerAutoTurnOrder();
+            if (orderedPlayerIds.Count == 0)
+            {
+                isAutoModeRunning = false;
+                isAutoModePausedByOverlay = false;
+                RefreshAutoModeUi();
+                ChangeState<EnemyTurnState>();
+                yield break;
+            }
+
+            isAutoModeRunning = true;
+            isAutoModePausedByOverlay = false;
+            HideActionMenu();
+            ClearSelectionAndHighlights();
+            SetEndTurnEnabled(false);
+            RefreshAutoModeUi();
+
+            UnitActionResult actionResult = simulation.ResolvePlayerAutoAction(orderedPlayerIds[0]);
+            if (actionResult == null)
+            {
+                isAutoModeRunning = false;
+                RefreshAutoModeUi();
+                ChangeState<UnitSelectionState>();
+                yield break;
+            }
+
+            Unit actorView = GetUnitView(actionResult.UnitId);
+            if (actorView != null && actionResult.EndPosition != actionResult.StartPosition)
+            {
+                Vector3 startWorld = gridManager.GetWorldPosition(actionResult.StartPosition) + new Vector3(0f, 0f, -0.5f);
+                Vector3 endWorld = gridManager.GetWorldPosition(actionResult.EndPosition) + new Vector3(0f, 0f, -0.5f);
+                yield return actorView.AnimateMove(startWorld, endWorld, 0.22f);
+            }
+
+            string logText;
+            if (actionResult.PerformedAttack)
+            {
+                yield return PlayCombatSequence(actionResult.CombatResult, TurnSide.Player);
+                logText = BuildCombatLog(actionResult.CombatResult);
+            }
+            else if (actionResult.PerformedSkill)
+            {
+                yield return PlaySkillSequence(actionResult.SkillResult, TurnSide.Player);
+                logText = BuildSkillLog(actionResult.SkillResult);
+            }
+            else
+            {
+                RefreshAllVisuals();
+                logText = BuildAutoActionLog(actionResult);
+            }
+
+            yield return new WaitForSeconds(actionSequencer.GetPostActionHold(actionResult));
+
+            isAutoModeRunning = false;
+            RefreshAutoModeUi();
+            ResolveAutoPlayerAction(logText);
+        }
+
         public void ResolvePlayerAction(string logMessage)
         {
             SetLog(logMessage);
@@ -607,6 +717,38 @@ namespace PhalanxChronicle.Battle
             ClearSelectionAndHighlights();
 
             Type nextStateType = AreAllPlayerUnitsDone() ? typeof(EnemyTurnState) : typeof(UnitSelectionState);
+            if (HandlePostActionScenarioFlow(nextStateType))
+            {
+                return;
+            }
+
+            SetEndTurnEnabled(true);
+            ChangeState(nextStateType);
+        }
+
+        public void ResolveAutoPlayerAction(string logMessage)
+        {
+            SetLog(logMessage);
+            PushBattleFeedEntry(logMessage);
+            HideActionMenu();
+            ClearDecisionContext();
+            ClearSelectionAndHighlights();
+
+            Type nextStateType;
+            if (AreAllPlayerUnitsDone())
+            {
+                nextStateType = typeof(EnemyTurnState);
+            }
+            else if (isAutoModeEnabled && !ShouldPauseAutoMode())
+            {
+                nextStateType = typeof(PlayerAutoTurnState);
+            }
+            else
+            {
+                isAutoModePausedByOverlay = isAutoModeEnabled;
+                nextStateType = typeof(UnitSelectionState);
+            }
+
             if (HandlePostActionScenarioFlow(nextStateType))
             {
                 return;
@@ -777,10 +919,14 @@ namespace PhalanxChronicle.Battle
                 canvasObject.transform,
                 HandleEndTurnRequested,
                 HandleRerollRequested,
+                HandleAutoModeRequested,
                 HandleDialogueAdvanceRequested,
                 HandleResultAdvanceRequested,
                 HandleOnboardingSkipRequested,
+                HandleAutoModeConfirmed,
+                HandleAutoModeCancelled,
                 hudModelBuilder);
+            RefreshAutoModeUi();
 
             GameObject actionMenuObject = new GameObject("ActionMenuPanel");
             actionMenuObject.transform.SetParent(canvasObject.transform, false);
@@ -891,6 +1037,7 @@ namespace PhalanxChronicle.Battle
             states[typeof(UnitSkillTargetState)] = new UnitSkillTargetState(this);
             states[typeof(UnitActionExecuteState)] = new UnitActionExecuteState(this);
             states[typeof(EnemyTurnState)] = new EnemyTurnState(this);
+            states[typeof(PlayerAutoTurnState)] = new PlayerAutoTurnState(this);
             states[typeof(ScenarioDialogueState)] = new ScenarioDialogueState(this);
             states[typeof(BattleVictoryState)] = new BattleVictoryState(this);
             states[typeof(BattleDefeatState)] = new BattleDefeatState(this);
@@ -986,6 +1133,71 @@ namespace PhalanxChronicle.Battle
             currentState?.OnEndTurnRequested();
         }
 
+        private void HandleAutoModeRequested()
+        {
+            if (battleHUD == null || simulation == null || simulation.Context == null || simulation.Context.BattleEnded)
+            {
+                return;
+            }
+
+            if (isAutoModeEnabled)
+            {
+                DisableAutoMode(LocalizationService.Text("ui.log.auto_disabled", "AI auto mode stopped."));
+                return;
+            }
+
+            isAutoConfirmVisible = true;
+            RefreshAutoModeUi();
+            battleHUD.ShowConfirmDialog(new BattleConfirmDialogModel
+            {
+                Title = LocalizationService.Text("ui.auto.confirm.title", "啟用 AI 自動模式？"),
+                Body = LocalizationService.Text("ui.auto.confirm.body", "啟用後，AI 會接手我軍並自動完成戰鬥。遇到劇情對話或新手引導時會暫停，直到你繼續。"),
+                ConfirmLabel = LocalizationService.Text("ui.auto.confirm.confirm", "啟用 AI"),
+                CancelLabel = LocalizationService.Text("ui.button.cancel", "取消"),
+            });
+            SyncUnitInfoVisibility();
+        }
+
+        private void HandleAutoModeConfirmed()
+        {
+            if (!isAutoConfirmVisible || battleHUD == null)
+            {
+                return;
+            }
+
+            isAutoConfirmVisible = false;
+            isAutoModeEnabled = true;
+            isAutoModePausedByOverlay = false;
+            battleHUD.HideConfirmDialog();
+            RefreshAutoModeUi();
+            SetLog(LocalizationService.Text("ui.log.auto_enabled", "AI auto mode engaged."));
+            SyncUnitInfoVisibility();
+
+            if (simulation == null || simulation.Context == null || simulation.Context.CurrentTurnSide != TurnSide.Player)
+            {
+                return;
+            }
+
+            if (IsPlayerManualControlState())
+            {
+                PrepareAutoModeTakeover();
+                ChangeState<UnitSelectionState>();
+            }
+        }
+
+        private void HandleAutoModeCancelled()
+        {
+            if (!isAutoConfirmVisible)
+            {
+                return;
+            }
+
+            isAutoConfirmVisible = false;
+            battleHUD.HideConfirmDialog();
+            RefreshAutoModeUi();
+            SyncUnitInfoVisibility();
+        }
+
         private void HandleRerollRequested()
         {
             if (IsInteractionLocked() || scenarioData == null || !scenarioData.Stage.IsRandomMap)
@@ -1005,6 +1217,125 @@ namespace PhalanxChronicle.Battle
         private void HandleResultAdvanceRequested()
         {
             currentState?.OnConfirmRequested();
+        }
+
+        private void DisableAutoMode(string logMessage)
+        {
+            bool wasEnabled = isAutoModeEnabled || isAutoConfirmVisible;
+            isAutoModeEnabled = false;
+            isAutoModePausedByOverlay = false;
+            isAutoConfirmVisible = false;
+            if (battleHUD != null)
+            {
+                battleHUD.HideConfirmDialog();
+            }
+
+            RefreshAutoModeUi();
+            SyncUnitInfoVisibility();
+
+            if (!string.IsNullOrWhiteSpace(logMessage) && wasEnabled)
+            {
+                SetLog(logMessage);
+            }
+
+            if (!isAutoModeRunning &&
+                simulation != null &&
+                simulation.Context != null &&
+                simulation.Context.CurrentTurnSide == TurnSide.Player &&
+                currentState is PlayerAutoTurnState)
+            {
+                ChangeState<UnitSelectionState>();
+            }
+        }
+
+        private void ResetAutoModeState()
+        {
+            isAutoModeEnabled = false;
+            isAutoModeRunning = false;
+            isAutoModePausedByOverlay = false;
+            isAutoConfirmVisible = false;
+            if (battleHUD != null)
+            {
+                battleHUD.HideConfirmDialog();
+            }
+
+            RefreshAutoModeUi();
+        }
+
+        private void RefreshAutoModeUi()
+        {
+            if (battleHUD == null)
+            {
+                return;
+            }
+
+            battleHUD.SetAutoModeState(isAutoModeEnabled);
+        }
+
+        private bool ShouldPauseAutoMode()
+        {
+            return isAutoConfirmVisible ||
+                   currentState is ScenarioDialogueState ||
+                   onboardingController != null && onboardingController.IsActive ||
+                   battleHUD != null && (battleHUD.IsCampaignOverlayVisible ||
+                                         battleHUD.IsResultVisible ||
+                                         battleHUD.IsDialogueVisible ||
+                                         battleHUD.IsConfirmDialogVisible);
+        }
+
+        private bool IsPlayerManualControlState()
+        {
+            return currentState is PlayerTurnStartState ||
+                   currentState is UnitSelectionState ||
+                   currentState is UnitMoveSelectState ||
+                   currentState is UnitActionMenuState ||
+                   currentState is UnitTargetSelectState ||
+                   currentState is UnitSkillTargetState;
+        }
+
+        private void PrepareAutoModeTakeover()
+        {
+            pendingCombatResult = null;
+            pendingSkillResult = null;
+            HideActionMenu();
+            ClearDecisionContext();
+            ClearSelectionAndHighlights();
+        }
+
+        private void TryResumeAutoModeAfterPause()
+        {
+            if (!isAutoModeEnabled ||
+                isAutoModeRunning ||
+                simulation == null ||
+                simulation.Context == null ||
+                simulation.Context.CurrentTurnSide != TurnSide.Player ||
+                !IsPlayerManualControlState())
+            {
+                return;
+            }
+
+            if (ShouldPauseAutoMode())
+            {
+                isAutoModePausedByOverlay = true;
+                RefreshAutoModeUi();
+                return;
+            }
+
+            PrepareAutoModeTakeover();
+            ChangeState<UnitSelectionState>();
+        }
+
+        private string BuildAutoActionLog(UnitActionResult actionResult)
+        {
+            if (actionResult == null)
+            {
+                return LocalizationService.Text("ui.log.auto_waiting", "AI auto mode is waiting for the next opening.");
+            }
+
+            string unitName = GetUnitDisplayName(actionResult.UnitId);
+            return actionResult.EndPosition != actionResult.StartPosition
+                ? LocalizationService.Format("ui.log.auto_advanced", "{0} advanced under AI command.", unitName)
+                : LocalizationService.Format("ui.log.auto_held", "{0} held position under AI command.", unitName);
         }
 
         private UnitRuntimeState GetSelectedUnit()
@@ -1039,6 +1370,7 @@ namespace PhalanxChronicle.Battle
                 BuildRosterEntries(UnitFaction.Enemy, threatProjection),
                 HandleHudUnitRequested);
             battleHUD.BindDecisionContextModel(BuildDecisionContextModel());
+            RefreshAutoModeUi();
             RefreshOnboardingPrompt();
         }
 
@@ -1355,6 +1687,7 @@ namespace PhalanxChronicle.Battle
             StopAllCoroutines();
             currentState?.Exit();
             currentState = null;
+            ResetAutoModeState();
             selectedUnitId = null;
             pendingCombatResult = null;
             pendingSkillResult = null;
@@ -1374,6 +1707,7 @@ namespace PhalanxChronicle.Battle
             battleHUD.HideDialogue();
             battleHUD.HideCampaignOverlay();
             battleHUD.HideOnboarding();
+            battleHUD.HideConfirmDialog();
 
             scenarioData = data;
             simulation = new BattleSimulation(scenarioData.Stage);
@@ -1507,6 +1841,7 @@ namespace PhalanxChronicle.Battle
             SyncUnitInfoVisibility();
             firstBattleOnboardingResolvedHandler?.Invoke(true);
             firstBattleOnboardingResolvedHandler = null;
+            TryResumeAutoModeAfterPause();
         }
 
         private void RefreshOnboardingPrompt()
@@ -1561,8 +1896,12 @@ namespace PhalanxChronicle.Battle
 
         private bool IsInteractionLocked()
         {
-            return currentState is ScenarioDialogueState ||
-                   battleHUD != null && (battleHUD.IsCampaignOverlayVisible || battleHUD.IsResultVisible);
+            return isAutoModeRunning ||
+                   isAutoConfirmVisible ||
+                   currentState is ScenarioDialogueState ||
+                   battleHUD != null && (battleHUD.IsCampaignOverlayVisible ||
+                                         battleHUD.IsResultVisible ||
+                                         battleHUD.IsConfirmDialogVisible);
         }
 
         private bool ShouldSuppressUnitInfo()
@@ -1571,7 +1910,8 @@ namespace PhalanxChronicle.Battle
                    (battleHUD.IsCampaignOverlayVisible ||
                     battleHUD.IsDialogueVisible ||
                     battleHUD.IsResultVisible ||
-                    battleHUD.IsOnboardingVisible);
+                    battleHUD.IsOnboardingVisible ||
+                    battleHUD.IsConfirmDialogVisible);
         }
 
         private void SyncUnitInfoVisibility()
@@ -1616,6 +1956,8 @@ namespace PhalanxChronicle.Battle
                 return false;
             }
 
+            isAutoModePausedByOverlay = isAutoModeEnabled;
+            RefreshAutoModeUi();
             pendingDialogueResumeState = resumeStateType;
             ChangeState<ScenarioDialogueState>();
             return true;
@@ -1633,6 +1975,9 @@ namespace PhalanxChronicle.Battle
             ProcessScenarioCheckpoint(ScenarioCheckpoint.ActionResolved);
             if (simulation.Context.BattleEnded)
             {
+                isAutoModeRunning = false;
+                isAutoModePausedByOverlay = false;
+                RefreshAutoModeUi();
                 onboardingController?.MarkBattleCompleted();
                 if (onboardingController != null && !onboardingController.WasSkipped)
                 {

@@ -47,6 +47,12 @@ namespace PhalanxChronicle.Battle.States
                 return;
             }
 
+            if (BattleManager.ShouldEnterAutoModeFromPlayerState())
+            {
+                BattleManager.ChangeState<PlayerAutoTurnState>();
+                return;
+            }
+
             BattleManager.ChangeState<UnitSelectionState>();
         }
     }
@@ -67,6 +73,12 @@ namespace PhalanxChronicle.Battle.States
             if (BattleManager.AreAllPlayerUnitsDone())
             {
                 BattleManager.ChangeState<EnemyTurnState>();
+                return;
+            }
+
+            if (BattleManager.ShouldEnterAutoModeFromPlayerState())
+            {
+                BattleManager.ChangeState<PlayerAutoTurnState>();
                 return;
             }
 
@@ -383,6 +395,25 @@ namespace PhalanxChronicle.Battle.States
         private IEnumerator RunEnemyTurn()
         {
             yield return BattleManager.ExecuteEnemyTurnSequence();
+        }
+    }
+
+    public sealed class PlayerAutoTurnState : BattleStateBase
+    {
+        public PlayerAutoTurnState(BattleManager battleManager) : base(battleManager)
+        {
+        }
+
+        public override string Name => nameof(PlayerAutoTurnState);
+
+        public override void Enter()
+        {
+            BattleManager.StartManagedCoroutine(RunAutoTurn());
+        }
+
+        private IEnumerator RunAutoTurn()
+        {
+            yield return BattleManager.RunAutoBattleLoop();
         }
     }
 

@@ -9,7 +9,7 @@ from generate_character_art import convert_svg_to_png, darken, ensure_dir, light
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TERRAIN_SOURCE_ROOT = ROOT / "ArtSource" / "Generated" / "Terrain"
+TERRAIN_SOURCE_ROOT = ROOT / "Assets" / "ArtSource" / "Terrain" / "Generated"
 TERRAIN_OUTPUT_ROOT = ROOT / "Assets" / "Resources" / "Terrain"
 TERRAIN_SIZE = 64
 VARIANTS = ("a", "b", "c")

@@ -480,6 +480,222 @@ namespace PhalanxChronicle.Headless.Tests
         }
 
         [Fact]
+        public void PlayerAutoDecision_PrefersKillableTargetOverHigherHpEnemy()
+        {
+            UnitDefinitionData player = CreateDefinition(
+                "player-ranger",
+                "Player Ranger",
+                UnitFaction.Player,
+                UnitRole.Ranger,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                attack: 7,
+                attackRange: 1,
+                aiProfile: AiProfileType.Aggressor);
+            UnitDefinitionData healthyTarget = CreateDefinition(
+                "enemy-healthy",
+                "Healthy Target",
+                UnitFaction.Enemy,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 18,
+                defense: 2);
+            UnitDefinitionData killableTarget = CreateDefinition(
+                "enemy-killable",
+                "Killable Target",
+                UnitFaction.Enemy,
+                UnitRole.Raider,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 4,
+                defense: 0);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Player Kill Priority",
+                "stage.player_kill_priority",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(player, new GridPosition(3, 2)),
+                    new UnitSpawnData(healthyTarget, new GridPosition(2, 2)),
+                    new UnitSpawnData(killableTarget, new GridPosition(4, 2)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            AiDecision decision = simulation.BuildPlayerAutoDecision("player-ranger");
+
+            Assert.Equal(AiActionType.Attack, decision.ActionType);
+            Assert.Equal("enemy-killable", decision.TargetUnitId);
+            Assert.Equal(new GridPosition(3, 2), decision.Destination);
+        }
+
+        [Fact]
+        public void PlayerAutoDecision_SupportPrefersHealingWoundedAlly()
+        {
+            UnitDefinitionData healer = CreateDefinition(
+                "player-healer",
+                "Player Healer",
+                UnitFaction.Player,
+                UnitRole.Commander,
+                PassiveSkillType.CommandAura,
+                ActiveSkillType.RoyalAid,
+                attack: 8,
+                aiProfile: AiProfileType.Support);
+            UnitDefinitionData woundedAlly = CreateDefinition(
+                "player-ally",
+                "Wounded Ally",
+                UnitFaction.Player,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 20,
+                defense: 4,
+                aiProfile: AiProfileType.Protector);
+            UnitDefinitionData enemy = CreateDefinition(
+                "enemy-1",
+                "Enemy",
+                UnitFaction.Enemy,
+                UnitRole.Raider,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 20,
+                attack: 8);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Player Support Priority",
+                "stage.player_support_priority",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(healer, new GridPosition(1, 1)),
+                    new UnitSpawnData(woundedAlly, new GridPosition(2, 1)),
+                    new UnitSpawnData(enemy, new GridPosition(6, 6)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+            simulation.Context.GetUnit("player-ally").ApplyDamage(12);
+
+            AiDecision decision = simulation.BuildPlayerAutoDecision("player-healer");
+
+            Assert.Equal(AiActionType.Skill, decision.ActionType);
+            Assert.Equal("player-ally", decision.TargetUnitId);
+        }
+
+        [Fact]
+        public void ResolvePlayerAutoAction_MovesExecutesAndMarksUnitActed()
+        {
+            UnitDefinitionData player = CreateDefinition(
+                "player-rider",
+                "Player Rider",
+                UnitFaction.Player,
+                UnitRole.Raider,
+                PassiveSkillType.RapidMarch,
+                ActiveSkillType.None,
+                attack: 9,
+                moveRange: 2,
+                attackRange: 1,
+                aiProfile: AiProfileType.Aggressor);
+            UnitDefinitionData enemy = CreateDefinition(
+                "enemy-1",
+                "Enemy",
+                UnitFaction.Enemy,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                maxHp: 18,
+                defense: 2);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Player Auto Resolve",
+                "stage.player_auto_resolve",
+                8,
+                8,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(player, new GridPosition(0, 0)),
+                    new UnitSpawnData(enemy, new GridPosition(3, 0)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            UnitActionResult actionResult = simulation.ResolvePlayerAutoAction("player-rider");
+
+            Assert.NotNull(actionResult);
+            Assert.NotEqual(actionResult.StartPosition, actionResult.EndPosition);
+            Assert.True(actionResult.PerformedAttack);
+            Assert.True(simulation.Context.GetUnit("player-rider").HasActed);
+        }
+
+        [Fact]
+        public void BuildPlayerAutoTurnOrder_ExcludesActedUnitsAndAllowsEnemyHandoff()
+        {
+            UnitDefinitionData playerA = CreateDefinition(
+                "player-a",
+                "Player A",
+                UnitFaction.Player,
+                UnitRole.Commander,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                moveRange: 2,
+                aiProfile: AiProfileType.Protector);
+            UnitDefinitionData playerB = CreateDefinition(
+                "player-b",
+                "Player B",
+                UnitFaction.Player,
+                UnitRole.Guardian,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                moveRange: 2,
+                aiProfile: AiProfileType.Protector);
+            UnitDefinitionData enemy = CreateDefinition(
+                "enemy-1",
+                "Enemy",
+                UnitFaction.Enemy,
+                UnitRole.Raider,
+                PassiveSkillType.None,
+                ActiveSkillType.None,
+                moveRange: 2);
+
+            StageDefinitionData stage = new StageDefinitionData(
+                "Player Auto Turn Order",
+                "stage.player_auto_turn_order",
+                10,
+                10,
+                new List<UnitSpawnData>
+                {
+                    new UnitSpawnData(playerA, new GridPosition(0, 0)),
+                    new UnitSpawnData(playerB, new GridPosition(1, 0)),
+                    new UnitSpawnData(enemy, new GridPosition(8, 8)),
+                },
+                new List<GridPosition>());
+
+            BattleSimulation simulation = new BattleSimulation(stage);
+
+            IReadOnlyList<string> firstOrder = simulation.BuildPlayerAutoTurnOrder();
+            Assert.Equal(2, firstOrder.Count);
+
+            UnitActionResult firstAction = simulation.ResolvePlayerAutoAction(firstOrder[0]);
+            Assert.NotNull(firstAction);
+
+            IReadOnlyList<string> secondOrder = simulation.BuildPlayerAutoTurnOrder();
+            Assert.Single(secondOrder);
+            Assert.DoesNotContain(firstOrder[0], secondOrder);
+
+            UnitActionResult secondAction = simulation.ResolvePlayerAutoAction(secondOrder[0]);
+            Assert.NotNull(secondAction);
+            Assert.True(simulation.AreAllUnitsDone(UnitFaction.Player));
+            Assert.Equal(TurnSide.Enemy, simulation.EndCurrentTurn());
+            Assert.Equal(TurnSide.Enemy, simulation.Context.CurrentTurnSide);
+        }
+
+        [Fact]
         public void EnemyAi_SupportAvoidsLowValueVolleyAgainstSingleTarget()
         {
             UnitDefinitionData player = CreateDefinition(

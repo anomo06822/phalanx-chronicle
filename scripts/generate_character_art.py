@@ -13,7 +13,7 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "Docs" / "character-asset-manifest.csv"
-ART_SOURCE_ROOT = ROOT / "ArtSource" / "Generated" / "Characters"
+ART_SOURCE_ROOT = ROOT / "Assets" / "ArtSource" / "Characters" / "Generated"
 PORTRAIT_OUTPUT_ROOT = ROOT / "Assets" / "Art" / "Characters" / "Portraits"
 BATTLE_OUTPUT_ROOT = ROOT / "Assets" / "Art" / "Characters" / "Battle"
 WEAPON_OUTPUT_ROOT = ROOT / "Assets" / "Art" / "UI" / "Weapons"
@@ -273,6 +273,104 @@ PURSUIT_PALETTE = Palette(
     hair="#1F1A19",
 )
 
+JIANGXIA_GUARD_PALETTE = Palette(
+    line="#151718",
+    bg_top="#11161B",
+    bg_bottom="#35505B",
+    haze="#E9ECE4",
+    paper="#F0ECE3",
+    primary="#60756A",
+    secondary="#355767",
+    accent="#C8A66A",
+    metal="#CBD3D9",
+    skin="#DCB38D",
+    hair="#1E1B19",
+)
+
+JIANGXIA_BOW_PALETTE = Palette(
+    line="#14171A",
+    bg_top="#111820",
+    bg_bottom="#33576C",
+    haze="#E9ECE7",
+    paper="#F2EEE5",
+    primary="#4F6B6A",
+    secondary="#2E4557",
+    accent="#D6BB7D",
+    metal="#D2D9DD",
+    skin="#DEB48B",
+    hair="#1F1C1A",
+)
+
+JIANGXIA_COMMAND_PALETTE = Palette(
+    line="#131619",
+    bg_top="#121821",
+    bg_bottom="#2C5164",
+    haze="#ECEDE7",
+    paper="#F2EEE5",
+    primary="#415F69",
+    secondary="#22384C",
+    accent="#D1A15E",
+    metal="#D7DBDE",
+    skin="#DDB189",
+    hair="#1D1A18",
+)
+
+JIANGXIA_RIDER_PALETTE = Palette(
+    line="#14171A",
+    bg_top="#10161B",
+    bg_bottom="#2B4C5E",
+    haze="#ECECE3",
+    paper="#F1EBDD",
+    primary="#6A7E70",
+    secondary="#395A6C",
+    accent="#D5B06B",
+    metal="#D5D9DC",
+    skin="#DDB28A",
+    hair="#1D1A19",
+)
+
+LUOCHENG_GUARD_PALETTE = Palette(
+    line="#171311",
+    bg_top="#191512",
+    bg_bottom="#5A4234",
+    haze="#EDE3D7",
+    paper="#F3E8DA",
+    primary="#6C5A48",
+    secondary="#3C4A52",
+    accent="#D2A367",
+    metal="#C8C0B5",
+    skin="#D9AE86",
+    hair="#211917",
+)
+
+LUOCHENG_WALL_PALETTE = Palette(
+    line="#171414",
+    bg_top="#181516",
+    bg_bottom="#54494A",
+    haze="#ECE3D8",
+    paper="#F2E9DD",
+    primary="#5A665F",
+    secondary="#485868",
+    accent="#D6B177",
+    metal="#CED1D1",
+    skin="#D9AE86",
+    hair="#211B19",
+)
+
+LUOCHENG_COMMAND_PALETTE = Palette(
+    line="#171210",
+    bg_top="#191412",
+    bg_bottom="#603D2F",
+    haze="#ECE0D5",
+    paper="#F1E5D9",
+    primary="#6B5043",
+    secondary="#2D3946",
+    accent="#D08C55",
+    metal="#D4CAC1",
+    skin="#DAAE86",
+    hair="#201816",
+)
+
 
 CHARACTER_SPECS = {
     "player-liu-bei": CharacterSpec("player-liu-bei", "Heroes", "player", "Commander", LIU_BEI_PALETTE, "sword", "crown", "short", "robe", hair_shape="tapered", weapon_side="left"),
@@ -284,6 +382,16 @@ CHARACTER_SPECS = {
     "player-ma-chao": CharacterSpec("player-ma-chao", "Heroes", "player", "Raider", MA_CHAO_PALETTE, "lance", "westernhelm", "none", "raider", hair_shape="wind", weapon_side="left"),
     "enemy-zhang-bao": CharacterSpec("enemy-zhang-bao", "Bosses", "enemy", "Commander", ZHANG_BAO_PALETTE, "seal", "talisman", "goatee", "robe", hair_shape="wild", weapon_side="right"),
     "enemy-zhang-liang": CharacterSpec("enemy-zhang-liang", "Bosses", "enemy", "Commander", ZHANG_LIANG_PALETTE, "blade", "rebelcrown", "mustache", "armor", hair_shape="heavy", weapon_side="left"),
+    "enemy-jiangxia-bridge-captain": CharacterSpec("enemy-jiangxia-bridge-captain", "Enemies", "enemy", "Guardian", JIANGXIA_GUARD_PALETTE, "spear", "weihelm", "trim", "armor", hair_shape="trimmed", weapon_side="left"),
+    "enemy-jiangxia-bow-chief": CharacterSpec("enemy-jiangxia-bow-chief", "Enemies", "enemy", "Ranger", JIANGXIA_BOW_PALETTE, "bow", "hawkhelm", "none", "cloak", hair_shape="trimmed", weapon_side="right"),
+    "enemy-jiangxia-outer-warden-a": CharacterSpec("enemy-jiangxia-outer-warden-a", "Enemies", "enemy", "Guardian", JIANGXIA_GUARD_PALETTE, "spear", "lighthelm", "mustache", "armor", hair_shape="trimmed", weapon_side="left"),
+    "enemy-jiangxia-ferry-captain": CharacterSpec("enemy-jiangxia-ferry-captain", "Bosses", "enemy", "Commander", JIANGXIA_COMMAND_PALETTE, "blade", "scarhelm", "trim", "armor", hair_shape="trimmed", weapon_side="right"),
+    "enemy-jiangxia-river-rider": CharacterSpec("enemy-jiangxia-river-rider", "Enemies", "enemy", "Raider", JIANGXIA_RIDER_PALETTE, "lance", "westernhelm", "none", "raider", hair_shape="wind", weapon_side="left"),
+    "enemy-luocheng-gate-captain": CharacterSpec("enemy-luocheng-gate-captain", "Enemies", "enemy", "Guardian", LUOCHENG_GUARD_PALETTE, "glaive", "weihelm", "trim", "armor", hair_shape="trimmed", weapon_side="left"),
+    "enemy-luocheng-wall-bow": CharacterSpec("enemy-luocheng-wall-bow", "Enemies", "enemy", "Ranger", LUOCHENG_WALL_PALETTE, "bow", "hawkhelm", "none", "cloak", hair_shape="trimmed", weapon_side="right"),
+    "enemy-luocheng-outer-guard": CharacterSpec("enemy-luocheng-outer-guard", "Enemies", "enemy", "Guardian", LUOCHENG_GUARD_PALETTE, "spear", "lighthelm", "short", "armor", hair_shape="trimmed", weapon_side="left"),
+    "enemy-luocheng-commandant": CharacterSpec("enemy-luocheng-commandant", "Bosses", "enemy", "Commander", LUOCHENG_COMMAND_PALETTE, "blade", "weihelm", "mustache", "armor", hair_shape="heavy", weapon_side="right"),
+    "enemy-luocheng-street-guard-a": CharacterSpec("enemy-luocheng-street-guard-a", "Enemies", "enemy", "Guardian", LUOCHENG_GUARD_PALETTE, "spear", "lighthelm", "none", "armor", hair_shape="trimmed", weapon_side="left"),
     "enemy-pursuit_commander": CharacterSpec("enemy-pursuit_commander", "Bosses", "enemy", "Commander", PURSUIT_PALETTE, "blade", "weihelm", "trim", "armor", hair_shape="trimmed", weapon_side="right"),
     "enemy-xiahou-dun": CharacterSpec("enemy-xiahou-dun", "Bosses", "enemy", "Commander", XIAHOU_DUN_PALETTE, "lance", "scarhelm", "trim", "armor", hair_shape="trimmed", face_mark="eyepatch", weapon_side="left"),
     "enemy-xiahou-yuan": CharacterSpec("enemy-xiahou-yuan", "Bosses", "enemy", "Commander", XIAHOU_YUAN_PALETTE, "bow", "hawkhelm", "none", "cloak", hair_shape="trimmed", weapon_side="right"),
@@ -894,11 +1002,23 @@ def load_asset_keys() -> tuple[dict[str, CharacterSpec], list[WeaponSpec]]:
     with MANIFEST_PATH.open(newline="") as manifest_file:
         rows = list(csv.DictReader(manifest_file))
 
-    character_keys = sorted({
-        row["portrait_asset_key"].replace("__portrait", "")
-        for row in rows
-        if row.get("portrait_asset_key")
-    })
+    character_keys = sorted(
+        {
+            row["portrait_asset_key"].replace("__portrait", "")
+            for row in rows
+            if row.get("portrait_asset_key")
+        }
+        |
+        {
+            row["battle_asset_key"].replace("__battle", "")
+            for row in rows
+            if row.get("battle_asset_key")
+        }
+    )
+    missing_character_keys = [key for key in character_keys if key not in CHARACTER_SPECS]
+    if missing_character_keys:
+        raise KeyError(f"Missing character specs for: {', '.join(missing_character_keys)}")
+
     character_specs = {key: CHARACTER_SPECS[key] for key in character_keys}
 
     weapon_keys = sorted({row["weapon_icon_key"] for row in rows if row.get("weapon_icon_key")})

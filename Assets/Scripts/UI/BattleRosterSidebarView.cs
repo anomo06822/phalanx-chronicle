@@ -39,6 +39,7 @@ namespace PhalanxChronicle.UI
         private Text secondaryInstructionLabel;
         private Button endTurnButton;
         private Button rerollButton;
+        private Button autoModeButton;
         private GameObject rerollButtonObject;
         private Transform alliedRosterRoot;
         private Transform enemyRosterRoot;
@@ -55,7 +56,7 @@ namespace PhalanxChronicle.UI
 
         public string CurrentObjectiveText => objectivePrimaryLabel != null ? objectivePrimaryLabel.text : string.Empty;
 
-        public void Initialize(Transform canvasRoot, Action onEndTurn, Action onReroll, int feedLimit)
+        public void Initialize(Transform canvasRoot, Action onEndTurn, Action onReroll, Action onAutoModeRequested, int feedLimit)
         {
             this.feedLimit = Mathf.Max(1, feedLimit);
 
@@ -149,18 +150,26 @@ namespace PhalanxChronicle.UI
             commandLayout.childControlHeight = true;
             commandLayout.childControlWidth = true;
             commandLayout.childForceExpandHeight = true;
-            commandLayout.childForceExpandWidth = false;
+            commandLayout.childForceExpandWidth = true;
             endTurnButton = BattleHudFactory.CreateButton(commandRow.transform, LocalizationService.Text("ui.button.end_turn", "結束回合"), true);
             endTurnButton.onClick.AddListener(() => onEndTurn?.Invoke());
             LayoutElement endTurnLayout = endTurnButton.GetComponent<LayoutElement>();
-            endTurnLayout.preferredWidth = 138f;
-            endTurnLayout.flexibleWidth = 0f;
+            endTurnLayout.minWidth = 88f;
+            endTurnLayout.preferredWidth = 0f;
+            endTurnLayout.flexibleWidth = 1f;
             rerollButton = BattleHudFactory.CreateButton(commandRow.transform, LocalizationService.Text("ui.button.reroll", "重擲"), false);
             rerollButtonObject = rerollButton.gameObject;
             rerollButton.onClick.AddListener(() => onReroll?.Invoke());
             LayoutElement rerollLayout = rerollButton.GetComponent<LayoutElement>();
-            rerollLayout.preferredWidth = 112f;
-            rerollLayout.flexibleWidth = 0f;
+            rerollLayout.minWidth = 84f;
+            rerollLayout.preferredWidth = 0f;
+            rerollLayout.flexibleWidth = 1f;
+            autoModeButton = BattleHudFactory.CreateButton(commandRow.transform, LocalizationService.Text("ui.button.auto_mode", "AI 自動"), false);
+            autoModeButton.onClick.AddListener(() => onAutoModeRequested?.Invoke());
+            LayoutElement autoModeLayout = autoModeButton.GetComponent<LayoutElement>();
+            autoModeLayout.minWidth = 92f;
+            autoModeLayout.preferredWidth = 0f;
+            autoModeLayout.flexibleWidth = 1f;
 
             GameObject contentPanel = BattleHudFactory.CreateInsetPanel("OverviewContentPanel", rootObject.transform, 0f, new Color(0.11f, 0.12f, 0.14f, 0.92f));
             LayoutElement contentPanelLayout = contentPanel.GetComponent<LayoutElement>();
@@ -298,6 +307,20 @@ namespace PhalanxChronicle.UI
             {
                 rerollButton.interactable = enabled;
             }
+        }
+
+        public void SetAutoModeState(bool enabled)
+        {
+            if (autoModeButton == null)
+            {
+                return;
+            }
+
+            BattleHudFactory.SetButtonLabel(
+                autoModeButton,
+                enabled
+                    ? LocalizationService.Text("ui.button.stop_auto_mode", "停止 AI")
+                    : LocalizationService.Text("ui.button.auto_mode", "AI 自動"));
         }
 
         private static GameObject BuildTabContent(Transform parent, string name, out Transform contentRoot)

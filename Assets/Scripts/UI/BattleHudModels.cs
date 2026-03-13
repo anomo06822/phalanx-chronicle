@@ -493,6 +493,17 @@ namespace PhalanxChronicle.UI
         public bool IsPromotionOption { get; set; }
     }
 
+    public sealed class BattleConfirmDialogModel
+    {
+        public string Title { get; set; } = string.Empty;
+
+        public string Body { get; set; } = string.Empty;
+
+        public string ConfirmLabel { get; set; } = string.Empty;
+
+        public string CancelLabel { get; set; } = string.Empty;
+    }
+
     public sealed class BattleOnboardingModel
     {
         public string ProgressLabel { get; set; } = string.Empty;

@@ -53,9 +53,14 @@ namespace PhalanxChronicle.UI
         private Button resultAdvanceButton;
         private Button dialogueAdvanceButton;
         private Button onboardingSkipButton;
+        private Button confirmPrimaryButton;
+        private Button confirmSecondaryButton;
         private GameObject resultPanel;
         private GameObject dialogueOverlay;
         private GameObject onboardingPanel;
+        private GameObject confirmDialogOverlay;
+        private Text confirmDialogTitleLabel;
+        private Text confirmDialogBodyLabel;
 
         public bool IsDialogueVisible => dialogueOverlay != null && dialogueOverlay.activeSelf;
 
@@ -67,6 +72,8 @@ namespace PhalanxChronicle.UI
 
         public bool IsOnboardingVisible => onboardingPanel != null && onboardingPanel.activeSelf;
 
+        public bool IsConfirmDialogVisible => confirmDialogOverlay != null && confirmDialogOverlay.activeSelf;
+
         public string CurrentObjectiveText => rosterSidebarView != null ? rosterSidebarView.CurrentObjectiveText : string.Empty;
 
         public IReadOnlyList<string> FeedEntries => feedEntries;
@@ -75,9 +82,12 @@ namespace PhalanxChronicle.UI
             Transform canvasRoot,
             Action onEndTurn,
             Action onReroll,
+            Action onAutoModeRequested,
             Action onDialogueAdvance,
             Action onResultAdvance,
             Action onOnboardingSkip,
+            Action onConfirmDialogPrimary,
+            Action onConfirmDialogSecondary,
             BattleHudModelBuilder modelBuilder = null)
         {
             hudModelBuilder = modelBuilder ?? new BattleHudModelBuilder();
@@ -87,7 +97,7 @@ namespace PhalanxChronicle.UI
             selectedNameLabel = selectedUnitView.NameLabel;
 
             rosterSidebarView = new BattleRosterSidebarView();
-            rosterSidebarView.Initialize(canvasRoot, onEndTurn, onReroll, FeedLimit);
+            rosterSidebarView.Initialize(canvasRoot, onEndTurn, onReroll, onAutoModeRequested, FeedLimit);
 
             contextRibbonView = new BattleContextRibbonView();
             contextRibbonView.Initialize(canvasRoot);
@@ -95,6 +105,7 @@ namespace PhalanxChronicle.UI
             BuildResultPanel(canvasRoot, onResultAdvance);
             BuildDialogueOverlay(canvasRoot, onDialogueAdvance);
             BuildOnboardingPanel(canvasRoot, onOnboardingSkip);
+            BuildConfirmDialog(canvasRoot, onConfirmDialogPrimary, onConfirmDialogSecondary);
 
             campaignOverlayView = new CampaignOverlayView();
             campaignOverlayView.Initialize(canvasRoot);
@@ -104,6 +115,7 @@ namespace PhalanxChronicle.UI
             BindOverview(new BattleOverviewModel());
             BindSelectedUnit(new BattleSelectedUnitModel());
             ClearContext();
+            SetAutoModeState(false);
         }
 
         public void BindOverview(BattleOverviewModel model)
@@ -182,6 +194,11 @@ namespace PhalanxChronicle.UI
         public void SetRerollEnabled(bool enabled)
         {
             rosterSidebarView?.SetRerollEnabled(enabled);
+        }
+
+        public void SetAutoModeState(bool enabled)
+        {
+            rosterSidebarView?.SetAutoModeState(enabled);
         }
 
         public void ShowResult(BattleResultModel model)
@@ -276,6 +293,37 @@ namespace PhalanxChronicle.UI
             if (onboardingPanel != null)
             {
                 onboardingPanel.SetActive(false);
+            }
+        }
+
+        public void ShowConfirmDialog(BattleConfirmDialogModel model)
+        {
+            if (confirmDialogOverlay == null)
+            {
+                return;
+            }
+
+            BattleConfirmDialogModel dialogModel = model ?? new BattleConfirmDialogModel();
+            confirmDialogTitleLabel.text = dialogModel.Title;
+            confirmDialogBodyLabel.text = dialogModel.Body;
+            BattleHudFactory.SetButtonLabel(
+                confirmPrimaryButton,
+                string.IsNullOrWhiteSpace(dialogModel.ConfirmLabel)
+                    ? LocalizationService.Text("ui.button.confirm", "確認")
+                    : dialogModel.ConfirmLabel);
+            BattleHudFactory.SetButtonLabel(
+                confirmSecondaryButton,
+                string.IsNullOrWhiteSpace(dialogModel.CancelLabel)
+                    ? LocalizationService.Text("ui.button.cancel", "取消")
+                    : dialogModel.CancelLabel);
+            confirmDialogOverlay.SetActive(true);
+        }
+
+        public void HideConfirmDialog()
+        {
+            if (confirmDialogOverlay != null)
+            {
+                confirmDialogOverlay.SetActive(false);
             }
         }
 
@@ -392,6 +440,49 @@ namespace PhalanxChronicle.UI
             onboardingSkipButton = BattleHudFactory.CreateButton(onboardingPanel.transform, LocalizationService.Text("ui.button.skip", "略過"), false);
             onboardingSkipButton.onClick.AddListener(() => onOnboardingSkip?.Invoke());
             onboardingPanel.SetActive(false);
+        }
+
+        private void BuildConfirmDialog(Transform canvasRoot, Action onConfirmPrimary, Action onConfirmSecondary)
+        {
+            confirmDialogOverlay = BattleHudFactory.CreateStretchPanel("ConfirmDialogOverlay", canvasRoot, BattleUiTheme.PanelOverlay);
+            GameObject dialogPanel = BattleHudFactory.CreatePanel(
+                "ConfirmDialogPanel",
+                confirmDialogOverlay.transform,
+                new Vector2(0.5f, 0.5f),
+                new Vector2(0.5f, 0.5f),
+                Vector2.zero,
+                new Vector2(560f, 272f),
+                BattleUiTheme.PanelSurface);
+
+            VerticalLayoutGroup layout = dialogPanel.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 12f;
+            layout.padding = new RectOffset(20, 20, 18, 18);
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+
+            confirmDialogTitleLabel = BattleHudFactory.CreateText(dialogPanel.transform, string.Empty, 24, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            confirmDialogTitleLabel.GetComponent<LayoutElement>().preferredHeight = 28f;
+
+            confirmDialogBodyLabel = BattleHudFactory.CreateText(dialogPanel.transform, string.Empty, 16, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            confirmDialogBodyLabel.GetComponent<LayoutElement>().preferredHeight = 132f;
+
+            GameObject buttonRow = new GameObject("ConfirmDialogButtonRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            buttonRow.transform.SetParent(dialogPanel.transform, false);
+            buttonRow.GetComponent<LayoutElement>().preferredHeight = 42f;
+            HorizontalLayoutGroup buttonLayout = buttonRow.GetComponent<HorizontalLayoutGroup>();
+            buttonLayout.spacing = 12f;
+            buttonLayout.childAlignment = TextAnchor.MiddleRight;
+            buttonLayout.childControlHeight = true;
+            buttonLayout.childControlWidth = true;
+            buttonLayout.childForceExpandHeight = true;
+            buttonLayout.childForceExpandWidth = true;
+
+            confirmSecondaryButton = BattleHudFactory.CreateButton(buttonRow.transform, LocalizationService.Text("ui.button.cancel", "取消"), false);
+            confirmSecondaryButton.onClick.AddListener(() => onConfirmSecondary?.Invoke());
+            confirmPrimaryButton = BattleHudFactory.CreateButton(buttonRow.transform, LocalizationService.Text("ui.button.confirm", "確認"), true);
+            confirmPrimaryButton.onClick.AddListener(() => onConfirmPrimary?.Invoke());
+            confirmDialogOverlay.SetActive(false);
         }
     }
 
