@@ -76,3 +76,8 @@ dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj
 - 已補上 `.github/ISSUE_TEMPLATE/` 與 `PULL_REQUEST_TEMPLATE.md`
 - 建議將 `04_開發里程碑.md` 的每個 milestone 建成一張 Epic issue，再往下拆成 Feature / Task
 - 可用 `scripts/github/bootstrap_initial_github.sh` 建立 labels、milestones 與初始 issues
+
+## License
+本專案自有程式碼、文件與原創資產以 MIT License 釋出，詳見 `LICENSE`。
+
+`Assets/TextMesh Pro/` 內附帶的字型、貼圖與相關檔案保留其原始授權，不因本 repo 採用 MIT 而改變；其中 `Assets/TextMesh Pro/Fonts/LiberationSans - OFL.txt` 已附上字型授權文本。
