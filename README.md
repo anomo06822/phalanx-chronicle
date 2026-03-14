@@ -68,6 +68,22 @@ dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj
   - 戰鬥 forecast / action menu / roster / result model
   - 首戰教學旗標與繁體中文 localization coverage
 
+## CI/CD 與發版
+- `.github/workflows/ci.yml` 會在 `push` 到 `main` 與 `pull_request` 時執行 headless 規則測試。
+- `.github/workflows/release.yml` 會在推送 `v*` tag，或在 GitHub Actions 手動執行時，建置 macOS 版本並上傳到 GitHub Release。
+- Unity 建置前需要先在 repo 的 GitHub Actions secrets 設定以下其中一組：
+  - `UNITY_LICENSE`
+  - `UNITY_EMAIL`、`UNITY_PASSWORD`、`UNITY_SERIAL`
+- 手動發版可到 GitHub Actions 的 `Release` workflow，輸入像 `v0.1.0` 這樣的版本號。
+- 也可以直接推 tag 觸發發版：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+- 目前產出的 macOS 版本仍是未 notarize 的 app；若要讓一般使用者下載後更順利開啟，建議後續補上 Apple Developer 簽名與 notarization。
+
 ## 原始需求與規劃文件
 - [01_MVP_規格書.md](./Docs/project-docs/01_MVP_規格書.md)
 - [02_技術架構設計.md](./Docs/project-docs/02_技術架構設計.md)
