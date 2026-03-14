@@ -16,6 +16,7 @@ permissions:
 
 env:
   BUILD_NAME: PhalanxChronicle
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PROJECT_PATH: .
   TARGET_PLATFORM: StandaloneOSX
 
@@ -29,7 +30,13 @@ jobs:
       UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
       UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64 }}
+      APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD }}
+      APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+      APPLE_NOTARY_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     outputs:
+      has_apple_notarization_credentials: ${{ steps.apple-notarization-check.outputs.has_apple_notarization_credentials }}
       has_unity_credentials: ${{ steps.unity-check.outputs.has_unity_credentials }}
       release_tag: ${{ steps.release-metadata.outputs.release_tag }}
 
@@ -58,6 +65,25 @@ jobs:
             echo "Professional license requires UNITY_EMAIL, UNITY_PASSWORD, and UNITY_SERIAL." >> "${GITHUB_STEP_SUMMARY}"
           fi
 
+      - name: Check Apple notarization credentials
+        id: apple-notarization-check
+        run: |
+          has_apple_notarization_credentials=false
+
+          if [ -n "${APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64}" ] && \
+             [ -n "${APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD}" ] && \
+             [ -n "${APPLE_NOTARY_APPLE_ID}" ] && \
+             [ -n "${APPLE_NOTARY_APP_SPECIFIC_PASSWORD}" ] && \
+             [ -n "${APPLE_TEAM_ID}" ]; then
+            has_apple_notarization_credentials=true
+          fi
+
+          echo "has_apple_notarization_credentials=${has_apple_notarization_credentials}" >> "${GITHUB_OUTPUT}"
+
+          if [ "${has_apple_notarization_credentials}" != "true" ]; then
+            echo "Apple notarization secrets are incomplete, so the release asset will remain unsigned and not notarized." >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
   build-macos:
     name: Build macOS Release
     runs-on: ubuntu-latest
@@ -71,9 +97,8 @@ jobs:
       UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
 
     steps:
-
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           lfs: true
@@ -84,7 +109,7 @@ jobs:
           git tag -f "${RELEASE_TAG}" "${GITHUB_SHA}"
 
       - name: Cache Unity Library
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: Library
           key: Library-${{ env.TARGET_PLATFORM }}-${{ hashFiles('Packages/manifest.json', 'Packages/packages-lock.json', 'ProjectSettings/ProjectVersion.txt') }}
@@ -93,7 +118,6 @@ jobs:
             Library-
 
       - name: Build Unity player
-        id: build
         uses: game-ci/unity-builder@v4
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
@@ -121,11 +145,113 @@ jobs:
           mkdir -p release
           ./scripts/github/package_macos_app.sh "${APP_PATH}" "${GITHUB_WORKSPACE}/release/${ASSET_NAME}"
 
-      - name: Upload packaged build
-        uses: actions/upload-artifact@v4
+      - name: Upload unsigned release candidate
+        uses: actions/upload-artifact@v6
         with:
-          name: PhalanxChronicle-macOS
+          compression-level: 0
+          name: PhalanxChronicle-macOS-release-candidate
           path: release/*.zip
+          if-no-files-found: error
+
+  sign-and-notarize-macos:
+    name: Sign and Notarize macOS App
+    runs-on: macos-latest
+    needs:
+      - preflight
+      - build-macos
+    if: needs.preflight.outputs.has_apple_notarization_credentials == 'true' && needs.build-macos.result == 'success'
+    env:
+      APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64 }}
+      APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD }}
+      APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+      APPLE_NOTARY_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
+
+    steps:
+      - name: Download unsigned release candidate
+        uses: actions/download-artifact@v6
+        with:
+          name: PhalanxChronicle-macOS-release-candidate
+          path: release-input
+
+      - name: Import Developer ID certificate
+        env:
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}-keychain
+        run: |
+          CERT_PATH="${RUNNER_TEMP}/developer-id-application.p12"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/developer-id.keychain-db"
+
+          echo "${APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64}" | base64 --decode > "${CERT_PATH}"
+
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security import "${CERT_PATH}" \
+            -k "${KEYCHAIN_PATH}" \
+            -P "${APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD}" \
+            -f pkcs12 \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security \
+            -T /usr/bin/xcrun
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security list-keychains -d user -s "${KEYCHAIN_PATH}"
+          security default-keychain -d user -s "${KEYCHAIN_PATH}"
+
+      - name: Sign, notarize, and staple app
+        run: |
+          INPUT_ZIP="$(find release-input -maxdepth 1 -name '*.zip' -print -quit)"
+
+          if [ -z "${INPUT_ZIP}" ]; then
+            echo "::error::No macOS release candidate zip was downloaded."
+            exit 1
+          fi
+
+          WORK_DIR="${RUNNER_TEMP}/notarization"
+          EXTRACT_DIR="${WORK_DIR}/extract"
+          SIGNED_DIR="${WORK_DIR}/signed"
+          mkdir -p "${EXTRACT_DIR}" "${SIGNED_DIR}" release-output
+
+          ditto -x -k "${INPUT_ZIP}" "${EXTRACT_DIR}"
+
+          APP_PATH="$(find "${EXTRACT_DIR}" -maxdepth 1 -name '*.app' -print -quit)"
+
+          if [ -z "${APP_PATH}" ]; then
+            echo "::error::No macOS .app bundle found after extracting release candidate."
+            exit 1
+          fi
+
+          SIGNING_IDENTITY="$(security find-identity -v -p codesigning | awk -F '\"' '/Developer ID Application/ { print $2; exit }')"
+
+          if [ -z "${SIGNING_IDENTITY}" ]; then
+            echo "::error::Developer ID Application identity not found after importing certificate."
+            exit 1
+          fi
+
+          codesign --force --deep --options runtime --timestamp --sign "${SIGNING_IDENTITY}" "${APP_PATH}"
+          codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
+
+          SIGNED_ZIP="${SIGNED_DIR}/PhalanxChronicle-${RELEASE_TAG}-macOS.zip"
+          ditto -c -k --keepParent "${APP_PATH}" "${SIGNED_ZIP}"
+
+          xcrun notarytool submit "${SIGNED_ZIP}" \
+            --apple-id "${APPLE_NOTARY_APPLE_ID}" \
+            --password "${APPLE_NOTARY_APP_SPECIFIC_PASSWORD}" \
+            --team-id "${APPLE_TEAM_ID}" \
+            --wait
+
+          xcrun stapler staple "${APP_PATH}"
+          xcrun stapler validate "${APP_PATH}"
+
+          FINAL_ZIP="release-output/PhalanxChronicle-${RELEASE_TAG}-macOS.zip"
+          ditto -c -k --keepParent "${APP_PATH}" "${FINAL_ZIP}"
+
+      - name: Upload notarized release
+        uses: actions/upload-artifact@v6
+        with:
+          compression-level: 0
+          name: PhalanxChronicle-macOS-release
+          path: release-output/*.zip
           if-no-files-found: error
 
   publish-release:
@@ -134,7 +260,12 @@ jobs:
     needs:
       - preflight
       - build-macos
-    if: needs.preflight.outputs.has_unity_credentials == 'true'
+      - sign-and-notarize-macos
+    if: |
+      always() &&
+      needs.preflight.outputs.has_unity_credentials == 'true' &&
+      needs.build-macos.result == 'success' &&
+      (needs.sign-and-notarize-macos.result == 'success' || needs.sign-and-notarize-macos.result == 'skipped')
     permissions:
       contents: write
     env:
@@ -143,11 +274,22 @@ jobs:
       RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
 
     steps:
-      - name: Download packaged build
-        uses: actions/download-artifact@v4
+      - name: Download notarized build
+        if: needs.preflight.outputs.has_apple_notarization_credentials == 'true'
+        uses: actions/download-artifact@v6
         with:
-          name: PhalanxChronicle-macOS
+          name: PhalanxChronicle-macOS-release
           path: release
+
+      - name: Download unsigned release candidate
+        if: needs.preflight.outputs.has_apple_notarization_credentials != 'true'
+        uses: actions/download-artifact@v6
+        with:
+          name: PhalanxChronicle-macOS-release-candidate
+          path: release
+
+      - name: Show release payload
+        run: ls -lah release
 
       - name: Create or update release
         run: |

@@ -71,6 +71,7 @@ dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj
 ## CI/CD 與發版
 - `.github/workflows/ci.yml` 會在 `push` 到 `main` 與 `pull_request` 時執行 headless 規則測試。
 - `.github/workflows/release.yml` 會在推送 `v*` tag，或在 GitHub Actions 手動執行時，建置 macOS 版本並上傳到 GitHub Release。
+- workflows 目前已切到 Node 24 相容版本，並在 workflow env 內顯式設定 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`，用來避開 GitHub Actions 的 Node 20 deprecation 警告。
 - Unity 建置前需要先在 repo 的 GitHub Actions secrets 設定以下其中一組：
   - 個人版授權：`UNITY_LICENSE`、`UNITY_EMAIL`、`UNITY_PASSWORD`
   - 專業版授權：`UNITY_EMAIL`、`UNITY_PASSWORD`、`UNITY_SERIAL`
@@ -87,6 +88,14 @@ gh secret set UNITY_LICENSE < "/Library/Application Support/Unity/Unity_lic.ulf"
 ```
 
 - 本專案目前使用 Unity `2022.3.21f1`；如果升級 Unity 版本或重新啟用授權，建議同步更新一次 `UNITY_LICENSE`。
+- 如果你要讓 GitHub Release 產出的 macOS 版本不再被 Gatekeeper 視為未驗證 app，還需要補上 Apple Developer 與 notarization secrets：
+  - `APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64`
+  - `APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD`
+  - `APPLE_TEAM_ID`
+  - `APPLE_NOTARY_APPLE_ID`
+  - `APPLE_NOTARY_APP_SPECIFIC_PASSWORD`
+- 這些 Apple secrets 都齊全時，`Release` workflow 會在 macOS runner 上自動執行 `codesign`、`notarytool submit --wait`、`stapler staple`，最後再把 notarized zip 上傳到 GitHub Release。
+- 如果 Apple secrets 不完整，release 仍會成功，但產物會維持 unsigned / not notarized 的 macOS 版本。
 - 手動發版可到 GitHub Actions 的 `Release` workflow，輸入像 `v0.1.0` 這樣的版本號。
 - 也可以直接推 tag 觸發發版：
 
