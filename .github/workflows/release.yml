@@ -16,7 +16,6 @@ permissions:
 
 env:
   BUILD_NAME: PhalanxChronicle
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PROJECT_PATH: .
   TARGET_PLATFORM: StandaloneOSX
 
@@ -25,6 +24,7 @@ jobs:
     name: Release Preconditions
     runs-on: ubuntu-latest
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -90,6 +90,7 @@ jobs:
     needs: preflight
     if: needs.preflight.outputs.has_unity_credentials == 'true'
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
@@ -161,6 +162,7 @@ jobs:
       - build-macos
     if: needs.preflight.outputs.has_apple_notarization_credentials == 'true' && needs.build-macos.result == 'success'
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64 }}
       APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD }}
       APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
@@ -269,6 +271,7 @@ jobs:
     permissions:
       contents: write
     env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
       RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}

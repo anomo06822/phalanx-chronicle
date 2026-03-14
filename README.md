@@ -71,7 +71,7 @@ dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj
 ## CI/CD 與發版
 - `.github/workflows/ci.yml` 會在 `push` 到 `main` 與 `pull_request` 時執行 headless 規則測試。
 - `.github/workflows/release.yml` 會在推送 `v*` tag，或在 GitHub Actions 手動執行時，建置 macOS 版本並上傳到 GitHub Release。
-- workflows 目前已切到 Node 24 相容版本，並在 workflow env 內顯式設定 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`，用來避開 GitHub Actions 的 Node 20 deprecation 警告。
+- workflows 目前已切到 Node 24 相容版本，並在各 job 的 env 內顯式設定 `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24="true"`，用來避開 GitHub Actions 的 Node 20 deprecation 警告。
 - Unity 建置前需要先在 repo 的 GitHub Actions secrets 設定以下其中一組：
   - 個人版授權：`UNITY_LICENSE`、`UNITY_EMAIL`、`UNITY_PASSWORD`
   - 專業版授權：`UNITY_EMAIL`、`UNITY_PASSWORD`、`UNITY_SERIAL`
