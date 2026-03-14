@@ -139,6 +139,7 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
       RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
 
     steps:
@@ -158,12 +159,13 @@ jobs:
             exit 1
           fi
 
-          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
+          if gh release view "${RELEASE_TAG}" --repo "${GH_REPO}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${assets[@]}" --repo "${GH_REPO}" --clobber
             exit 0
           fi
 
           gh release create "${RELEASE_TAG}" "${assets[@]}" \
+            --repo "${GH_REPO}" \
             --generate-notes \
             --latest \
             --target "${GITHUB_SHA}" \
