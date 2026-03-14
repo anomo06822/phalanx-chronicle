@@ -70,19 +70,23 @@ dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj
 
 ## CI/CD 與發版
 - `.github/workflows/ci.yml` 會在 `push` 到 `main` 與 `pull_request` 時執行 headless 規則測試。
-- `.github/workflows/activation.yml` 可手動產生 Unity 的 `.alf` activation file，供個人版授權換取 `.ulf` license file。
 - `.github/workflows/release.yml` 會在推送 `v*` tag，或在 GitHub Actions 手動執行時，建置 macOS 版本並上傳到 GitHub Release。
 - Unity 建置前需要先在 repo 的 GitHub Actions secrets 設定以下其中一組：
   - 個人版授權：`UNITY_LICENSE`、`UNITY_EMAIL`、`UNITY_PASSWORD`
   - 專業版授權：`UNITY_EMAIL`、`UNITY_PASSWORD`、`UNITY_SERIAL`
 - 如果尚未設定完整的 Unity secrets，`Release` workflow 會保留成功狀態，但略過建置與發版步驟，避免 tag push 直接變成失敗。
 - 如果你使用 Unity Personal：
-  1. 到 GitHub Actions 手動執行 `Acquire Unity Activation File`
-  2. 下載 artifact 內的 `.alf`
-  3. 到 [license.unity3d.com](https://license.unity3d.com) 上傳 `.alf`，下載 `.ulf`
-  4. 把 `.ulf` 內容完整存成 repo secret `UNITY_LICENSE`
-  5. 再補上 `UNITY_EMAIL` 與 `UNITY_PASSWORD`
-- 本專案目前使用 Unity `2022.3.21f1`；如果升級 Unity 版本，通常需要重新申請一次 `.alf/.ulf`。
+  1. 先在本機用 Unity Hub 啟用 Unity `2022.3.21f1`
+  2. 取得本機 license file：`/Library/Application Support/Unity/Unity_lic.ulf`
+  3. 把 `.ulf` 內容完整存成 repo secret `UNITY_LICENSE`
+  4. 再補上 `UNITY_EMAIL` 與 `UNITY_PASSWORD`
+- 可用以下指令直接把本機 `.ulf` 存進 GitHub secret：
+
+```bash
+gh secret set UNITY_LICENSE < "/Library/Application Support/Unity/Unity_lic.ulf"
+```
+
+- 本專案目前使用 Unity `2022.3.21f1`；如果升級 Unity 版本或重新啟用授權，建議同步更新一次 `UNITY_LICENSE`。
 - 手動發版可到 GitHub Actions 的 `Release` workflow，輸入像 `v0.1.0` 這樣的版本號。
 - 也可以直接推 tag 觸發發版：
 
