@@ -38,6 +38,28 @@ Thumbs.db
 __pycache__/
 *.pyc
 
+# Local secrets and signing material
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+*.cer
+*.crt
+*.der
+.npmrc
+.yarnrc
+.pypirc
+.netrc
+secrets.json
+secrets.yaml
+secrets.yml
+secrets.env
+
 # Authoring/editor backup files
 *.tmx~
 *.tsx~
