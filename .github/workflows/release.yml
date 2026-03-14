@@ -44,7 +44,7 @@ jobs:
         run: |
           has_unity_credentials=false
 
-          if [ -n "${UNITY_LICENSE}" ]; then
+          if [ -n "${UNITY_LICENSE}" ] && [ -n "${UNITY_EMAIL}" ] && [ -n "${UNITY_PASSWORD}" ]; then
             has_unity_credentials=true
           elif [ -n "${UNITY_EMAIL}" ] && [ -n "${UNITY_PASSWORD}" ] && [ -n "${UNITY_SERIAL}" ]; then
             has_unity_credentials=true
@@ -53,7 +53,9 @@ jobs:
           echo "has_unity_credentials=${has_unity_credentials}" >> "${GITHUB_OUTPUT}"
 
           if [ "${has_unity_credentials}" != "true" ]; then
-            echo "Unity credentials are not configured, so the macOS build and GitHub Release publish steps will be skipped." >> "${GITHUB_STEP_SUMMARY}"
+            echo "Unity credentials are incomplete, so the macOS build and GitHub Release publish steps will be skipped." >> "${GITHUB_STEP_SUMMARY}"
+            echo "Personal license requires UNITY_LICENSE, UNITY_EMAIL, and UNITY_PASSWORD." >> "${GITHUB_STEP_SUMMARY}"
+            echo "Professional license requires UNITY_EMAIL, UNITY_PASSWORD, and UNITY_SERIAL." >> "${GITHUB_STEP_SUMMARY}"
           fi
 
   build-macos:
