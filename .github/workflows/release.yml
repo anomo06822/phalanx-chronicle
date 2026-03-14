@@ -165,6 +165,8 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
       APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_P12_BASE64 }}
       APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_CERT_PASSWORD }}
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
       APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
       APPLE_NOTARY_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_NOTARY_APP_SPECIFIC_PASSWORD }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -172,10 +174,11 @@ jobs:
 
     steps:
       - name: Download unsigned release candidate
-        uses: actions/download-artifact@v6
-        with:
-          name: PhalanxChronicle-macOS-release-candidate
-          path: release-input
+        run: |
+          gh run download "${GITHUB_RUN_ID}" \
+            --repo "${GH_REPO}" \
+            --name "PhalanxChronicle-macOS-release-candidate" \
+            --dir release-input
 
       - name: Import Developer ID certificate
         env:
@@ -279,17 +282,19 @@ jobs:
     steps:
       - name: Download notarized build
         if: needs.preflight.outputs.has_apple_notarization_credentials == 'true'
-        uses: actions/download-artifact@v6
-        with:
-          name: PhalanxChronicle-macOS-release
-          path: release
+        run: |
+          gh run download "${GITHUB_RUN_ID}" \
+            --repo "${GH_REPO}" \
+            --name "PhalanxChronicle-macOS-release" \
+            --dir release
 
       - name: Download unsigned release candidate
         if: needs.preflight.outputs.has_apple_notarization_credentials != 'true'
-        uses: actions/download-artifact@v6
-        with:
-          name: PhalanxChronicle-macOS-release-candidate
-          path: release
+        run: |
+          gh run download "${GITHUB_RUN_ID}" \
+            --repo "${GH_REPO}" \
+            --name "PhalanxChronicle-macOS-release-candidate" \
+            --dir release
 
       - name: Show release payload
         run: ls -lah release
