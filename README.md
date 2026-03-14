@@ -74,6 +74,7 @@ dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj
 - Unity 建置前需要先在 repo 的 GitHub Actions secrets 設定以下其中一組：
   - `UNITY_LICENSE`
   - `UNITY_EMAIL`、`UNITY_PASSWORD`、`UNITY_SERIAL`
+- 如果尚未設定 Unity secrets，`Release` workflow 會保留成功狀態，但略過建置與發版步驟，避免 tag push 直接變成失敗。
 - 手動發版可到 GitHub Actions 的 `Release` workflow，輸入像 `v0.1.0` 這樣的版本號。
 - 也可以直接推 tag 觸發發版：
 

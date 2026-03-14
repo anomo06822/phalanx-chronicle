@@ -20,8 +20,8 @@ env:
   TARGET_PLATFORM: StandaloneOSX
 
 jobs:
-  build-macos:
-    name: Build macOS Release
+  preflight:
+    name: Release Preconditions
     runs-on: ubuntu-latest
     env:
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
@@ -29,20 +29,46 @@ jobs:
       UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
       UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+    outputs:
+      has_unity_credentials: ${{ steps.unity-check.outputs.has_unity_credentials }}
+      release_tag: ${{ steps.release-metadata.outputs.release_tag }}
 
     steps:
-      - name: Validate Unity credentials
+      - name: Capture release metadata
+        id: release-metadata
         run: |
+          echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check Unity credentials
+        id: unity-check
+        run: |
+          has_unity_credentials=false
+
           if [ -n "${UNITY_LICENSE}" ]; then
-            exit 0
+            has_unity_credentials=true
+          elif [ -n "${UNITY_EMAIL}" ] && [ -n "${UNITY_PASSWORD}" ] && [ -n "${UNITY_SERIAL}" ]; then
+            has_unity_credentials=true
           fi
 
-          if [ -n "${UNITY_EMAIL}" ] && [ -n "${UNITY_PASSWORD}" ] && [ -n "${UNITY_SERIAL}" ]; then
-            exit 0
+          echo "has_unity_credentials=${has_unity_credentials}" >> "${GITHUB_OUTPUT}"
+
+          if [ "${has_unity_credentials}" != "true" ]; then
+            echo "Unity credentials are not configured, so the macOS build and GitHub Release publish steps will be skipped." >> "${GITHUB_STEP_SUMMARY}"
           fi
 
-          echo "::error::Missing Unity build credentials. Add UNITY_LICENSE, or UNITY_EMAIL + UNITY_PASSWORD + UNITY_SERIAL in GitHub Actions secrets."
-          exit 1
+  build-macos:
+    name: Build macOS Release
+    runs-on: ubuntu-latest
+    needs: preflight
+    if: needs.preflight.outputs.has_unity_credentials == 'true'
+    env:
+      RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+
+    steps:
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -103,12 +129,15 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    needs: build-macos
+    needs:
+      - preflight
+      - build-macos
+    if: needs.preflight.outputs.has_unity_credentials == 'true'
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
+      RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
 
     steps:
       - name: Download packaged build
