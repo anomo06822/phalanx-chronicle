@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PhalanxChronicle.Core;
 using PhalanxChronicle.Localization;
 using PhalanxChronicle.Presentation;
 using TMPro;
@@ -329,6 +330,82 @@ namespace PhalanxChronicle.UI
             ShowOverlay();
         }
 
+        public void ShowCampaignEquipment(CampaignEquipmentDeckModel model, Action<string> onOptionSelected, Action onPrimary, Action onSecondary = null)
+        {
+            stageSelectionHandler = null;
+            optionSelectionHandler = onOptionSelected;
+            primaryHandler = onPrimary;
+            secondaryHandler = onSecondary;
+
+            CampaignEquipmentDeckModel equipmentModel = model ?? new CampaignEquipmentDeckModel();
+            ApplyFrame(
+                equipmentModel.Eyebrow,
+                equipmentModel.Title,
+                equipmentModel.Body,
+                equipmentModel.ProgressLabel,
+                equipmentModel.HighlightLabel,
+                equipmentModel.DeckTitle,
+                string.IsNullOrWhiteSpace(equipmentModel.PreviewMessage)
+                    ? LocalizationService.Text("campaign.deck.equipment_body", "先選部位，再從下方名單替換裝備。")
+                    : equipmentModel.PreviewMessage);
+            RebuildContent(root =>
+            {
+                IReadOnlyList<CampaignOptionEntryModel> promotionOptions = equipmentModel.PromotionOptions ?? Array.Empty<CampaignOptionEntryModel>();
+                if (promotionOptions.Count > 0)
+                {
+                    string currentSection = null;
+                    foreach (CampaignOptionEntryModel entry in promotionOptions
+                        .OrderBy(option => option.SortWeight)
+                        .ThenBy(option => option.Title, StringComparer.Ordinal))
+                    {
+                        if (!string.Equals(currentSection, entry.Section, StringComparison.Ordinal) &&
+                            !string.IsNullOrWhiteSpace(entry.Section))
+                        {
+                            currentSection = entry.Section;
+                            CreateListSectionHeader(root, currentSection);
+                        }
+
+                        CreateOptionEntry(root, entry);
+                    }
+                }
+
+                if ((equipmentModel.SlotCards ?? Array.Empty<CampaignEquipmentSlotCardModel>()).Count > 0)
+                {
+                    CreateListSectionHeader(root, LocalizationService.Text("camp.equip.section.slots", "裝備槽位"));
+                    CreateEquipmentSlotRow(root, equipmentModel.SlotCards);
+                }
+
+                bool hasChoices = false;
+                foreach (CampaignEquipmentChoiceSectionModel section in (equipmentModel.ChoiceSections ?? Array.Empty<CampaignEquipmentChoiceSectionModel>()))
+                {
+                    IReadOnlyList<CampaignEquipmentChoiceModel> choices = section?.Choices ?? Array.Empty<CampaignEquipmentChoiceModel>();
+                    if (choices.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    hasChoices = true;
+                    CreateListSectionHeader(root, section.Title);
+                    foreach (CampaignEquipmentChoiceModel choice in choices
+                        .OrderBy(entry => entry.SortWeight)
+                        .ThenBy(entry => entry.ItemName, StringComparer.Ordinal))
+                    {
+                        CreateEquipmentChoiceEntry(root, choice);
+                    }
+                }
+
+                if (!hasChoices)
+                {
+                    CreateEmptyStatePanel(
+                        root,
+                        LocalizationService.Text("camp.equip.empty.title", "目前沒有可替換裝備"),
+                        LocalizationService.Text("camp.equip.empty.desc", "這個部位沒有其他可直接換上的裝備，也沒有可轉裝的對象。"));
+                }
+            });
+            ConfigureButtons(equipmentModel.PrimaryActionLabel, equipmentModel.SecondaryActionLabel);
+            ShowOverlay();
+        }
+
         public void Hide()
         {
             stageSelectionHandler = null;
@@ -482,6 +559,18 @@ namespace PhalanxChronicle.UI
 
         private void CreateOptionEntry(Transform parent, CampaignOptionEntryModel model)
         {
+            if (model.PromotionPreview != null)
+            {
+                CreatePromotionPreviewEntry(parent, model);
+                return;
+            }
+
+            if (model.PromotionComparisons != null && model.PromotionComparisons.Count > 0)
+            {
+                CreatePromotionComparisonEntry(parent, model);
+                return;
+            }
+
             GameObject root = BattleHudFactory.CreateInsetPanel("CampaignOptionEntry", parent, 0f, model.IsEnabled ? (model.IsEmphasized ? BattleUiTheme.PanelCommand : BattleUiTheme.PanelInset) : BattleUiTheme.PanelGhost);
             LayoutElement rootLayout = root.GetComponent<LayoutElement>();
             bool hasSupportingLine = !string.IsNullOrWhiteSpace(model.RecommendedReason) || !string.IsNullOrWhiteSpace(model.AvailabilityReason);
@@ -569,6 +658,542 @@ namespace PhalanxChronicle.UI
                 Text availability = BattleHudFactory.CreateText(textColumn.transform, model.AvailabilityReason, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
                 ClampText(availability, 18f, TextOverflowModes.Truncate);
             }
+        }
+
+        private void CreatePromotionPreviewEntry(Transform parent, CampaignOptionEntryModel model)
+        {
+            GameObject root = BattleHudFactory.CreateInsetPanel("PromotionPreviewEntry", parent, 0f, model.IsEmphasized ? BattleUiTheme.PanelInsetStrong : BattleUiTheme.PanelInset);
+            LayoutElement rootLayout = root.GetComponent<LayoutElement>();
+            rootLayout.flexibleHeight = 0f;
+
+            Transform content = BattleHudFactory.CreateInsetContentRoot(root.transform, 16f);
+            VerticalLayoutGroup contentLayout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 8f;
+            contentLayout.childControlHeight = true;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+
+            GameObject headerRow = new GameObject("PromotionPreviewHeaderRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            headerRow.transform.SetParent(content, false);
+            headerRow.GetComponent<LayoutElement>().preferredHeight = 40f;
+            HorizontalLayoutGroup headerLayout = headerRow.GetComponent<HorizontalLayoutGroup>();
+            headerLayout.spacing = 10f;
+            headerLayout.childAlignment = TextAnchor.MiddleLeft;
+            headerLayout.childControlHeight = true;
+            headerLayout.childControlWidth = true;
+            headerLayout.childForceExpandHeight = false;
+            headerLayout.childForceExpandWidth = false;
+
+            GameObject badgePanel = BattleHudFactory.CreateInsetPanel("PromotionPreviewBadge", headerRow.transform, 40f, BattleUiTheme.PanelReward);
+            LayoutElement badgeLayout = badgePanel.GetComponent<LayoutElement>();
+            badgeLayout.preferredWidth = 40f;
+            badgeLayout.preferredHeight = 40f;
+            badgeLayout.flexibleWidth = 0f;
+            badgeLayout.flexibleHeight = 0f;
+            PopulateBadgeContent(badgePanel.transform, model.IconItemId, string.IsNullOrWhiteSpace(model.IconGlyph) ? "階" : model.IconGlyph);
+
+            Text title = BattleHudFactory.CreateText(headerRow.transform, model.Title, 20, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            LayoutElement titleLayout = title.GetComponent<LayoutElement>();
+            titleLayout.flexibleWidth = 1f;
+            ClampText(title, 26f, TextOverflowModes.Truncate);
+
+            Text stageBadge = BattleHudFactory.CreateText(headerRow.transform, model.PromotionPreview.CurrentStageLabel, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextGold);
+            LayoutElement stageLayout = stageBadge.GetComponent<LayoutElement>();
+            stageLayout.preferredWidth = 92f;
+            stageLayout.flexibleWidth = 0f;
+            ClampText(stageBadge, 20f, TextOverflowModes.Truncate);
+
+            Button toggleButton = BattleHudFactory.CreateButton(headerRow.transform, model.PromotionPreview.ToggleLabel, false);
+            LayoutElement toggleLayout = toggleButton.GetComponent<LayoutElement>();
+            toggleLayout.preferredWidth = 150f;
+            toggleLayout.flexibleWidth = 0f;
+            toggleButton.onClick.RemoveAllListeners();
+            toggleButton.onClick.AddListener(() => optionSelectionHandler?.Invoke(model.OptionId));
+
+            if (!string.IsNullOrWhiteSpace(model.PromotionPreview.NextStageLabel))
+            {
+                Text nextStage = BattleHudFactory.CreateText(content, model.PromotionPreview.NextStageLabel, 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+                BattleHudFactory.EnableAutoHeight(nextStage, 18f);
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.PromotionPreview.PrimarySummary))
+            {
+                Text primarySummary = BattleHudFactory.CreateText(content, model.PromotionPreview.PrimarySummary, 14, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+                BattleHudFactory.EnableAutoHeight(primarySummary, 22f);
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.PromotionPreview.SecondarySummary))
+            {
+                Text secondarySummary = BattleHudFactory.CreateText(content, model.PromotionPreview.SecondarySummary, 12, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.82f, 0.91f, 0.99f, 1f));
+                BattleHudFactory.EnableAutoHeight(secondarySummary, 18f);
+            }
+
+            if (model.IsStageIntroExpanded && model.StageIntro != null && model.StageIntro.Count > 0)
+            {
+                GameObject introContainer = new GameObject("PromotionStageIntroContainer", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+                introContainer.transform.SetParent(content, false);
+                LayoutElement introLayout = introContainer.GetComponent<LayoutElement>();
+                introLayout.flexibleHeight = 0f;
+                VerticalLayoutGroup introColumn = introContainer.GetComponent<VerticalLayoutGroup>();
+                introColumn.spacing = 8f;
+                introColumn.childControlHeight = true;
+                introColumn.childControlWidth = true;
+                introColumn.childForceExpandHeight = false;
+
+                foreach (ProgressionStageIntroModel stage in model.StageIntro)
+                {
+                    CreateProgressionStageCard(introContainer.transform, stage);
+                }
+            }
+
+            FinalizeDynamicEntryHeight(root, 148f);
+        }
+
+        private void CreatePromotionComparisonEntry(Transform parent, CampaignOptionEntryModel model)
+        {
+            GameObject root = BattleHudFactory.CreateInsetPanel(
+                "PromotionComparisonEntry",
+                parent,
+                0f,
+                model.IsEnabled ? (model.IsEmphasized ? BattleUiTheme.PanelCommand : BattleUiTheme.PanelInsetStrong) : BattleUiTheme.PanelGhost);
+            LayoutElement rootLayout = root.GetComponent<LayoutElement>();
+            rootLayout.flexibleHeight = 0f;
+
+            Button button = root.AddComponent<Button>();
+            button.interactable = model.IsEnabled && !string.IsNullOrWhiteSpace(model.OptionId);
+            button.onClick.AddListener(() => optionSelectionHandler?.Invoke(model.OptionId));
+            ColorBlock colors = button.colors;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.04f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
+            colors.disabledColor = new Color(0.7f, 0.7f, 0.72f, 0.8f);
+            button.colors = colors;
+
+            Transform content = BattleHudFactory.CreateInsetContentRoot(root.transform, 16f);
+            HorizontalLayoutGroup contentLayout = content.gameObject.AddComponent<HorizontalLayoutGroup>();
+            contentLayout.spacing = 12f;
+            contentLayout.childControlHeight = true;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childForceExpandWidth = false;
+            contentLayout.childAlignment = TextAnchor.UpperLeft;
+
+            GameObject badgePanel = BattleHudFactory.CreateInsetPanel("PromotionComparisonBadge", content.transform, 60f, BattleUiTheme.PanelReward);
+            LayoutElement badgeLayout = badgePanel.GetComponent<LayoutElement>();
+            badgeLayout.preferredWidth = 60f;
+            badgeLayout.preferredHeight = 60f;
+            badgeLayout.flexibleWidth = 0f;
+            badgeLayout.flexibleHeight = 0f;
+            PopulateBadgeContent(badgePanel.transform, model.IconItemId, string.IsNullOrWhiteSpace(model.IconGlyph) ? "進" : model.IconGlyph);
+
+            GameObject textColumn = new GameObject("PromotionComparisonTextColumn", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            textColumn.transform.SetParent(content, false);
+            LayoutElement columnLayout = textColumn.GetComponent<LayoutElement>();
+            columnLayout.flexibleWidth = 1f;
+            columnLayout.flexibleHeight = 0f;
+            VerticalLayoutGroup columnGroup = textColumn.GetComponent<VerticalLayoutGroup>();
+            columnGroup.spacing = 6f;
+            columnGroup.childControlHeight = true;
+            columnGroup.childControlWidth = true;
+            columnGroup.childForceExpandHeight = false;
+
+            GameObject titleRow = new GameObject("PromotionComparisonTitleRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            titleRow.transform.SetParent(textColumn.transform, false);
+            titleRow.GetComponent<LayoutElement>().preferredHeight = 28f;
+            HorizontalLayoutGroup titleLayout = titleRow.GetComponent<HorizontalLayoutGroup>();
+            titleLayout.spacing = 8f;
+            titleLayout.childAlignment = TextAnchor.MiddleLeft;
+            titleLayout.childControlHeight = true;
+            titleLayout.childControlWidth = true;
+            titleLayout.childForceExpandHeight = false;
+            titleLayout.childForceExpandWidth = false;
+
+            Text title = BattleHudFactory.CreateText(titleRow.transform, model.Title, 19, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            LayoutElement titleLayoutElement = title.GetComponent<LayoutElement>();
+            titleLayoutElement.flexibleWidth = 1f;
+            ClampText(title, 24f, TextOverflowModes.Truncate);
+
+            Text status = BattleHudFactory.CreateText(titleRow.transform, model.Status, 12, FontStyle.Bold, TextAnchor.MiddleRight, model.IsEnabled ? BattleUiTheme.TextGold : BattleUiTheme.TextMuted);
+            LayoutElement statusLayout = status.GetComponent<LayoutElement>();
+            statusLayout.preferredWidth = 108f;
+            statusLayout.flexibleWidth = 0f;
+            ClampText(status, 18f, TextOverflowModes.Truncate);
+
+            PromotionComparisonModel comparison = model.PromotionComparisons[0];
+            if (!string.IsNullOrWhiteSpace(comparison.StatDeltaLabel))
+            {
+                Text statDelta = BattleHudFactory.CreateText(textColumn.transform, comparison.StatDeltaLabel, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+                BattleHudFactory.EnableAutoHeight(statDelta, 18f);
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.Description))
+            {
+                Text description = BattleHudFactory.CreateText(textColumn.transform, model.Description, 13, FontStyle.Normal, TextAnchor.UpperLeft, model.IsEnabled ? BattleUiTheme.TextPrimary : BattleUiTheme.TextMuted);
+                BattleHudFactory.EnableAutoHeight(description, 20f);
+            }
+
+            CreateSkillComparisonBlock(
+                textColumn.transform,
+                LocalizationService.Text("ui.label.passive", "被動戰法"),
+                comparison.PassiveCurrentName,
+                comparison.PassiveTargetName,
+                comparison.PassiveChangeLabel,
+                comparison.PassiveDetail,
+                model.IsEnabled);
+            CreateSkillComparisonBlock(
+                textColumn.transform,
+                LocalizationService.Text("ui.label.active", "主動戰技"),
+                comparison.ActiveCurrentName,
+                comparison.ActiveTargetName,
+                comparison.ActiveChangeLabel,
+                comparison.ActiveDetail,
+                model.IsEnabled);
+
+            if (!string.IsNullOrWhiteSpace(comparison.MasteryPreview))
+            {
+                Text masteryPreview = BattleHudFactory.CreateText(textColumn.transform, comparison.MasteryPreview, 12, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.82f, 0.91f, 0.99f, 1f));
+                BattleHudFactory.EnableAutoHeight(masteryPreview, 18f);
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.AvailabilityReason))
+            {
+                Text availability = BattleHudFactory.CreateText(textColumn.transform, model.AvailabilityReason, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
+                BattleHudFactory.EnableAutoHeight(availability, 18f);
+            }
+
+            FinalizeDynamicEntryHeight(root, 186f);
+        }
+
+        private void CreateProgressionStageCard(Transform parent, ProgressionStageIntroModel model)
+        {
+            GameObject card = BattleHudFactory.CreateInsetPanel("ProgressionStageCard", parent, 0f, model.IsReached ? BattleUiTheme.PanelBackdrop : BattleUiTheme.PanelGhost);
+            LayoutElement cardLayout = card.GetComponent<LayoutElement>();
+            cardLayout.flexibleHeight = 0f;
+            Transform content = BattleHudFactory.CreateInsetContentRoot(card.transform, 12f);
+            VerticalLayoutGroup column = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            column.spacing = 4f;
+            column.childControlHeight = true;
+            column.childControlWidth = true;
+            column.childForceExpandHeight = false;
+
+            GameObject titleRow = new GameObject("ProgressionStageTitleRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            titleRow.transform.SetParent(content, false);
+            titleRow.GetComponent<LayoutElement>().preferredHeight = 24f;
+            HorizontalLayoutGroup titleLayout = titleRow.GetComponent<HorizontalLayoutGroup>();
+            titleLayout.spacing = 8f;
+            titleLayout.childAlignment = TextAnchor.MiddleLeft;
+            titleLayout.childControlHeight = true;
+            titleLayout.childControlWidth = true;
+            titleLayout.childForceExpandHeight = false;
+            titleLayout.childForceExpandWidth = false;
+
+            Text title = BattleHudFactory.CreateText(titleRow.transform, model.Title, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            LayoutElement titleElement = title.GetComponent<LayoutElement>();
+            titleElement.flexibleWidth = 1f;
+            ClampText(title, 20f, TextOverflowModes.Truncate);
+
+            Text badge = BattleHudFactory.CreateText(titleRow.transform, model.StatusBadge, 11, FontStyle.Bold, TextAnchor.MiddleRight, model.IsReached ? BattleUiTheme.TextGold : BattleUiTheme.TextMuted);
+            LayoutElement badgeElement = badge.GetComponent<LayoutElement>();
+            badgeElement.preferredWidth = 92f;
+            badgeElement.flexibleWidth = 0f;
+            ClampText(badge, 18f, TextOverflowModes.Truncate);
+
+            Text range = BattleHudFactory.CreateText(content, model.LevelRangeLabel, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
+            ClampText(range, 18f, TextOverflowModes.Truncate);
+
+            Text summary = BattleHudFactory.CreateText(content, model.Summary, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            BattleHudFactory.EnableAutoHeight(summary, 18f);
+
+            Text unlocks = BattleHudFactory.CreateText(content, model.UnlocksLabel, 12, FontStyle.Italic, TextAnchor.UpperLeft, model.IsReached ? BattleUiTheme.TextSecondary : BattleUiTheme.TextMuted);
+            BattleHudFactory.EnableAutoHeight(unlocks, 18f);
+
+            FinalizeDynamicEntryHeight(card, 92f);
+        }
+
+        private static void CreateSkillComparisonBlock(Transform parent, string label, string currentValue, string targetValue, string changeLabel, string detail, bool enabled)
+        {
+            GameObject block = new GameObject("SkillComparisonBlock", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            block.transform.SetParent(parent, false);
+            LayoutElement blockLayout = block.GetComponent<LayoutElement>();
+            blockLayout.flexibleHeight = 0f;
+            VerticalLayoutGroup blockGroup = block.GetComponent<VerticalLayoutGroup>();
+            blockGroup.spacing = 2f;
+            blockGroup.childControlHeight = true;
+            blockGroup.childControlWidth = true;
+            blockGroup.childForceExpandHeight = false;
+
+            GameObject headerRow = new GameObject("SkillComparisonHeaderRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            headerRow.transform.SetParent(block.transform, false);
+            headerRow.GetComponent<LayoutElement>().preferredHeight = 18f;
+            HorizontalLayoutGroup headerLayout = headerRow.GetComponent<HorizontalLayoutGroup>();
+            headerLayout.spacing = 8f;
+            headerLayout.childAlignment = TextAnchor.MiddleLeft;
+            headerLayout.childControlHeight = true;
+            headerLayout.childControlWidth = true;
+            headerLayout.childForceExpandHeight = false;
+            headerLayout.childForceExpandWidth = false;
+
+            Text header = BattleHudFactory.CreateText(headerRow.transform, label, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            LayoutElement headerLayoutElement = header.GetComponent<LayoutElement>();
+            headerLayoutElement.flexibleWidth = 1f;
+            ClampText(header, 18f, TextOverflowModes.Truncate);
+
+            if (!string.IsNullOrWhiteSpace(changeLabel))
+            {
+                Text change = BattleHudFactory.CreateText(headerRow.transform, changeLabel, 11, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextGold);
+                LayoutElement changeLayout = change.GetComponent<LayoutElement>();
+                changeLayout.preferredWidth = 54f;
+                changeLayout.flexibleWidth = 0f;
+                ClampText(change, 18f, TextOverflowModes.Truncate);
+            }
+
+            bool showTarget = !string.Equals(currentValue, targetValue, StringComparison.Ordinal) || !string.IsNullOrWhiteSpace(changeLabel);
+            Text current = BattleHudFactory.CreateText(
+                block.transform,
+                showTarget
+                    ? LocalizationService.Format("camp.promote.compare.current_line", "目前：{0}", currentValue)
+                    : currentValue,
+                12,
+                FontStyle.Normal,
+                TextAnchor.UpperLeft,
+                enabled ? BattleUiTheme.TextPrimary : BattleUiTheme.TextMuted);
+            BattleHudFactory.EnableAutoHeight(current, 18f);
+
+            if (showTarget)
+            {
+                Text target = BattleHudFactory.CreateText(block.transform, LocalizationService.Format("camp.promote.compare.target_line", "升階後：{0}", targetValue), 12, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextGold);
+                BattleHudFactory.EnableAutoHeight(target, 18f);
+            }
+
+            if (!string.IsNullOrWhiteSpace(detail))
+            {
+                Text detailLabel = BattleHudFactory.CreateText(block.transform, detail, 11, FontStyle.Italic, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+                BattleHudFactory.EnableAutoHeight(detailLabel, 16f);
+            }
+        }
+
+        private static void FinalizeDynamicEntryHeight(GameObject root, float minimumHeight)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            RectTransform rect = root.GetComponent<RectTransform>();
+            LayoutElement layout = root.GetComponent<LayoutElement>();
+            if (rect == null || layout == null)
+            {
+                return;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
+            layout.preferredHeight = Mathf.Max(minimumHeight, LayoutUtility.GetPreferredHeight(rect) + 4f);
+        }
+
+        private void CreateEquipmentSlotRow(Transform parent, IReadOnlyList<CampaignEquipmentSlotCardModel> slotCards)
+        {
+            GameObject row = new GameObject("EquipmentSlotRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            row.transform.SetParent(parent, false);
+            LayoutElement rowLayout = row.GetComponent<LayoutElement>();
+            rowLayout.preferredHeight = 104f;
+            HorizontalLayoutGroup layout = row.GetComponent<HorizontalLayoutGroup>();
+            layout.spacing = 10f;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = true;
+
+            foreach (CampaignEquipmentSlotCardModel slotCard in slotCards ?? Array.Empty<CampaignEquipmentSlotCardModel>())
+            {
+                CreateEquipmentSlotCard(row.transform, slotCard);
+            }
+        }
+
+        private void CreateEquipmentSlotCard(Transform parent, CampaignEquipmentSlotCardModel model)
+        {
+            Color panelColor = model != null && model.IsSelected
+                ? BattleUiTheme.PanelSelected
+                : BattleUiTheme.PanelInset;
+            GameObject root = BattleHudFactory.CreateInsetPanel("EquipmentSlotCard", parent, 0f, panelColor);
+            LayoutElement rootLayout = root.GetComponent<LayoutElement>();
+            rootLayout.preferredHeight = 104f;
+            rootLayout.flexibleWidth = 1f;
+            rootLayout.flexibleHeight = 0f;
+            Button button = root.AddComponent<Button>();
+            button.interactable = model != null && !string.IsNullOrWhiteSpace(model.OptionId);
+            button.onClick.AddListener(() => optionSelectionHandler?.Invoke(model.OptionId));
+            ColorBlock colors = button.colors;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.04f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
+            button.colors = colors;
+
+            Transform content = BattleHudFactory.CreateInsetContentRoot(root.transform, 12f);
+            VerticalLayoutGroup column = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            column.spacing = 4f;
+            column.childControlHeight = true;
+            column.childControlWidth = true;
+            column.childForceExpandHeight = false;
+
+            GameObject topRow = new GameObject("EquipmentSlotTopRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            topRow.transform.SetParent(content, false);
+            topRow.GetComponent<LayoutElement>().preferredHeight = 20f;
+            HorizontalLayoutGroup topLayout = topRow.GetComponent<HorizontalLayoutGroup>();
+            topLayout.spacing = 6f;
+            topLayout.childAlignment = TextAnchor.MiddleLeft;
+            topLayout.childControlHeight = true;
+            topLayout.childControlWidth = true;
+            topLayout.childForceExpandHeight = false;
+            topLayout.childForceExpandWidth = false;
+
+            Text slotLabel = BattleHudFactory.CreateText(topRow.transform, model.SlotLabel, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            LayoutElement slotLayout = slotLabel.GetComponent<LayoutElement>();
+            slotLayout.flexibleWidth = 1f;
+
+            if (model.IsTreasure)
+            {
+                BattleHudFactory.CreateAdaptiveChip(topRow.transform, new HudChipModel
+                {
+                    Text = LocalizationService.Text("camp.equip.badge.treasure", "寶物"),
+                    BackgroundColor = BattleUiTheme.PanelReward,
+                    TextColor = BattleUiTheme.TextGold,
+                }, 20f);
+            }
+
+            Text itemName = BattleHudFactory.CreateText(
+                content,
+                model.IsEmpty ? LocalizationService.Text("camp.equip.empty_slot", "尚未裝備") : model.ItemName,
+                17,
+                FontStyle.Bold,
+                TextAnchor.MiddleLeft,
+                model.IsEmpty ? BattleUiTheme.TextMuted : BattleUiTheme.TextPrimary);
+            ClampText(itemName, 24f, TextOverflowModes.Truncate);
+
+            Text summary = BattleHudFactory.CreateText(content, model.SummaryLine, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            ClampText(summary, 34f, TextOverflowModes.Truncate);
+        }
+
+        private void CreateEquipmentChoiceEntry(Transform parent, CampaignEquipmentChoiceModel model)
+        {
+            GameObject root = BattleHudFactory.CreateInsetPanel("EquipmentChoiceEntry", parent, 0f, GetEquipmentChoicePanelColor(model));
+            LayoutElement rootLayout = root.GetComponent<LayoutElement>();
+            bool hasHint = !string.IsNullOrWhiteSpace(model.HintLine);
+            bool hasBadges = model.Badges != null && model.Badges.Count > 0;
+            rootLayout.preferredHeight = hasHint || hasBadges ? 138f : 122f;
+            rootLayout.flexibleHeight = 0f;
+            Button button = root.AddComponent<Button>();
+            button.interactable = model.IsEnabled;
+            button.onClick.AddListener(() => optionSelectionHandler?.Invoke(model.OptionId));
+            ColorBlock colors = button.colors;
+            colors.highlightedColor = new Color(1f, 1f, 1f, 0.04f);
+            colors.pressedColor = new Color(1f, 1f, 1f, 0.08f);
+            colors.disabledColor = new Color(0.7f, 0.7f, 0.72f, 0.8f);
+            button.colors = colors;
+
+            Transform content = BattleHudFactory.CreateInsetContentRoot(root.transform, 14f);
+            HorizontalLayoutGroup layout = content.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 12f;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = false;
+
+            GameObject iconPanel = BattleHudFactory.CreateInsetPanel("EquipmentChoiceIcon", content.transform, 60f, model.IsEmphasized ? BattleUiTheme.PanelReward : BattleUiTheme.PanelGhost);
+            LayoutElement iconLayout = iconPanel.GetComponent<LayoutElement>();
+            iconLayout.preferredWidth = 60f;
+            iconLayout.preferredHeight = 60f;
+            iconLayout.flexibleWidth = 0f;
+            iconLayout.flexibleHeight = 0f;
+            string fallbackGlyph = string.IsNullOrWhiteSpace(model.ItemId)
+                ? (model.IsEnabled ? "卸" : model.StateKind == EquipmentChoiceStateKind.Current ? "空" : "備")
+                : model.StateKind == EquipmentChoiceStateKind.Current ? "裝" : "備";
+            PopulateBadgeContent(iconPanel.transform, model.ItemId, fallbackGlyph);
+
+            GameObject textColumn = new GameObject("EquipmentChoiceTextColumn", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            textColumn.transform.SetParent(content, false);
+            LayoutElement columnLayout = textColumn.GetComponent<LayoutElement>();
+            columnLayout.flexibleWidth = 1f;
+            columnLayout.flexibleHeight = 0f;
+            VerticalLayoutGroup textLayout = textColumn.GetComponent<VerticalLayoutGroup>();
+            textLayout.spacing = 5f;
+            textLayout.childControlHeight = true;
+            textLayout.childControlWidth = true;
+            textLayout.childForceExpandHeight = false;
+
+            Text title = BattleHudFactory.CreateText(textColumn.transform, model.ItemName, 18, FontStyle.Bold, TextAnchor.MiddleLeft, model.IsEnabled ? BattleUiTheme.TextPrimary : BattleUiTheme.TextMuted);
+            ClampText(title, 24f, TextOverflowModes.Truncate);
+
+            if (hasBadges)
+            {
+                GameObject badgeRow = new GameObject("EquipmentChoiceBadgeRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+                badgeRow.transform.SetParent(textColumn.transform, false);
+                badgeRow.GetComponent<LayoutElement>().preferredHeight = 24f;
+                HorizontalLayoutGroup badgeLayout = badgeRow.GetComponent<HorizontalLayoutGroup>();
+                badgeLayout.spacing = 6f;
+                badgeLayout.childControlHeight = true;
+                badgeLayout.childControlWidth = false;
+                badgeLayout.childForceExpandHeight = false;
+                badgeLayout.childForceExpandWidth = false;
+                foreach (HudChipModel badge in model.Badges.Where(chip => chip != null && !string.IsNullOrWhiteSpace(chip.Text)).Take(4))
+                {
+                    BattleHudFactory.CreateAdaptiveChip(badgeRow.transform, badge, 22f);
+                }
+            }
+
+            Text compare = BattleHudFactory.CreateText(textColumn.transform, model.CompareSummary, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            ClampText(compare, 18f, TextOverflowModes.Truncate);
+
+            Text effect = BattleHudFactory.CreateText(textColumn.transform, model.EffectSummary, 13, FontStyle.Normal, TextAnchor.UpperLeft, model.IsEnabled ? BattleUiTheme.TextSecondary : BattleUiTheme.TextMuted);
+            ClampText(effect, 36f, TextOverflowModes.Truncate);
+
+            if (hasHint)
+            {
+                Text hint = BattleHudFactory.CreateText(
+                    textColumn.transform,
+                    model.HintLine,
+                    12,
+                    FontStyle.Italic,
+                    TextAnchor.UpperLeft,
+                    model.StateKind == EquipmentChoiceStateKind.EquippedByOther ? BattleUiTheme.TextWarning : BattleUiTheme.TextSecondary);
+                ClampText(hint, 18f, TextOverflowModes.Truncate);
+            }
+        }
+
+        private static Color GetEquipmentChoicePanelColor(CampaignEquipmentChoiceModel model)
+        {
+            if (model == null)
+            {
+                return BattleUiTheme.PanelInset;
+            }
+
+            if (!model.IsEnabled)
+            {
+                return model.IsEmphasized ? BattleUiTheme.PanelCommand : BattleUiTheme.PanelGhost;
+            }
+
+            if (string.IsNullOrWhiteSpace(model.ItemId))
+            {
+                return BattleUiTheme.PanelGhost;
+            }
+
+            return model.IsEmphasized ? BattleUiTheme.PanelInsetStrong : BattleUiTheme.PanelInset;
+        }
+
+        private static void CreateEmptyStatePanel(Transform parent, string title, string body)
+        {
+            GameObject panel = BattleHudFactory.CreateInsetPanel("CampaignEmptyState", parent, 0f, BattleUiTheme.PanelGhost);
+            LayoutElement layout = panel.GetComponent<LayoutElement>();
+            layout.preferredHeight = 88f;
+            Transform content = BattleHudFactory.CreateInsetContentRoot(panel.transform, 16f);
+            VerticalLayoutGroup column = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            column.spacing = 4f;
+            column.childControlHeight = true;
+            column.childControlWidth = true;
+            column.childForceExpandHeight = false;
+
+            Text titleLabel = BattleHudFactory.CreateText(content, title, 15, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
+            ClampText(titleLabel, 22f, TextOverflowModes.Truncate);
+            Text bodyLabel = BattleHudFactory.CreateText(content, body, 13, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
+            ClampText(bodyLabel, 34f, TextOverflowModes.Truncate);
         }
 
         private void ShowOverlay()

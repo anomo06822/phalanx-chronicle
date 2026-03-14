@@ -25,6 +25,8 @@ namespace PhalanxChronicle.Battle
         private CampaignProgressionService campaignProgressionService;
         private CampaignSaveRepository campaignSaveRepository;
         private CampaignSaveData campaignSaveData;
+        private readonly CampaignPromotionPreviewBuilder promotionPreviewBuilder = new CampaignPromotionPreviewBuilder();
+        private readonly HashSet<string> expandedPromotionIntroUnits = new HashSet<string>(StringComparer.Ordinal);
         private string currentCampMessage = string.Empty;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -468,7 +470,7 @@ namespace PhalanxChronicle.Battle
             }
         }
 
-        private void ShowUnitManagement(string unitId, string message = null)
+        private void ShowUnitManagement(string unitId, string message = null, ItemCategory? selectedCategory = null)
         {
             CampaignUnitState unit = campaignSaveData != null ? campaignSaveData.GetUnit(unitId) : null;
             if (unit == null)
@@ -476,84 +478,8 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            List<CampaignOptionEntryModel> options = new List<CampaignOptionEntryModel>();
-            if (CanPromote(unit))
-            {
-                foreach (PromotionDefinition promotion in PromotionCatalog.GetOptions(unit.UnitId))
-                {
-                    options.Add(new CampaignOptionEntryModel
-                    {
-                        OptionId = "promote|" + unit.UnitId + "|" + promotion.PromotionId,
-                        IconGlyph = "進",
-                        Title = LocalizationService.Format(
-                            "camp.promote.to",
-                            "轉職為 {0}",
-                            LocalizationService.Text(UnitClassCatalog.Get(promotion.TargetClassId).DisplayNameKey, promotion.TargetClassId)),
-                        Status = LocalizationService.Text("camp.promote.branch", "升階分支"),
-                        MetricLine = BuildPromotionMetricLine(promotion),
-                        Description = BuildPromotionSummary(promotion),
-                        IsEnabled = true,
-                        IsEmphasized = true,
-                        IsPromotionOption = true,
-                    });
-                }
-            }
-
-            foreach (ItemDefinition item in campaignProgressionService.GetEquippableItems(campaignSaveData, unit.UnitId, ItemCategory.Weapon))
-            {
-                options.Add(new CampaignOptionEntryModel
-                {
-                    OptionId = "weapon|" + unit.UnitId + "|" + item.ItemId,
-                    IconGlyph = BuildItemGlyph(item),
-                    IconItemId = item.ItemId,
-                    Title = LocalizationService.Text(item.NameKey, item.NameFallback),
-                    Status = string.Equals(unit.EquipmentLoadout.WeaponId, item.ItemId, StringComparison.Ordinal)
-                        ? LocalizationService.Text("camp.equip.current", "已裝備")
-                        : LocalizationService.Format("camp.equip.available", "可用 {0}", campaignProgressionService.GetAvailableEquipmentCount(campaignSaveData, item.ItemId, unit.UnitId)),
-                    MetricLine = BuildItemMetricLine(item, campaignProgressionService.GetAvailableEquipmentCount(campaignSaveData, item.ItemId, unit.UnitId)),
-                    Description = BuildItemSummary(item),
-                    IsEnabled = true,
-                    IsEmphasized = string.Equals(unit.EquipmentLoadout.WeaponId, item.ItemId, StringComparison.Ordinal),
-                });
-            }
-
-            foreach (ItemDefinition item in campaignProgressionService.GetEquippableItems(campaignSaveData, unit.UnitId, ItemCategory.Armor))
-            {
-                options.Add(new CampaignOptionEntryModel
-                {
-                    OptionId = "armor|" + unit.UnitId + "|" + item.ItemId,
-                    IconGlyph = BuildItemGlyph(item),
-                    IconItemId = item.ItemId,
-                    Title = LocalizationService.Text(item.NameKey, item.NameFallback),
-                    Status = string.Equals(unit.EquipmentLoadout.ArmorId, item.ItemId, StringComparison.Ordinal)
-                        ? LocalizationService.Text("camp.equip.current", "已裝備")
-                        : LocalizationService.Format("camp.equip.available", "可用 {0}", campaignProgressionService.GetAvailableEquipmentCount(campaignSaveData, item.ItemId, unit.UnitId)),
-                    MetricLine = BuildItemMetricLine(item, campaignProgressionService.GetAvailableEquipmentCount(campaignSaveData, item.ItemId, unit.UnitId)),
-                    Description = BuildItemSummary(item),
-                    IsEnabled = true,
-                    IsEmphasized = string.Equals(unit.EquipmentLoadout.ArmorId, item.ItemId, StringComparison.Ordinal),
-                });
-            }
-
-            foreach (ItemDefinition item in campaignProgressionService.GetEquippableItems(campaignSaveData, unit.UnitId, ItemCategory.Mount))
-            {
-                options.Add(new CampaignOptionEntryModel
-                {
-                    OptionId = "mount|" + unit.UnitId + "|" + item.ItemId,
-                    IconGlyph = BuildItemGlyph(item),
-                    IconItemId = item.ItemId,
-                    Title = LocalizationService.Text(item.NameKey, item.NameFallback),
-                    Status = string.Equals(unit.EquipmentLoadout.MountId, item.ItemId, StringComparison.Ordinal)
-                        ? LocalizationService.Text("camp.equip.current", "已裝備")
-                        : LocalizationService.Format("camp.equip.available", "可用 {0}", campaignProgressionService.GetAvailableEquipmentCount(campaignSaveData, item.ItemId, unit.UnitId)),
-                    MetricLine = BuildItemMetricLine(item, campaignProgressionService.GetAvailableEquipmentCount(campaignSaveData, item.ItemId, unit.UnitId)),
-                    Description = BuildItemSummary(item),
-                    IsEnabled = true,
-                    IsEmphasized = string.Equals(unit.EquipmentLoadout.MountId, item.ItemId, StringComparison.Ordinal),
-                });
-            }
-
-            CampaignOptionListModel model = new CampaignOptionListModel
+            ItemCategory activeCategory = selectedCategory ?? GetDefaultSelectedEquipmentCategory(unit);
+            CampaignEquipmentDeckModel model = new CampaignEquipmentDeckModel
             {
                 Eyebrow = LocalizationService.Text("campaign.unit_management.eyebrow", "武將整備"),
                 Title = GetUnitDisplayName(unit.UnitId),
@@ -561,12 +487,19 @@ namespace PhalanxChronicle.Battle
                 ProgressLabel = BuildCampaignProgressSnapshot(),
                 HighlightLabel = BuildCampUnitStatus(unit),
                 DeckTitle = LocalizationService.Text("campaign.unit_management.deck", "裝備與升階"),
-                Options = options,
+                PreviewMessage = LocalizationService.Format(
+                    "camp.equip.preview",
+                    "目前查看 {0} 槽位。可直接換上空閒裝備，或把其他武將身上的同部位裝備轉給這名角色。",
+                    GetEquipmentSlotLabel(activeCategory)),
+                PromotionOptions = BuildPromotionOptions(unit, activeCategory),
+                SlotCards = BuildEquipmentSlotCards(unit, activeCategory),
+                SelectedSlotCategory = activeCategory,
+                ChoiceSections = BuildEquipmentChoiceSections(unit, activeCategory),
                 PrimaryActionLabel = LocalizationService.Text("ui.button.back_to_camp", "返回軍營"),
                 SecondaryActionLabel = string.Empty,
             };
 
-            battleManager.ShowCampaignOptionList(model, HandleUnitManagementOptionSelected, () => ShowCampHub(currentCampMessage));
+            battleManager.ShowCampaignEquipment(model, HandleUnitManagementOptionSelected, () => ShowCampHub(currentCampMessage));
         }
 
         private void HandleUnitManagementOptionSelected(string optionId)
@@ -583,6 +516,21 @@ namespace PhalanxChronicle.Battle
             }
 
             string unitId = segments[1];
+            if (segments[0] == "promotion-intro")
+            {
+                ItemCategory selectedCategory = segments.Length >= 3 && TryParseItemCategory(segments[2], out ItemCategory parsedCategory)
+                    ? parsedCategory
+                    : GetDefaultSelectedEquipmentCategory(campaignSaveData != null ? campaignSaveData.GetUnit(unitId) : null);
+
+                if (!expandedPromotionIntroUnits.Add(unitId))
+                {
+                    expandedPromotionIntroUnits.Remove(unitId);
+                }
+
+                ShowUnitManagement(unitId, null, selectedCategory);
+                return;
+            }
+
             if (segments[0] == "promote")
             {
                 string promotionId = segments.Length >= 3 ? segments[2] : null;
@@ -595,21 +543,51 @@ namespace PhalanxChronicle.Battle
                 return;
             }
 
-            if (segments.Length < 3)
+            if (segments[0] == "slot")
+            {
+                if (segments.Length >= 3 && TryParseItemCategory(segments[2], out ItemCategory selectedCategory))
+                {
+                    ShowUnitManagement(unitId, null, selectedCategory);
+                }
+
+                return;
+            }
+
+            if (segments[0] == "unequip" &&
+                segments.Length >= 3 &&
+                TryParseItemCategory(segments[2], out ItemCategory unequipCategory) &&
+                campaignProgressionService.TryUnequipItem(campaignSaveData, unitId, unequipCategory))
+            {
+                campaignSaveRepository.Save(campaignSaveData);
+                ShowUnitManagement(unitId, LocalizationService.Text("camp.equip.success", "裝備已更新。"), unequipCategory);
+                return;
+            }
+
+            if (segments[0] == "transfer" &&
+                segments.Length >= 5 &&
+                TryParseItemCategory(segments[2], out ItemCategory transferCategory))
+            {
+                string itemId = segments[3];
+                string fromUnitId = segments[4];
+                ShowTransferConfirm(unitId, fromUnitId, itemId, transferCategory);
+                return;
+            }
+
+            if (segments[0] != "equip" || segments.Length < 4 || !TryParseItemCategory(segments[2], out ItemCategory category))
             {
                 return;
             }
 
-            string itemId = segments[2];
-            bool equipped = segments[0] == "weapon"
-                ? campaignProgressionService.TryEquipWeapon(campaignSaveData, unitId, itemId)
-                : segments[0] == "armor"
-                    ? campaignProgressionService.TryEquipArmor(campaignSaveData, unitId, itemId)
-                    : campaignProgressionService.TryEquipMount(campaignSaveData, unitId, itemId);
+            string equipItemId = segments[3];
+            bool equipped = category == ItemCategory.Weapon
+                ? campaignProgressionService.TryEquipWeapon(campaignSaveData, unitId, equipItemId)
+                : category == ItemCategory.Armor
+                    ? campaignProgressionService.TryEquipArmor(campaignSaveData, unitId, equipItemId)
+                    : campaignProgressionService.TryEquipMount(campaignSaveData, unitId, equipItemId);
             if (equipped)
             {
                 campaignSaveRepository.Save(campaignSaveData);
-                ShowUnitManagement(unitId, LocalizationService.Text("camp.equip.success", "裝備已更新。"));
+                ShowUnitManagement(unitId, LocalizationService.Text("camp.equip.success", "裝備已更新。"), category);
             }
         }
 
@@ -683,24 +661,42 @@ namespace PhalanxChronicle.Battle
         private void ShowInventory(string message = null)
         {
             List<CampaignOptionEntryModel> options = campaignSaveData.Inventory.Entries
-                .OrderByDescending(entry =>
+                .OrderBy(entry =>
+                {
+                    ItemDefinition definition = ItemCatalog.Get(entry.ItemId);
+                    return GetInventoryCategorySortOrder(definition);
+                })
+                .ThenByDescending(entry =>
                 {
                     ItemDefinition definition = ItemCatalog.Get(entry.ItemId);
                     return definition != null && definition.IsTreasure ? 1 : 0;
                 })
-                .ThenBy(entry => entry.ItemId, StringComparer.Ordinal)
+                .ThenBy(entry =>
+                {
+                    ItemDefinition definition = ItemCatalog.Get(entry.ItemId);
+                    return definition != null
+                        ? LocalizationService.Text(definition.NameKey, definition.NameFallback)
+                        : entry.ItemId;
+                }, StringComparer.Ordinal)
                 .Select(entry =>
                 {
                     ItemDefinition definition = ItemCatalog.Get(entry.ItemId);
+                    int equippedCount = definition != null && definition.IsEquipable
+                        ? campaignProgressionService.GetEquippedItemCount(campaignSaveData, entry.ItemId)
+                        : 0;
                     return new CampaignOptionEntryModel
                     {
                         OptionId = string.Empty,
+                        Section = GetItemCategoryLabel(definition),
                         IconGlyph = BuildItemGlyph(definition),
                         IconItemId = definition != null ? definition.ItemId : string.Empty,
                         Title = definition != null ? LocalizationService.Text(definition.NameKey, definition.NameFallback) : entry.ItemId,
-                        Status = LocalizationService.Format("camp.inventory.count", "x{0}", entry.Quantity),
+                        Status = definition != null && definition.IsEquipable
+                            ? LocalizationService.Format("camp.inventory.equipped_status", "持有 {0} / 裝備中 {1}", entry.Quantity, equippedCount)
+                            : LocalizationService.Format("camp.inventory.count", "x{0}", entry.Quantity),
                         MetricLine = BuildInventoryMetricLine(definition, entry.Quantity),
                         Description = definition != null ? LocalizationService.Text(definition.DescriptionKey, definition.DescriptionFallback) : string.Empty,
+                        SortWeight = GetInventoryCategorySortOrder(definition) * 100,
                         IsEnabled = false,
                     };
                 })
@@ -953,6 +949,7 @@ namespace PhalanxChronicle.Battle
         {
             ItemDefinition mount = ItemCatalog.Get(unit.EquipmentLoadout.MountId);
             int moveValue = unit.MoveRange + (mount != null ? mount.MoveBonus : 0);
+            IReadOnlyList<PromotionDefinition> promotionOptions = PromotionCatalog.GetOptions(unit.UnitId);
             List<string> parts = new List<string>
             {
                 LocalizationService.Format(
@@ -968,27 +965,8 @@ namespace PhalanxChronicle.Battle
                     unit.MaxMana,
                     moveValue),
                 BuildCampUnitEquipmentSummary(unit),
+                promotionPreviewBuilder.BuildProgressionBodySummary(unit, promotionOptions),
             };
-
-            if (CanPromote(unit))
-            {
-                parts.Add(LocalizationService.Text(
-                    "camp.promote.ready_hint",
-                    "目前已可轉職。下方高亮的升階卡片，就是這名角色的轉職入口。"));
-            }
-            else if (unit != null && unit.HasPromoted)
-            {
-                parts.Add(LocalizationService.Text(
-                    "camp.promote.done_hint",
-                    "這名角色已完成升階，之後不能再更換分支。"));
-            }
-            else if (unit != null)
-            {
-                parts.Add(LocalizationService.Format(
-                    "camp.promote.locked_hint",
-                    "升階會在等級 10 解鎖。目前等級：{0}。",
-                    unit.Level));
-            }
 
             if (!string.IsNullOrWhiteSpace(message))
             {
@@ -996,25 +974,6 @@ namespace PhalanxChronicle.Battle
             }
 
             return string.Join("\n\n", parts);
-        }
-
-        private string BuildPromotionSummary(PromotionDefinition definition)
-        {
-            string passiveName = LocalizationService.Text(definition.PassiveSkillNameKey, definition.PassiveSkill.ToString());
-            string activeName = LocalizationService.Text(definition.ActiveSkillNameKey, definition.ActiveSkill.ToString());
-            string statSummary = LocalizationService.Format(
-                "camp.promote.summary",
-                "+{0} 生命  +{1} 攻  +{2} 防  +{3} 士氣",
-                definition.HpBonus,
-                definition.AttackBonus,
-                definition.DefenseBonus,
-                definition.ManaBonus);
-            return string.Join(
-                "\n",
-                LocalizationService.Text("camp.promote.tap_hint", "點擊後立即完成升階。"),
-                statSummary,
-                LocalizationService.Text("ui.label.passive", "被動戰法") + "：" + passiveName,
-                LocalizationService.Text("ui.label.active", "主動戰技") + "：" + activeName);
         }
 
         private string BuildItemSummary(ItemDefinition item)
@@ -1086,17 +1045,264 @@ namespace PhalanxChronicle.Battle
                 unit.AttackRange);
         }
 
-        private string BuildPromotionMetricLine(PromotionDefinition definition)
+        private List<CampaignOptionEntryModel> BuildPromotionOptions(CampaignUnitState unit, ItemCategory selectedCategory)
         {
-            if (definition == null)
+            List<CampaignOptionEntryModel> options = new List<CampaignOptionEntryModel>();
+            if (unit == null)
             {
-                return string.Empty;
+                return options;
             }
 
-            return LocalizationService.Format(
-                "camp.promote.metric",
-                "目標兵種：{0}  |  被動與主動戰技同步更新",
-                LocalizationService.Text(UnitClassCatalog.Get(definition.TargetClassId).DisplayNameKey, definition.TargetClassId));
+            IReadOnlyList<PromotionDefinition> promotionDefinitions = PromotionCatalog.GetOptions(unit.UnitId);
+            bool hasPromotionOptions = promotionDefinitions.Count > 0;
+            bool isExpanded = expandedPromotionIntroUnits.Contains(unit.UnitId);
+
+            PromotionPreviewModel previewModel = promotionPreviewBuilder.BuildPreview(unit, promotionDefinitions, isExpanded);
+            options.Add(new CampaignOptionEntryModel
+            {
+                OptionId = "promotion-intro|" + unit.UnitId + "|" + FormatItemCategory(selectedCategory),
+                Section = LocalizationService.Text("camp.section.promotion_preview", "升階預覽"),
+                IconGlyph = "階",
+                Title = LocalizationService.Text("camp.promote.preview.title", "升階預覽"),
+                Status = previewModel.CurrentStageLabel,
+                MetricLine = previewModel.NextStageLabel,
+                Description = previewModel.PrimarySummary,
+                RecommendedReason = previewModel.SecondarySummary,
+                IsEnabled = true,
+                IsEmphasized = isExpanded,
+                PromotionPreview = previewModel,
+                StageIntro = promotionPreviewBuilder.BuildStageIntro(unit, promotionDefinitions),
+                IsStageIntroExpanded = isExpanded,
+                SortWeight = 0,
+            });
+
+            if (!hasPromotionOptions && !unit.HasPromoted)
+            {
+                return options;
+            }
+
+            if (unit.HasPromoted)
+            {
+                PromotionDefinition selectedPromotion = promotionPreviewBuilder.ResolveSelectedPromotion(unit, promotionDefinitions);
+                if (selectedPromotion == null)
+                {
+                    return options;
+                }
+
+                options.Add(new CampaignOptionEntryModel
+                {
+                    OptionId = string.Empty,
+                    Section = LocalizationService.Text("camp.promote.branch", "升階分支"),
+                    IconGlyph = "定",
+                    Title = ResolvePromotionTargetClassName(selectedPromotion.TargetClassId),
+                    Status = LocalizationService.Text("camp.promote.selected_branch", "已選分支"),
+                    MetricLine = LocalizationService.Format(
+                        "camp.promote.selected.metric",
+                        "下一階段：Lv{0} 精通",
+                        GetPromotionSignatureUnlockLevel(unit)),
+                    Description = LocalizationService.Text("camp.promote.selected.desc", "這條升階分支已鎖定，接下來會朝精通階段繼續成長。"),
+                    IsEnabled = true,
+                    IsEmphasized = true,
+                    IsPromotionOption = true,
+                    PromotionComparisons = new[] { promotionPreviewBuilder.BuildSelectedPromotionSummary(unit, selectedPromotion) },
+                    SortWeight = 10,
+                });
+
+                return options;
+            }
+
+            bool canPromote = CanPromote(unit);
+            for (int index = 0; index < promotionDefinitions.Count; index++)
+            {
+                PromotionDefinition promotion = promotionDefinitions[index];
+                PromotionComparisonModel comparison = promotionPreviewBuilder.BuildPromotionComparison(unit, promotion);
+                options.Add(new CampaignOptionEntryModel
+                {
+                    OptionId = "promote|" + unit.UnitId + "|" + promotion.PromotionId,
+                    Section = LocalizationService.Text("camp.promote.branch", "升階分支"),
+                    IconGlyph = "進",
+                    Title = ResolvePromotionTargetClassName(promotion.TargetClassId),
+                    Status = canPromote
+                        ? LocalizationService.Text("camp.promote.ready_status", "可升階")
+                        : LocalizationService.Format("camp.promote.locked_status", "Lv{0} 解鎖", 10),
+                    MetricLine = comparison.StatDeltaLabel,
+                    Description = canPromote
+                        ? LocalizationService.Text("camp.promote.tap_hint", "點擊後立即完成升階。")
+                        : LocalizationService.Format("camp.promote.locked_hint", "升階會在等級 10 解鎖。目前等級：{0}。", unit.Level),
+                    AvailabilityReason = canPromote
+                        ? string.Empty
+                        : LocalizationService.Text("camp.promote.preview_branch_hint", "先看前後技能差異，等達到等級 10 再決定分支。"),
+                    IsEnabled = canPromote,
+                    IsEmphasized = canPromote,
+                    IsPromotionOption = true,
+                    PromotionComparisons = new[] { comparison },
+                    SortWeight = 20 + index,
+                });
+            }
+
+            return options;
+        }
+
+        private static string ResolvePromotionTargetClassName(string classId)
+        {
+            UnitClassDefinition definition = UnitClassCatalog.Get(classId);
+            if (definition == null)
+            {
+                return classId ?? string.Empty;
+            }
+
+            return LocalizationService.Text(definition.DisplayNameKey, classId);
+        }
+
+        private static int GetPromotionSignatureUnlockLevel(CampaignUnitState unit)
+        {
+            GrowthProfileDefinition growthProfile = unit != null ? GrowthProfileCatalog.Get(unit.GrowthProfileId) : null;
+            return growthProfile != null ? growthProfile.SignaturePassiveUnlockLevel : 15;
+        }
+
+        private IReadOnlyList<CampaignEquipmentSlotCardModel> BuildEquipmentSlotCards(CampaignUnitState unit, ItemCategory selectedCategory)
+        {
+            return new[]
+            {
+                BuildEquipmentSlotCard(unit, ItemCategory.Weapon, selectedCategory),
+                BuildEquipmentSlotCard(unit, ItemCategory.Armor, selectedCategory),
+                BuildEquipmentSlotCard(unit, ItemCategory.Mount, selectedCategory),
+            };
+        }
+
+        private CampaignEquipmentSlotCardModel BuildEquipmentSlotCard(CampaignUnitState unit, ItemCategory category, ItemCategory selectedCategory)
+        {
+            ItemDefinition equippedItem = ItemCatalog.Get(GetEquippedItemId(unit, category));
+            return new CampaignEquipmentSlotCardModel
+            {
+                OptionId = "slot|" + unit.UnitId + "|" + FormatItemCategory(category),
+                Category = category,
+                SlotLabel = GetEquipmentSlotLabel(category),
+                ItemId = equippedItem != null ? equippedItem.ItemId : string.Empty,
+                ItemName = equippedItem != null
+                    ? LocalizationService.Text(equippedItem.NameKey, equippedItem.NameFallback)
+                    : LocalizationService.Text("camp.equip.empty_slot", "尚未裝備"),
+                SummaryLine = BuildEquipmentSlotSummary(equippedItem),
+                IsTreasure = equippedItem != null && equippedItem.IsTreasure,
+                IsSelected = category == selectedCategory,
+                IsEmpty = equippedItem == null,
+            };
+        }
+
+        private IReadOnlyList<CampaignEquipmentChoiceSectionModel> BuildEquipmentChoiceSections(CampaignUnitState unit, ItemCategory category)
+        {
+            List<EquipmentChoiceDefinition> rawChoices = campaignProgressionService
+                .GetEquipmentChoices(campaignSaveData, unit.UnitId, category)
+                .ToList();
+            ItemDefinition currentItem = ItemCatalog.Get(GetEquippedItemId(unit, category));
+            List<CampaignEquipmentChoiceSectionModel> sections = new List<CampaignEquipmentChoiceSectionModel>();
+
+            List<CampaignEquipmentChoiceModel> currentChoices = new List<CampaignEquipmentChoiceModel>();
+            EquipmentChoiceDefinition currentDefinition = rawChoices.FirstOrDefault(choice => choice.StateKind == EquipmentChoiceStateKind.Current);
+            if (currentDefinition != null && currentItem != null)
+            {
+                currentChoices.Add(BuildEquipmentChoiceModel(unit, category, currentDefinition, currentItem, currentItem));
+                currentChoices.Add(BuildUnequipChoiceModel(unit, category, currentItem));
+            }
+            else
+            {
+                currentChoices.Add(new CampaignEquipmentChoiceModel
+                {
+                    ItemName = LocalizationService.Text("camp.equip.current_empty", "目前未裝備"),
+                    Category = category,
+                    StateKind = EquipmentChoiceStateKind.Current,
+                    CompareSummary = LocalizationService.Text("camp.equip.compare.none", "無變化"),
+                    EffectSummary = LocalizationService.Text("camp.equip.empty_hint", "這個部位目前是空的，可直接從下方選擇可用裝備。"),
+                    IsEnabled = false,
+                    IsEmphasized = true,
+                    SortWeight = 0,
+                    Badges = Array.Empty<HudChipModel>(),
+                });
+            }
+
+            sections.Add(new CampaignEquipmentChoiceSectionModel
+            {
+                Title = LocalizationService.Text("camp.equip.section.current", "目前裝備"),
+                Choices = currentChoices,
+            });
+
+            List<CampaignEquipmentChoiceModel> availableChoices = rawChoices
+                .Where(choice => choice.StateKind == EquipmentChoiceStateKind.Available)
+                .Select(choice => BuildEquipmentChoiceModel(unit, category, choice, ItemCatalog.Get(choice.ItemId), currentItem))
+                .OrderBy(choice => choice.SortWeight)
+                .ThenBy(choice => choice.ItemName, StringComparer.Ordinal)
+                .ToList();
+            if (availableChoices.Count > 0)
+            {
+                sections.Add(new CampaignEquipmentChoiceSectionModel
+                {
+                    Title = LocalizationService.Text("camp.equip.section.available", "可直接換上"),
+                    Choices = availableChoices,
+                });
+            }
+
+            List<CampaignEquipmentChoiceModel> otherChoices = rawChoices
+                .Where(choice => choice.StateKind == EquipmentChoiceStateKind.EquippedByOther)
+                .Select(choice => BuildEquipmentChoiceModel(unit, category, choice, ItemCatalog.Get(choice.ItemId), currentItem))
+                .OrderBy(choice => choice.SortWeight)
+                .ThenBy(choice => choice.ItemName, StringComparer.Ordinal)
+                .ToList();
+            if (otherChoices.Count > 0)
+            {
+                sections.Add(new CampaignEquipmentChoiceSectionModel
+                {
+                    Title = LocalizationService.Text("camp.equip.section.other_units", "其他武將裝備中"),
+                    Choices = otherChoices,
+                });
+            }
+
+            return sections;
+        }
+
+        private CampaignEquipmentChoiceModel BuildEquipmentChoiceModel(
+            CampaignUnitState targetUnit,
+            ItemCategory category,
+            EquipmentChoiceDefinition choice,
+            ItemDefinition item,
+            ItemDefinition currentItem)
+        {
+            IReadOnlyList<HudChipModel> badges = BuildEquipmentBadges(targetUnit, choice, item);
+            return new CampaignEquipmentChoiceModel
+            {
+                OptionId = BuildEquipmentChoiceOptionId(targetUnit.UnitId, category, choice),
+                ItemId = item != null ? item.ItemId : string.Empty,
+                ItemName = item != null ? LocalizationService.Text(item.NameKey, item.NameFallback) : choice.ItemId,
+                Category = category,
+                StateKind = choice.StateKind,
+                EquippedByUnitId = choice.EquippedByUnitId,
+                Badges = badges,
+                CompareSummary = BuildEquipmentDeltaSummary(currentItem, item),
+                EffectSummary = BuildEquipmentEffectSummary(item),
+                HintLine = BuildEquipmentHintLine(targetUnit, choice, item),
+                IsEnabled = choice.StateKind != EquipmentChoiceStateKind.Current,
+                IsEmphasized = choice.StateKind == EquipmentChoiceStateKind.Current ||
+                               (item != null && string.Equals(item.RecommendedOwnerUnitId, targetUnit.UnitId, StringComparison.Ordinal)),
+                SortWeight = BuildEquipmentChoiceSortWeight(targetUnit.UnitId, choice, item),
+            };
+        }
+
+        private CampaignEquipmentChoiceModel BuildUnequipChoiceModel(CampaignUnitState unit, ItemCategory category, ItemDefinition currentItem)
+        {
+            return new CampaignEquipmentChoiceModel
+            {
+                OptionId = "unequip|" + unit.UnitId + "|" + FormatItemCategory(category),
+                ItemId = string.Empty,
+                ItemName = LocalizationService.Text("camp.equip.unequip", "卸下此部位"),
+                Category = category,
+                StateKind = EquipmentChoiceStateKind.Current,
+                Badges = Array.Empty<HudChipModel>(),
+                CompareSummary = BuildEquipmentDeltaSummary(currentItem, null),
+                EffectSummary = LocalizationService.Text("camp.equip.unequip.desc", "清空這個部位，讓裝備回到倉庫並保留給其他角色使用。"),
+                HintLine = LocalizationService.Text("camp.equip.unequip.hint", "此操作不會消耗或遺失裝備，只會讓此部位回到空槽。"),
+                IsEnabled = true,
+                IsEmphasized = false,
+                SortWeight = 1,
+            };
         }
 
         private string BuildItemMetricLine(ItemDefinition item, int availableCount)
@@ -1133,6 +1339,359 @@ namespace PhalanxChronicle.Battle
                             ? "坐騎"
                             : "物資";
             return LocalizationService.Format("camp.inventory.metric_line", "{0}  |  持有 {1}", category, quantity);
+        }
+
+        private IReadOnlyList<HudChipModel> BuildEquipmentBadges(CampaignUnitState targetUnit, EquipmentChoiceDefinition choice, ItemDefinition item)
+        {
+            List<HudChipModel> badges = new List<HudChipModel>();
+            if (choice.StateKind == EquipmentChoiceStateKind.Current)
+            {
+                badges.Add(CreateBadge(
+                    LocalizationService.Text("camp.equip.current", "已裝備"),
+                    BattleUiTheme.AccentGold,
+                    new Color(0.16f, 0.1f, 0.04f, 1f)));
+            }
+
+            if (item != null && item.IsTreasure)
+            {
+                badges.Add(CreateBadge(
+                    LocalizationService.Text("camp.equip.badge.treasure", "寶物"),
+                    BattleUiTheme.PanelReward,
+                    BattleUiTheme.TextGold));
+            }
+
+            if (item != null && string.Equals(item.RecommendedOwnerUnitId, targetUnit.UnitId, StringComparison.Ordinal))
+            {
+                badges.Add(CreateBadge(
+                    LocalizationService.Text("camp.equip.badge.recommended", "推薦"),
+                    BattleUiTheme.AccentBlue,
+                    BattleUiTheme.TextPrimary));
+            }
+
+            if (choice.StateKind == EquipmentChoiceStateKind.EquippedByOther && !string.IsNullOrWhiteSpace(choice.EquippedByUnitId))
+            {
+                badges.Add(CreateBadge(
+                    LocalizationService.Format("camp.equip.badge.equipped_by", "{0} 裝備中", GetUnitDisplayName(choice.EquippedByUnitId)),
+                    BattleUiTheme.ChipWarning,
+                    BattleUiTheme.TextThreat));
+            }
+
+            return badges;
+        }
+
+        private static HudChipModel CreateBadge(string text, Color backgroundColor, Color textColor)
+        {
+            return new HudChipModel
+            {
+                Text = text,
+                BackgroundColor = backgroundColor,
+                TextColor = textColor,
+            };
+        }
+
+        private string BuildEquipmentHintLine(CampaignUnitState targetUnit, EquipmentChoiceDefinition choice, ItemDefinition item)
+        {
+            if (choice.StateKind == EquipmentChoiceStateKind.EquippedByOther && !string.IsNullOrWhiteSpace(choice.EquippedByUnitId))
+            {
+                return LocalizationService.Format(
+                    "camp.equip.transfer.hint",
+                    "確認後會從 {0} 身上卸下，並立刻裝到 {1} 的這個部位。",
+                    GetUnitDisplayName(choice.EquippedByUnitId),
+                    GetUnitDisplayName(targetUnit.UnitId));
+            }
+
+            if (item != null && string.Equals(item.RecommendedOwnerUnitId, targetUnit.UnitId, StringComparison.Ordinal))
+            {
+                return LocalizationService.Text("camp.equip.recommended_hint", "適合此將");
+            }
+
+            return string.Empty;
+        }
+
+        private string BuildEquipmentChoiceOptionId(string unitId, ItemCategory category, EquipmentChoiceDefinition choice)
+        {
+            if (choice == null)
+            {
+                return string.Empty;
+            }
+
+            string categoryKey = FormatItemCategory(category);
+            switch (choice.StateKind)
+            {
+                case EquipmentChoiceStateKind.Available:
+                    return "equip|" + unitId + "|" + categoryKey + "|" + choice.ItemId;
+                case EquipmentChoiceStateKind.EquippedByOther:
+                    return "transfer|" + unitId + "|" + categoryKey + "|" + choice.ItemId + "|" + choice.EquippedByUnitId;
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private int BuildEquipmentChoiceSortWeight(string unitId, EquipmentChoiceDefinition choice, ItemDefinition item)
+        {
+            int stateWeight = choice.StateKind == EquipmentChoiceStateKind.Current
+                ? 0
+                : choice.StateKind == EquipmentChoiceStateKind.Available
+                    ? 100
+                    : 200;
+            int recommendationWeight = item != null && string.Equals(item.RecommendedOwnerUnitId, unitId, StringComparison.Ordinal) ? 0 : 10;
+            int treasureWeight = item != null && item.IsTreasure ? 0 : 5;
+            return stateWeight + recommendationWeight + treasureWeight;
+        }
+
+        private string BuildEquipmentSlotSummary(ItemDefinition item)
+        {
+            if (item == null)
+            {
+                return LocalizationService.Text("camp.equip.slot.empty", "點選此槽位查看可裝備清單");
+            }
+
+            List<string> parts = new List<string>();
+            if (item.AttackBonus != 0)
+            {
+                parts.Add(LocalizationService.Format("camp.item.attack", "攻 +{0}", item.AttackBonus));
+            }
+
+            if (item.DefenseBonus != 0)
+            {
+                parts.Add(LocalizationService.Format("camp.item.defense", "防 +{0}", item.DefenseBonus));
+            }
+
+            if (item.HpBonus != 0)
+            {
+                parts.Add(LocalizationService.Format("camp.item.hp", "生命 +{0}", item.HpBonus));
+            }
+
+            if (item.MoveBonus != 0)
+            {
+                parts.Add(LocalizationService.Format("camp.item.move", "移動 +{0}", item.MoveBonus));
+            }
+
+            if (parts.Count == 0)
+            {
+                string treasureEffect = BuildTreasureEffectSummary(item);
+                return string.IsNullOrWhiteSpace(treasureEffect)
+                    ? LocalizationService.Text(item.DescriptionKey, item.DescriptionFallback)
+                    : treasureEffect;
+            }
+
+            return string.Join("  ", parts);
+        }
+
+        private string BuildEquipmentEffectSummary(ItemDefinition item)
+        {
+            if (item == null)
+            {
+                return LocalizationService.Text("camp.equip.compare.none", "無變化");
+            }
+
+            string treasureEffect = BuildTreasureEffectSummary(item);
+            return string.IsNullOrWhiteSpace(treasureEffect)
+                ? LocalizationService.Text(item.DescriptionKey, item.DescriptionFallback)
+                : treasureEffect;
+        }
+
+        private string BuildEquipmentDeltaSummary(ItemDefinition currentItem, ItemDefinition candidateItem)
+        {
+            List<string> parts = new List<string>();
+            AppendDelta(parts, LocalizationService.Text("camp.item.stat.attack.short", "攻"), (candidateItem?.AttackBonus ?? 0) - (currentItem?.AttackBonus ?? 0));
+            AppendDelta(parts, LocalizationService.Text("camp.item.stat.defense.short", "防"), (candidateItem?.DefenseBonus ?? 0) - (currentItem?.DefenseBonus ?? 0));
+            AppendDelta(parts, LocalizationService.Text("camp.item.stat.hp.short", "命"), (candidateItem?.HpBonus ?? 0) - (currentItem?.HpBonus ?? 0));
+            AppendDelta(parts, LocalizationService.Text("camp.item.stat.move.short", "移"), (candidateItem?.MoveBonus ?? 0) - (currentItem?.MoveBonus ?? 0));
+            return parts.Count == 0
+                ? LocalizationService.Text("camp.equip.compare.none", "無變化")
+                : string.Join("  ", parts);
+        }
+
+        private static void AppendDelta(List<string> parts, string label, int delta)
+        {
+            if (parts == null || delta == 0)
+            {
+                return;
+            }
+
+            string prefix = delta > 0 ? "▲" : "▼";
+            parts.Add(prefix + label + " " + (delta > 0 ? "+" : string.Empty) + delta);
+        }
+
+        private void ShowTransferConfirm(string targetUnitId, string fromUnitId, string itemId, ItemCategory category)
+        {
+            ItemDefinition item = ItemCatalog.Get(itemId);
+            if (item == null)
+            {
+                return;
+            }
+
+            battleManager.ShowConfirmDialog(
+                new BattleConfirmDialogModel
+                {
+                    Title = LocalizationService.Text("camp.equip.transfer.confirm.title", "確認轉裝？"),
+                    Body = LocalizationService.Format(
+                        "camp.equip.transfer.confirm.body",
+                        "要把 {0} 從 {1} 身上卸下，改裝到 {2} 的 {3} 槽位嗎？",
+                        LocalizationService.Text(item.NameKey, item.NameFallback),
+                        GetUnitDisplayName(fromUnitId),
+                        GetUnitDisplayName(targetUnitId),
+                        GetEquipmentSlotLabel(category)),
+                    ConfirmLabel = LocalizationService.Text("camp.equip.transfer.confirm.confirm", "確認轉裝"),
+                    CancelLabel = LocalizationService.Text("ui.button.cancel", "取消"),
+                },
+                () =>
+                {
+                    battleManager.HideConfirmDialog();
+                    if (!campaignProgressionService.TryTransferEquipment(campaignSaveData, fromUnitId, targetUnitId, itemId, category))
+                    {
+                        return;
+                    }
+
+                    campaignSaveRepository.Save(campaignSaveData);
+                    ShowUnitManagement(targetUnitId, LocalizationService.Text("camp.equip.transfer.success", "裝備已轉移。"), category);
+                },
+                battleManager.HideConfirmDialog);
+        }
+
+        private static string FormatItemCategory(ItemCategory category)
+        {
+            switch (category)
+            {
+                case ItemCategory.Weapon:
+                    return "weapon";
+                case ItemCategory.Armor:
+                    return "armor";
+                case ItemCategory.Mount:
+                    return "mount";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static bool TryParseItemCategory(string value, out ItemCategory category)
+        {
+            switch (value)
+            {
+                case "weapon":
+                    category = ItemCategory.Weapon;
+                    return true;
+                case "armor":
+                    category = ItemCategory.Armor;
+                    return true;
+                case "mount":
+                    category = ItemCategory.Mount;
+                    return true;
+                default:
+                    category = ItemCategory.SpecialGood;
+                    return false;
+            }
+        }
+
+        private static string GetEquipmentSlotLabel(ItemCategory category)
+        {
+            switch (category)
+            {
+                case ItemCategory.Weapon:
+                    return LocalizationService.Text("camp.equip.slot.weapon", "武器");
+                case ItemCategory.Armor:
+                    return LocalizationService.Text("camp.equip.slot.armor", "護具");
+                case ItemCategory.Mount:
+                    return LocalizationService.Text("camp.equip.slot.mount", "坐騎");
+                default:
+                    return LocalizationService.Text("camp.equip.none", "無");
+            }
+        }
+
+        private static int GetInventoryCategorySortOrder(ItemDefinition definition)
+        {
+            if (definition == null)
+            {
+                return 4;
+            }
+
+            if (definition.IsTreasure)
+            {
+                return 0;
+            }
+
+            switch (definition.Category)
+            {
+                case ItemCategory.Weapon:
+                    return 1;
+                case ItemCategory.Armor:
+                    return 2;
+                case ItemCategory.Mount:
+                    return 3;
+                default:
+                    return 4;
+            }
+        }
+
+        private static string GetItemCategoryLabel(ItemDefinition definition)
+        {
+            if (definition == null)
+            {
+                return LocalizationService.Text("camp.inventory.section.other", "其他");
+            }
+
+            if (definition.IsTreasure)
+            {
+                return LocalizationService.Text("camp.inventory.section.treasure", "寶物");
+            }
+
+            switch (definition.Category)
+            {
+                case ItemCategory.Weapon:
+                    return LocalizationService.Text("camp.inventory.section.weapon", "武器");
+                case ItemCategory.Armor:
+                    return LocalizationService.Text("camp.inventory.section.armor", "護具");
+                case ItemCategory.Mount:
+                    return LocalizationService.Text("camp.inventory.section.mount", "坐騎");
+                default:
+                    return LocalizationService.Text("camp.inventory.section.other", "其他");
+            }
+        }
+
+        private static ItemCategory GetDefaultSelectedEquipmentCategory(CampaignUnitState unit)
+        {
+            if (unit == null)
+            {
+                return ItemCategory.Weapon;
+            }
+
+            if (!string.IsNullOrWhiteSpace(unit.EquipmentLoadout.WeaponId))
+            {
+                return ItemCategory.Weapon;
+            }
+
+            if (!string.IsNullOrWhiteSpace(unit.EquipmentLoadout.ArmorId))
+            {
+                return ItemCategory.Armor;
+            }
+
+            if (!string.IsNullOrWhiteSpace(unit.EquipmentLoadout.MountId))
+            {
+                return ItemCategory.Mount;
+            }
+
+            return ItemCategory.Weapon;
+        }
+
+        private static string GetEquippedItemId(CampaignUnitState unit, ItemCategory category)
+        {
+            if (unit == null)
+            {
+                return string.Empty;
+            }
+
+            switch (category)
+            {
+                case ItemCategory.Weapon:
+                    return unit.EquipmentLoadout.WeaponId;
+                case ItemCategory.Armor:
+                    return unit.EquipmentLoadout.ArmorId;
+                case ItemCategory.Mount:
+                    return unit.EquipmentLoadout.MountId;
+                default:
+                    return string.Empty;
+            }
         }
 
         private static string BuildItemGlyph(ItemDefinition item)

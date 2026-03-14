@@ -5,7 +5,7 @@ namespace PhalanxChronicle.UI
     internal static class BattleHudLayoutPolicy
     {
         public const float BasePanelHeight = 836f;
-        public const float ActionDockHeight = 292f;
+        public const float ActionDockHeight = 316f;
         public const float ActionDockBottomMargin = 14f;
         public const float ActionDockHorizontalReserve = 56f;
         public const float SidePanelBottomMargin = 16f;
@@ -13,6 +13,7 @@ namespace PhalanxChronicle.UI
         public const float SidePanelMinHeight = 260f;
         public const float SelectedPanelWidth = 292f;
         public const float RosterSidebarWidth = 318f;
+        private const float SideLaneBottomReserve = 18f;
 
         public static float CalculatePanelHeight(RectTransform canvasRect)
         {
@@ -21,7 +22,9 @@ namespace PhalanxChronicle.UI
                 return BasePanelHeight;
             }
 
-            float reservedBottom = ActionDockBottomMargin + ActionDockHeight + SidePanelBottomMargin;
+            // Side panels live in the left/right lanes, so they should not reserve the full
+            // center command dock height. Otherwise the roster view wastes a large empty area.
+            float reservedBottom = SideLaneBottomReserve;
             float usableHeight = canvasRect.rect.height - reservedBottom - SidePanelTopMargin;
             if (usableHeight < SidePanelMinHeight)
             {
@@ -38,7 +41,7 @@ namespace PhalanxChronicle.UI
                 return 0f;
             }
 
-            float reservedBottom = ActionDockBottomMargin + ActionDockHeight + SidePanelBottomMargin;
+            float reservedBottom = SideLaneBottomReserve;
             return reservedBottom + panelHeight * 0.5f - canvasRect.rect.height * 0.5f;
         }
     }

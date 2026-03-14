@@ -349,6 +349,12 @@ namespace PhalanxChronicle.UI
             campaignOverlayView?.ShowCampaignOptionList(model, onOptionSelected, onPrimary, onSecondary);
         }
 
+        public void ShowCampaignEquipment(CampaignEquipmentDeckModel model, Action<string> onOptionSelected, Action onPrimary, Action onSecondary = null)
+        {
+            SetBattleShellVisible(false);
+            campaignOverlayView?.ShowCampaignEquipment(model, onOptionSelected, onPrimary, onSecondary);
+        }
+
         public void HideCampaignOverlay()
         {
             campaignOverlayView?.Hide();
@@ -2288,6 +2294,197 @@ namespace PhalanxChronicle.UI
 
     #endif
 
+    internal enum BattleTextRole
+    {
+        SingleLineTitle,
+        DenseMeta,
+        ChipText,
+        TwoLineSummary,
+        BodyAuto,
+    }
+
+    internal static class BattleTextLayoutPolicy
+    {
+        public static void Apply(Text text, BattleTextRole role)
+        {
+            if (text == null)
+            {
+                return;
+            }
+
+            LayoutElement layout = text.GetComponent<LayoutElement>();
+            ContentSizeFitter fitter = text.GetComponent<ContentSizeFitter>();
+
+            switch (role)
+            {
+                case BattleTextRole.SingleLineTitle:
+                    ConfigureSingleLine(text, layout, 1, 4f);
+                    DisableAutoHeight(fitter);
+                    break;
+                case BattleTextRole.DenseMeta:
+                    ConfigureSingleLine(text, layout, 1, 2f);
+                    DisableAutoHeight(fitter);
+                    break;
+                case BattleTextRole.ChipText:
+                    ConfigureSingleLine(text, layout, 1, 1f);
+                    DisableAutoHeight(fitter);
+                    break;
+                case BattleTextRole.TwoLineSummary:
+                    ConfigureLimitedMultiLine(text, layout, 2, 4f);
+                    DisableAutoHeight(fitter);
+                    break;
+                case BattleTextRole.BodyAuto:
+                    ConfigureAutoHeight(text, layout);
+                    EnsureAutoHeight(fitter, text.gameObject);
+                    break;
+            }
+        }
+
+        public static float Refresh(Text text, BattleTextRole role, float minHeight = 0f)
+        {
+            if (text == null)
+            {
+                return minHeight;
+            }
+
+            Apply(text, role);
+            LayoutElement layout = text.GetComponent<LayoutElement>();
+            if (layout == null)
+            {
+                return minHeight;
+            }
+
+            if (role != BattleTextRole.BodyAuto)
+            {
+                float currentHeight = layout.preferredHeight > 0f ? layout.preferredHeight : layout.minHeight;
+                return Mathf.Max(minHeight, currentHeight);
+            }
+
+            layout.preferredHeight = -1f;
+            Canvas.ForceUpdateCanvases();
+
+            float availableWidth = text.rectTransform.rect.width;
+            if (availableWidth <= 1f)
+            {
+                availableWidth = 600f;
+            }
+
+            float measuredHeight = Mathf.Ceil(text.GetPreferredValues(text.text, availableWidth, 0f).y);
+            float finalHeight = Mathf.Max(minHeight, measuredHeight);
+            layout.minHeight = minHeight;
+            layout.preferredHeight = finalHeight;
+            layout.flexibleHeight = 0f;
+            return finalHeight;
+        }
+
+        private static void ConfigureSingleLine(Text text, LayoutElement layout, int lines, float padding)
+        {
+            text.enableWordWrapping = false;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.maxVisibleLines = lines;
+            if (layout != null)
+            {
+                float height = EstimateHeight(text.fontSize, lines, padding);
+                layout.minHeight = height;
+                layout.preferredHeight = height;
+                layout.flexibleHeight = 0f;
+            }
+        }
+
+        private static void ConfigureLimitedMultiLine(Text text, LayoutElement layout, int lines, float padding)
+        {
+            text.enableWordWrapping = true;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.maxVisibleLines = lines;
+            if (layout != null)
+            {
+                float height = EstimateHeight(text.fontSize, lines, padding);
+                layout.minHeight = height;
+                layout.preferredHeight = height;
+                layout.flexibleHeight = 0f;
+            }
+        }
+
+        private static void ConfigureAutoHeight(Text text, LayoutElement layout)
+        {
+            text.enableWordWrapping = true;
+            text.overflowMode = TextOverflowModes.Overflow;
+            text.maxVisibleLines = 0;
+            if (layout != null)
+            {
+                layout.preferredHeight = -1f;
+                layout.flexibleHeight = 0f;
+            }
+        }
+
+        private static float EstimateHeight(float fontSize, int lines, float padding)
+        {
+            float lineHeight = Mathf.Max(fontSize * 1.2f, fontSize + 2f);
+            return Mathf.Ceil(lineHeight * lines + padding);
+        }
+
+        private static void DisableAutoHeight(ContentSizeFitter fitter)
+        {
+            if (fitter == null)
+            {
+                return;
+            }
+
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+        }
+
+        private static void EnsureAutoHeight(ContentSizeFitter fitter, GameObject owner)
+        {
+            if (fitter == null)
+            {
+                fitter = owner.AddComponent<ContentSizeFitter>();
+            }
+
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
+    }
+
+    internal static class BattlePanelHeightPolicy
+    {
+        public const float OverviewSectionSpacing = 6f;
+        public const float OverviewSummaryHeight = 120f;
+        public const float OverviewObjectiveHeight = 96f;
+        public const float OverviewCommandHeight = 46f;
+        public const float OverviewTabHeight = 28f;
+        public const float OverviewVisibleEntryCount = 5f;
+        public const float OverviewRosterEntryHeight = 84f;
+        public const float OverviewRosterEntrySpacing = 6f;
+        public const float OverviewContentInset = 20f;
+        public const float OverviewContentSpacing = 8f;
+        public const float SelectedDetailCollapsedHeight = 52f;
+        public const float SelectedDetailExpandedMinHeight = 188f;
+        public const float SelectedDetailScrollMinHeight = 132f;
+
+        public static float CalculateOverviewRosterViewportMinHeight()
+        {
+            return OverviewVisibleEntryCount * OverviewRosterEntryHeight +
+                   (OverviewVisibleEntryCount - 1f) * OverviewRosterEntrySpacing;
+        }
+
+        public static float CalculateOverviewContentTargetHeight(float panelHeight)
+        {
+            float consumedHeight = 32f +
+                                   18f +
+                                   OverviewSummaryHeight +
+                                   OverviewObjectiveHeight +
+                                   OverviewCommandHeight +
+                                   OverviewSectionSpacing * 4f;
+            float available = Mathf.Max(320f, panelHeight - consumedHeight);
+            float requiredForFiveRows = OverviewContentInset +
+                                        OverviewTabHeight +
+                                        OverviewContentSpacing +
+                                        CalculateOverviewRosterViewportMinHeight();
+            return Mathf.Min(available, Mathf.Max(320f, requiredForFiveRows));
+        }
+    }
+
     internal static class BattleHudFactory
     {
         public static GameObject CreatePanel(
@@ -2414,8 +2611,13 @@ namespace PhalanxChronicle.UI
 
         public static void CreateSectionHeader(Transform parent, string text)
         {
-            Text header = CreateText(parent, text, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            header.GetComponent<LayoutElement>().preferredHeight = 18f;
+            Text header = CreateText(parent, text, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold, BattleTextRole.SingleLineTitle);
+            LayoutElement layout = header.GetComponent<LayoutElement>();
+            if (layout != null)
+            {
+                layout.preferredHeight = 18f;
+                layout.minHeight = 18f;
+            }
         }
 
         public static Text CreateText(Transform parent, string content, int size, FontStyle fontStyle, TextAnchor alignment, Color color)
@@ -2443,6 +2645,20 @@ namespace PhalanxChronicle.UI
             }
 
             textObject.GetComponent<LayoutElement>().preferredHeight = size + 8f;
+            return text;
+        }
+
+        public static Text CreateText(
+            Transform parent,
+            string content,
+            int size,
+            FontStyle fontStyle,
+            TextAnchor alignment,
+            Color color,
+            BattleTextRole role)
+        {
+            Text text = CreateText(parent, content, size, fontStyle, alignment, color);
+            ApplyTextRole(text, role);
             return text;
         }
 
@@ -2483,6 +2699,22 @@ namespace PhalanxChronicle.UI
                 shadow.effectDistance = new Vector2(0.18f, -0.18f);
                 shadow.effectColor = new Color(0f, 0f, 0f, 0.22f);
             }
+            return text;
+        }
+
+        public static Text CreateAbsoluteText(
+            Transform parent,
+            Vector2 offsetMin,
+            Vector2 offsetMax,
+            string content,
+            int size,
+            FontStyle fontStyle,
+            TextAnchor alignment,
+            Color color,
+            BattleTextRole role)
+        {
+            Text text = CreateAbsoluteText(parent, offsetMin, offsetMax, content, size, fontStyle, alignment, color);
+            ApplyTextRole(text, role);
             return text;
         }
 
@@ -2546,6 +2778,16 @@ namespace PhalanxChronicle.UI
 
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
+
+        public static void ApplyTextRole(Text text, BattleTextRole role)
+        {
+            BattleTextLayoutPolicy.Apply(text, role);
+        }
+
+        public static float RefreshTextRole(Text text, BattleTextRole role, float minHeight = 0f)
+        {
+            return BattleTextLayoutPolicy.Refresh(text, role, minHeight);
         }
 
         public static float RefreshAutoHeight(Text text, float minHeight = 0f)

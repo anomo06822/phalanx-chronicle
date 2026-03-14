@@ -14,6 +14,15 @@ namespace PhalanxChronicle.UI
     {
         private const float MaxDockWidth = 1120f;
         private const float MinDockWidth = 540f;
+        private static readonly Color DockHeaderTextColor = new Color(0.94f, 0.88f, 0.74f, 1f);
+        private static readonly Color CardPrimaryTextColor = new Color(0.98f, 0.97f, 0.94f, 1f);
+        private static readonly Color CardSecondaryTextColor = new Color(0.94f, 0.96f, 0.99f, 1f);
+        private static readonly Color CardPrimaryDetailColor = new Color(0.21f, 0.13f, 0.07f, 1f);
+        private static readonly Color CardSecondaryDetailColor = new Color(0.85f, 0.89f, 0.94f, 1f);
+        private static readonly Color CardPrimaryMutedColor = new Color(0.46f, 0.35f, 0.24f, 1f);
+        private static readonly Color CardSecondaryMutedColor = new Color(0.64f, 0.67f, 0.72f, 1f);
+        private static readonly Color CardPrimaryRiskColor = new Color(0.45f, 0.17f, 0.08f, 1f);
+        private static readonly Color CardSecondaryRiskColor = new Color(1f, 0.86f, 0.69f, 1f);
 
         protected GameObject rootObject;
         protected Text modeLabel;
@@ -63,7 +72,7 @@ namespace PhalanxChronicle.UI
 
             GameObject headerRow = new GameObject("HeaderRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             headerRow.transform.SetParent(rootObject.transform, false);
-            headerRow.GetComponent<LayoutElement>().preferredHeight = 30f;
+            headerRow.GetComponent<LayoutElement>().preferredHeight = 34f;
             HorizontalLayoutGroup headerLayout = headerRow.GetComponent<HorizontalLayoutGroup>();
             headerLayout.spacing = BattleUiTheme.Space8;
             headerLayout.childAlignment = TextAnchor.MiddleLeft;
@@ -72,25 +81,25 @@ namespace PhalanxChronicle.UI
             headerLayout.childForceExpandHeight = false;
             headerLayout.childForceExpandWidth = false;
 
-            GameObject modePanel = CreateInsetPanel("ActionModePanel", headerRow.transform, 30f, BattleUiTheme.PanelReward);
+            GameObject modePanel = CreateInsetPanel("ActionModePanel", headerRow.transform, 30f, BattleUiTheme.PanelInsetStrong);
             modePanel.GetComponent<LayoutElement>().preferredWidth = 152f;
-            modeLabel = CreateText(modePanel.transform, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(0.14f, 0.1f, 0.06f, 1f));
+            modeLabel = CreateText(modePanel.transform, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleCenter, DockHeaderTextColor);
+            BattleHudFactory.ApplyTextRole(modeLabel, BattleTextRole.SingleLineTitle);
             RectTransform modeRect = modeLabel.GetComponent<RectTransform>();
             modeRect.anchorMin = Vector2.zero;
             modeRect.anchorMax = Vector2.one;
             modeRect.offsetMin = new Vector2(10f, 2f);
             modeRect.offsetMax = new Vector2(-10f, -2f);
 
-            contextHintLabel = CreateText(headerRow.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
+            contextHintLabel = CreateText(headerRow.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
             LayoutElement contextLayout = contextHintLabel.GetComponent<LayoutElement>();
             contextLayout.flexibleWidth = 1f;
-            contextLayout.preferredHeight = 22f;
-            BattleHudFactory.SetOverflow(contextHintLabel, TextOverflowModes.Truncate, true);
+            BattleHudFactory.ApplyTextRole(contextHintLabel, BattleTextRole.TwoLineSummary);
 
-            GameObject actionRow = CreateRow("PrimaryActionRow", rootObject.transform, 108f);
+            GameObject actionRow = CreateRow("PrimaryActionRow", rootObject.transform, 128f);
             attackButtonView = CreateCard(actionRow.transform, true);
             skillButtonView = CreateCard(actionRow.transform, true);
-            GameObject secondaryRow = CreateRow("SecondaryActionRow", rootObject.transform, 108f);
+            GameObject secondaryRow = CreateRow("SecondaryActionRow", rootObject.transform, 128f);
             waitButtonView = CreateCard(secondaryRow.transform, false);
             backButtonView = CreateCard(secondaryRow.transform, false);
 
@@ -186,6 +195,9 @@ namespace PhalanxChronicle.UI
                 : string.Empty;
             view.RiskLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(view.RiskLabel.text));
             RebuildMetricRow(view.MetricRoot, descriptor != null ? descriptor.MetricChips : null);
+            BattleHudFactory.RefreshTextRole(view.ReasonLabel, BattleTextRole.DenseMeta, 16f);
+            BattleHudFactory.RefreshTextRole(view.OutcomeLabel, BattleTextRole.TwoLineSummary, 34f);
+            BattleHudFactory.RefreshTextRole(view.RiskLabel, BattleTextRole.DenseMeta, 16f);
 
             bool interactable = descriptor != null && descriptor.IsEnabled;
             if (descriptor == null)
@@ -209,18 +221,14 @@ namespace PhalanxChronicle.UI
                 ? (primary ? new Color(0.34f, 0.22f, 0.08f, 0.66f) : new Color(0.24f, 0.33f, 0.48f, 0.6f))
                 : new Color(0.18f, 0.18f, 0.2f, 0.42f);
             view.TitleLabel.color = primary
-                ? (interactable ? BattleUiTheme.ButtonText : new Color(0.9f, 0.88f, 0.84f, 1f))
-                : (interactable ? BattleUiTheme.ButtonSecondaryText : BattleUiTheme.TextMuted);
-            Color detailColor = primary
-                ? new Color(0.2f, 0.12f, 0.07f, 0.98f)
-                : new Color(0.88f, 0.9f, 0.94f, 1f);
-            Color disabledDetailColor = primary
-                ? new Color(0.74f, 0.75f, 0.78f, 1f)
-                : BattleUiTheme.TextMuted;
+                ? (interactable ? CardPrimaryTextColor : CardPrimaryMutedColor)
+                : (interactable ? CardSecondaryTextColor : CardSecondaryMutedColor);
+            Color detailColor = primary ? CardPrimaryDetailColor : CardSecondaryDetailColor;
+            Color disabledDetailColor = primary ? CardPrimaryMutedColor : CardSecondaryMutedColor;
             view.ReasonLabel.color = interactable ? detailColor : disabledDetailColor;
             view.OutcomeLabel.color = interactable ? detailColor : disabledDetailColor;
             view.RiskLabel.color = interactable
-                ? (primary ? new Color(0.42f, 0.16f, 0.08f, 0.98f) : new Color(0.99f, 0.83f, 0.65f, 1f))
+                ? (primary ? CardPrimaryRiskColor : CardSecondaryRiskColor)
                 : disabledDetailColor;
         }
 
@@ -261,7 +269,7 @@ namespace PhalanxChronicle.UI
             buttonObject.transform.SetParent(parent, false);
             LayoutElement layoutElement = buttonObject.GetComponent<LayoutElement>();
             layoutElement.flexibleWidth = 1f;
-            layoutElement.preferredHeight = 108f;
+            layoutElement.preferredHeight = 128f;
             layoutElement.minWidth = 0f;
 
             Image image = buttonObject.GetComponent<Image>();
@@ -287,28 +295,38 @@ namespace PhalanxChronicle.UI
             RectTransform contentRect = contentObject.GetComponent<RectTransform>();
             contentRect.anchorMin = Vector2.zero;
             contentRect.anchorMax = Vector2.one;
-            contentRect.offsetMin = new Vector2(12f, 8f);
-            contentRect.offsetMax = new Vector2(-12f, -8f);
+            contentRect.offsetMin = new Vector2(12f, 10f);
+            contentRect.offsetMax = new Vector2(-12f, -10f);
 
             VerticalLayoutGroup contentLayout = contentObject.GetComponent<VerticalLayoutGroup>();
-            contentLayout.spacing = 3f;
+            contentLayout.spacing = 4f;
             contentLayout.childAlignment = TextAnchor.UpperLeft;
             contentLayout.childControlHeight = true;
             contentLayout.childControlWidth = true;
             contentLayout.childForceExpandHeight = false;
             contentLayout.childForceExpandWidth = true;
 
-            Text titleLabel = CreateText(contentObject.transform, string.Empty, primary ? 16 : 15, FontStyle.Bold, TextAnchor.MiddleLeft, primary ? BattleUiTheme.ButtonText : BattleUiTheme.ButtonSecondaryText);
-            titleLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
-            BattleHudFactory.SetOverflow(titleLabel, TextOverflowModes.Truncate, false);
+            GameObject titleBand = CreateInsetPanel(
+                "TitleBand",
+                contentObject.transform,
+                28f,
+                primary ? new Color(0.19f, 0.14f, 0.09f, 0.34f) : new Color(0.09f, 0.12f, 0.17f, 0.46f));
+            Transform titleRoot = BattleHudFactory.CreateInsetContentRoot(titleBand.transform, 10f);
+            Text titleLabel = BattleHudFactory.CreateText(
+                titleRoot,
+                string.Empty,
+                primary ? 16 : 15,
+                FontStyle.Bold,
+                TextAnchor.MiddleLeft,
+                primary ? CardPrimaryTextColor : CardSecondaryTextColor,
+                BattleTextRole.SingleLineTitle);
 
-            Text reasonLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, primary ? new Color(0.2f, 0.12f, 0.07f, 0.98f) : new Color(0.88f, 0.9f, 0.94f, 1f));
-            reasonLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
-            BattleHudFactory.SetOverflow(reasonLabel, TextOverflowModes.Truncate, true);
+            Text reasonLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, primary ? CardPrimaryDetailColor : CardSecondaryDetailColor);
+            BattleHudFactory.ApplyTextRole(reasonLabel, BattleTextRole.DenseMeta);
 
             GameObject metricRow = new GameObject("MetricRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             metricRow.transform.SetParent(contentObject.transform, false);
-            metricRow.GetComponent<LayoutElement>().preferredHeight = 20f;
+            metricRow.GetComponent<LayoutElement>().preferredHeight = 22f;
             HorizontalLayoutGroup metricLayout = metricRow.GetComponent<HorizontalLayoutGroup>();
             metricLayout.spacing = 4f;
             metricLayout.childAlignment = TextAnchor.MiddleLeft;
@@ -317,13 +335,11 @@ namespace PhalanxChronicle.UI
             metricLayout.childForceExpandHeight = false;
             metricLayout.childForceExpandWidth = false;
 
-            Text outcomeLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, primary ? new Color(0.2f, 0.12f, 0.06f, 1f) : new Color(0.97f, 0.94f, 0.89f, 1f));
-            outcomeLabel.GetComponent<LayoutElement>().preferredHeight = 30f;
-            BattleHudFactory.SetOverflow(outcomeLabel, TextOverflowModes.Truncate, true);
+            Text outcomeLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, primary ? CardPrimaryDetailColor : CardSecondaryTextColor);
+            BattleHudFactory.ApplyTextRole(outcomeLabel, BattleTextRole.TwoLineSummary);
 
-            Text riskLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, primary ? new Color(0.42f, 0.16f, 0.08f, 0.98f) : new Color(0.99f, 0.83f, 0.65f, 1f));
-            riskLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
-            BattleHudFactory.SetOverflow(riskLabel, TextOverflowModes.Truncate, true);
+            Text riskLabel = CreateText(contentObject.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, primary ? CardPrimaryRiskColor : CardSecondaryRiskColor);
+            BattleHudFactory.ApplyTextRole(riskLabel, BattleTextRole.DenseMeta);
 
             return new ActionCardView(button, image, outline, titleLabel, reasonLabel, metricRow.transform, outcomeLabel, riskLabel);
         }

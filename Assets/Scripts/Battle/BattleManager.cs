@@ -60,6 +60,8 @@ namespace PhalanxChronicle.Battle
         private bool isAutoModeRunning;
         private bool isAutoModePausedByOverlay;
         private bool isAutoConfirmVisible;
+        private Action confirmDialogPrimaryHandler;
+        private Action confirmDialogSecondaryHandler;
 
         public bool IsDialogueVisible => battleHUD != null && battleHUD.IsDialogueVisible;
 
@@ -142,9 +144,36 @@ namespace PhalanxChronicle.Battle
             SyncUnitInfoVisibility();
         }
 
+        public void ShowCampaignEquipment(CampaignEquipmentDeckModel model, Action<string> onOptionSelected, Action onPrimary, Action onSecondary = null)
+        {
+            battleHUD.ShowCampaignEquipment(model, onOptionSelected, onPrimary, onSecondary);
+            SyncUnitInfoVisibility();
+        }
+
         public void HideCampaignOverlay()
         {
             battleHUD.HideCampaignOverlay();
+            SyncUnitInfoVisibility();
+        }
+
+        public void ShowConfirmDialog(BattleConfirmDialogModel model, Action onConfirm, Action onCancel = null)
+        {
+            if (battleHUD == null)
+            {
+                return;
+            }
+
+            confirmDialogPrimaryHandler = onConfirm;
+            confirmDialogSecondaryHandler = onCancel ?? HideConfirmDialog;
+            battleHUD.ShowConfirmDialog(model);
+            SyncUnitInfoVisibility();
+        }
+
+        public void HideConfirmDialog()
+        {
+            confirmDialogPrimaryHandler = null;
+            confirmDialogSecondaryHandler = null;
+            battleHUD?.HideConfirmDialog();
             SyncUnitInfoVisibility();
         }
 
@@ -952,8 +981,8 @@ namespace PhalanxChronicle.Battle
                 HandleDialogueAdvanceRequested,
                 HandleResultAdvanceRequested,
                 HandleOnboardingSkipRequested,
-                HandleAutoModeConfirmed,
-                HandleAutoModeCancelled,
+                HandleConfirmDialogPrimaryRequested,
+                HandleConfirmDialogSecondaryRequested,
                 hudModelBuilder);
             RefreshAutoModeUi();
 
@@ -1177,14 +1206,38 @@ namespace PhalanxChronicle.Battle
 
             isAutoConfirmVisible = true;
             RefreshAutoModeUi();
-            battleHUD.ShowConfirmDialog(new BattleConfirmDialogModel
+            ShowConfirmDialog(new BattleConfirmDialogModel
             {
                 Title = LocalizationService.Text("ui.auto.confirm.title", "啟用 AI 自動模式？"),
                 Body = LocalizationService.Text("ui.auto.confirm.body", "啟用後，AI 會接手我軍並自動完成戰鬥。遇到劇情對話或新手引導時會暫停，直到你繼續。"),
                 ConfirmLabel = LocalizationService.Text("ui.auto.confirm.confirm", "啟用 AI"),
                 CancelLabel = LocalizationService.Text("ui.button.cancel", "取消"),
-            });
+            },
+            HandleAutoModeConfirmed,
+            HandleAutoModeCancelled);
             SyncUnitInfoVisibility();
+        }
+
+        private void HandleConfirmDialogPrimaryRequested()
+        {
+            Action handler = confirmDialogPrimaryHandler;
+            confirmDialogPrimaryHandler = null;
+            confirmDialogSecondaryHandler = null;
+            handler?.Invoke();
+        }
+
+        private void HandleConfirmDialogSecondaryRequested()
+        {
+            Action handler = confirmDialogSecondaryHandler;
+            confirmDialogPrimaryHandler = null;
+            confirmDialogSecondaryHandler = null;
+            if (handler != null)
+            {
+                handler.Invoke();
+                return;
+            }
+
+            HideConfirmDialog();
         }
 
         private void HandleAutoModeConfirmed()
@@ -1197,7 +1250,7 @@ namespace PhalanxChronicle.Battle
             isAutoConfirmVisible = false;
             isAutoModeEnabled = true;
             isAutoModePausedByOverlay = false;
-            battleHUD.HideConfirmDialog();
+            HideConfirmDialog();
             RefreshAutoModeUi();
             SetLog(LocalizationService.Text("ui.log.auto_enabled", "AI auto mode engaged."));
             SyncUnitInfoVisibility();
@@ -1222,7 +1275,7 @@ namespace PhalanxChronicle.Battle
             }
 
             isAutoConfirmVisible = false;
-            battleHUD.HideConfirmDialog();
+            HideConfirmDialog();
             RefreshAutoModeUi();
             SyncUnitInfoVisibility();
         }
@@ -1254,10 +1307,7 @@ namespace PhalanxChronicle.Battle
             isAutoModeEnabled = false;
             isAutoModePausedByOverlay = false;
             isAutoConfirmVisible = false;
-            if (battleHUD != null)
-            {
-                battleHUD.HideConfirmDialog();
-            }
+            HideConfirmDialog();
 
             RefreshAutoModeUi();
             SyncUnitInfoVisibility();
@@ -1283,10 +1333,7 @@ namespace PhalanxChronicle.Battle
             isAutoModeRunning = false;
             isAutoModePausedByOverlay = false;
             isAutoConfirmVisible = false;
-            if (battleHUD != null)
-            {
-                battleHUD.HideConfirmDialog();
-            }
+            HideConfirmDialog();
 
             RefreshAutoModeUi();
         }
@@ -1787,7 +1834,7 @@ namespace PhalanxChronicle.Battle
             battleHUD.HideDialogue();
             battleHUD.HideCampaignOverlay();
             battleHUD.HideOnboarding();
-            battleHUD.HideConfirmDialog();
+            HideConfirmDialog();
 
             scenarioData = data;
             simulation = new BattleSimulation(scenarioData.Stage);

@@ -516,6 +516,151 @@ namespace PhalanxChronicle.UI
         public bool IsEmphasized { get; set; }
 
         public bool IsPromotionOption { get; set; }
+
+        public PromotionPreviewModel PromotionPreview { get; set; }
+
+        public IReadOnlyList<PromotionComparisonModel> PromotionComparisons { get; set; } = Array.Empty<PromotionComparisonModel>();
+
+        public IReadOnlyList<ProgressionStageIntroModel> StageIntro { get; set; } = Array.Empty<ProgressionStageIntroModel>();
+
+        public bool IsStageIntroExpanded { get; set; }
+    }
+
+    public sealed class PromotionPreviewModel
+    {
+        public string CurrentStageLabel { get; set; } = string.Empty;
+
+        public string NextStageLabel { get; set; } = string.Empty;
+
+        public string PrimarySummary { get; set; } = string.Empty;
+
+        public string SecondarySummary { get; set; } = string.Empty;
+
+        public string ToggleLabel { get; set; } = string.Empty;
+    }
+
+    public sealed class PromotionComparisonModel
+    {
+        public string StatDeltaLabel { get; set; } = string.Empty;
+
+        public string PassiveCurrentName { get; set; } = string.Empty;
+
+        public string PassiveTargetName { get; set; } = string.Empty;
+
+        public string PassiveChangeLabel { get; set; } = string.Empty;
+
+        public string PassiveDetail { get; set; } = string.Empty;
+
+        public string ActiveCurrentName { get; set; } = string.Empty;
+
+        public string ActiveTargetName { get; set; } = string.Empty;
+
+        public string ActiveChangeLabel { get; set; } = string.Empty;
+
+        public string ActiveDetail { get; set; } = string.Empty;
+
+        public string MasteryPreview { get; set; } = string.Empty;
+    }
+
+    public sealed class ProgressionStageIntroModel
+    {
+        public string Title { get; set; } = string.Empty;
+
+        public string LevelRangeLabel { get; set; } = string.Empty;
+
+        public string Summary { get; set; } = string.Empty;
+
+        public string UnlocksLabel { get; set; } = string.Empty;
+
+        public string StatusBadge { get; set; } = string.Empty;
+
+        public bool IsReached { get; set; }
+    }
+
+    public sealed class CampaignEquipmentDeckModel
+    {
+        public string Eyebrow { get; set; } = string.Empty;
+
+        public string Title { get; set; } = string.Empty;
+
+        public string Body { get; set; } = string.Empty;
+
+        public string ProgressLabel { get; set; } = string.Empty;
+
+        public string HighlightLabel { get; set; } = string.Empty;
+
+        public string DeckTitle { get; set; } = string.Empty;
+
+        public string PreviewMessage { get; set; } = string.Empty;
+
+        public IReadOnlyList<CampaignOptionEntryModel> PromotionOptions { get; set; } = new List<CampaignOptionEntryModel>();
+
+        public IReadOnlyList<CampaignEquipmentSlotCardModel> SlotCards { get; set; } = new List<CampaignEquipmentSlotCardModel>();
+
+        public ItemCategory SelectedSlotCategory { get; set; } = ItemCategory.Weapon;
+
+        public IReadOnlyList<CampaignEquipmentChoiceSectionModel> ChoiceSections { get; set; } = new List<CampaignEquipmentChoiceSectionModel>();
+
+        public string PrimaryActionLabel { get; set; } = string.Empty;
+
+        public string SecondaryActionLabel { get; set; } = string.Empty;
+    }
+
+    public sealed class CampaignEquipmentSlotCardModel
+    {
+        public string OptionId { get; set; } = string.Empty;
+
+        public ItemCategory Category { get; set; } = ItemCategory.Weapon;
+
+        public string SlotLabel { get; set; } = string.Empty;
+
+        public string ItemId { get; set; } = string.Empty;
+
+        public string ItemName { get; set; } = string.Empty;
+
+        public string SummaryLine { get; set; } = string.Empty;
+
+        public bool IsTreasure { get; set; }
+
+        public bool IsSelected { get; set; }
+
+        public bool IsEmpty { get; set; }
+    }
+
+    public sealed class CampaignEquipmentChoiceSectionModel
+    {
+        public string Title { get; set; } = string.Empty;
+
+        public IReadOnlyList<CampaignEquipmentChoiceModel> Choices { get; set; } = new List<CampaignEquipmentChoiceModel>();
+    }
+
+    public sealed class CampaignEquipmentChoiceModel
+    {
+        public string OptionId { get; set; } = string.Empty;
+
+        public string ItemId { get; set; } = string.Empty;
+
+        public string ItemName { get; set; } = string.Empty;
+
+        public ItemCategory Category { get; set; } = ItemCategory.Weapon;
+
+        public EquipmentChoiceStateKind StateKind { get; set; } = EquipmentChoiceStateKind.Available;
+
+        public string EquippedByUnitId { get; set; } = string.Empty;
+
+        public IReadOnlyList<HudChipModel> Badges { get; set; } = new List<HudChipModel>();
+
+        public string CompareSummary { get; set; } = string.Empty;
+
+        public string EffectSummary { get; set; } = string.Empty;
+
+        public string HintLine { get; set; } = string.Empty;
+
+        public bool IsEnabled { get; set; } = true;
+
+        public bool IsEmphasized { get; set; }
+
+        public int SortWeight { get; set; }
     }
 
     public sealed class BattleConfirmDialogModel

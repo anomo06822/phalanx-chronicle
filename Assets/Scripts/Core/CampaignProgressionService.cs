@@ -220,6 +220,112 @@ namespace PhalanxChronicle.Core
             return definitions.OrderBy(item => item.ItemId, StringComparer.Ordinal).ToList();
         }
 
+        public IReadOnlyList<EquipmentChoiceDefinition> GetEquipmentChoices(CampaignSaveData saveData, string unitId, ItemCategory category)
+        {
+            CampaignUnitState unitState = saveData != null ? saveData.GetUnit(unitId) : null;
+            if (unitState == null)
+            {
+                return Array.Empty<EquipmentChoiceDefinition>();
+            }
+
+            string currentItemId = GetEquippedItemId(unitState, category);
+            List<EquipmentChoiceDefinition> choices = new List<EquipmentChoiceDefinition>();
+            if (!string.IsNullOrWhiteSpace(currentItemId))
+            {
+                choices.Add(new EquipmentChoiceDefinition(currentItemId, category, EquipmentChoiceStateKind.Current));
+            }
+
+            foreach (InventoryItemEntry entry in saveData.Inventory.Entries)
+            {
+                ItemDefinition definition = ItemCatalog.Get(entry.ItemId);
+                if (definition == null ||
+                    definition.Category != category ||
+                    !definition.CanEquip(unitState.Role) ||
+                    string.Equals(entry.ItemId, currentItemId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (GetAvailableEquipmentCount(saveData, entry.ItemId, unitId) > 0)
+                {
+                    choices.Add(new EquipmentChoiceDefinition(entry.ItemId, category, EquipmentChoiceStateKind.Available));
+                }
+            }
+
+            foreach (CampaignUnitState otherUnit in saveData.Units.Where(unit => unit.UnitId != unitId))
+            {
+                string equippedItemId = GetEquippedItemId(otherUnit, category);
+                if (string.IsNullOrWhiteSpace(equippedItemId) ||
+                    string.Equals(equippedItemId, currentItemId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                ItemDefinition definition = ItemCatalog.Get(equippedItemId);
+                if (definition == null ||
+                    !definition.CanEquip(unitState.Role) ||
+                    GetAvailableEquipmentCount(saveData, equippedItemId, unitId) > 0)
+                {
+                    continue;
+                }
+
+                choices.Add(new EquipmentChoiceDefinition(
+                    equippedItemId,
+                    category,
+                    EquipmentChoiceStateKind.EquippedByOther,
+                    otherUnit.UnitId));
+            }
+
+            return choices
+                .OrderBy(choice => choice.StateKind)
+                .ThenByDescending(choice =>
+                {
+                    ItemDefinition definition = ItemCatalog.Get(choice.ItemId);
+                    return definition != null &&
+                           string.Equals(definition.RecommendedOwnerUnitId, unitId, StringComparison.Ordinal)
+                        ? 1
+                        : 0;
+                })
+                .ThenByDescending(choice =>
+                {
+                    ItemDefinition definition = ItemCatalog.Get(choice.ItemId);
+                    return definition != null && definition.IsTreasure ? 1 : 0;
+                })
+                .ThenBy(choice =>
+                {
+                    ItemDefinition definition = ItemCatalog.Get(choice.ItemId);
+                    return definition != null ? definition.ItemId : choice.ItemId;
+                }, StringComparer.Ordinal)
+                .ThenBy(choice => choice.EquippedByUnitId, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        public int GetEquippedItemCount(CampaignSaveData saveData, string itemId)
+        {
+            if (saveData == null || string.IsNullOrWhiteSpace(itemId))
+            {
+                return 0;
+            }
+
+            return saveData.Units.Count(unit =>
+                string.Equals(unit.EquipmentLoadout.WeaponId, itemId, StringComparison.Ordinal) ||
+                string.Equals(unit.EquipmentLoadout.ArmorId, itemId, StringComparison.Ordinal) ||
+                string.Equals(unit.EquipmentLoadout.MountId, itemId, StringComparison.Ordinal));
+        }
+
+        public IReadOnlyList<string> GetUnitsEquippingItem(CampaignSaveData saveData, string itemId, ItemCategory? category = null)
+        {
+            if (saveData == null || string.IsNullOrWhiteSpace(itemId))
+            {
+                return Array.Empty<string>();
+            }
+
+            return saveData.Units
+                .Where(unit => IsItemEquippedInCategory(unit, itemId, category))
+                .Select(unit => unit.UnitId)
+                .ToList();
+        }
+
         public int GetAvailableEquipmentCount(CampaignSaveData saveData, string itemId, string unitIdToIgnore = null)
         {
             if (saveData == null || string.IsNullOrWhiteSpace(itemId))
@@ -272,6 +378,45 @@ namespace PhalanxChronicle.Core
             return TryEquipItem(saveData, unitId, itemId, ItemCategory.Mount);
         }
 
+        public bool TryTransferEquipment(CampaignSaveData saveData, string fromUnitId, string toUnitId, string itemId, ItemCategory category)
+        {
+            CampaignUnitState fromUnit = saveData != null ? saveData.GetUnit(fromUnitId) : null;
+            CampaignUnitState toUnit = saveData != null ? saveData.GetUnit(toUnitId) : null;
+            if (fromUnit == null ||
+                toUnit == null ||
+                string.Equals(fromUnit.UnitId, toUnit.UnitId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            ItemDefinition definition = ItemCatalog.Get(itemId);
+            if (definition == null ||
+                !definition.IsEquipable ||
+                definition.Category != category ||
+                !definition.CanEquip(toUnit.Role) ||
+                !string.Equals(GetEquippedItemId(fromUnit, category), itemId, StringComparison.Ordinal) ||
+                string.Equals(GetEquippedItemId(toUnit, category), itemId, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            UnequipItem(fromUnit, category);
+            EquipItem(toUnit, itemId, category);
+            return true;
+        }
+
+        public bool TryUnequipItem(CampaignSaveData saveData, string unitId, ItemCategory category)
+        {
+            CampaignUnitState unitState = saveData != null ? saveData.GetUnit(unitId) : null;
+            if (unitState == null || string.IsNullOrWhiteSpace(GetEquippedItemId(unitState, category)))
+            {
+                return false;
+            }
+
+            UnequipItem(unitState, category);
+            return true;
+        }
+
         private bool TryEquipItem(CampaignSaveData saveData, string unitId, string itemId, ItemCategory category)
         {
             CampaignUnitState unitState = saveData != null ? saveData.GetUnit(unitId) : null;
@@ -291,25 +436,8 @@ namespace PhalanxChronicle.Core
                 return false;
             }
 
-            if (definition.Category == ItemCategory.Weapon)
-            {
-                unitState.EquipWeapon(itemId);
-                return true;
-            }
-
-            if (definition.Category == ItemCategory.Armor)
-            {
-                unitState.EquipArmor(itemId);
-                return true;
-            }
-
-            if (definition.Category == ItemCategory.Mount)
-            {
-                unitState.EquipMount(itemId);
-                return true;
-            }
-
-            return false;
+            EquipItem(unitState, itemId, category);
+            return true;
         }
 
         public bool TryPromoteUnit(CampaignSaveData saveData, string unitId)
@@ -337,6 +465,67 @@ namespace PhalanxChronicle.Core
             return string.Equals(unitState.EquipmentLoadout.WeaponId, itemId, StringComparison.Ordinal) ||
                    string.Equals(unitState.EquipmentLoadout.ArmorId, itemId, StringComparison.Ordinal) ||
                    string.Equals(unitState.EquipmentLoadout.MountId, itemId, StringComparison.Ordinal);
+        }
+
+        private static bool IsItemEquippedInCategory(CampaignUnitState unitState, string itemId, ItemCategory? category)
+        {
+            if (unitState == null || string.IsNullOrWhiteSpace(itemId))
+            {
+                return false;
+            }
+
+            if (category == null)
+            {
+                return IsCurrentlyEquipped(unitState, itemId);
+            }
+
+            return string.Equals(GetEquippedItemId(unitState, category.Value), itemId, StringComparison.Ordinal);
+        }
+
+        private static string GetEquippedItemId(CampaignUnitState unitState, ItemCategory category)
+        {
+            if (unitState == null)
+            {
+                return string.Empty;
+            }
+
+            switch (category)
+            {
+                case ItemCategory.Weapon:
+                    return unitState.EquipmentLoadout.WeaponId;
+                case ItemCategory.Armor:
+                    return unitState.EquipmentLoadout.ArmorId;
+                case ItemCategory.Mount:
+                    return unitState.EquipmentLoadout.MountId;
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static void EquipItem(CampaignUnitState unitState, string itemId, ItemCategory category)
+        {
+            if (unitState == null)
+            {
+                return;
+            }
+
+            switch (category)
+            {
+                case ItemCategory.Weapon:
+                    unitState.EquipWeapon(itemId);
+                    break;
+                case ItemCategory.Armor:
+                    unitState.EquipArmor(itemId);
+                    break;
+                case ItemCategory.Mount:
+                    unitState.EquipMount(itemId);
+                    break;
+            }
+        }
+
+        private static void UnequipItem(CampaignUnitState unitState, ItemCategory category)
+        {
+            EquipItem(unitState, string.Empty, category);
         }
 
         private static int GetAttackBonus(ItemDefinition definition)

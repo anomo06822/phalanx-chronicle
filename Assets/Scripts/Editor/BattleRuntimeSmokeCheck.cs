@@ -185,6 +185,11 @@ namespace PhalanxChronicle.Editor
                     throw new InvalidOperationException("Expected the action menu to expose the new context hint copy.");
                 }
 
+                AssertActionCardReadable(actionMenuPanel, "attackButtonView", "Attack");
+                AssertActionCardReadable(actionMenuPanel, "skillButtonView", "Skill");
+                AssertActionCardReadable(actionMenuPanel, "waitButtonView", "Wait");
+                AssertActionCardReadable(actionMenuPanel, "backButtonView", "Back");
+
                 if (battleManager.IsActionMenuBackEnabled)
                 {
                     throw new InvalidOperationException("Back should be disabled while the unit has not moved.");
@@ -231,6 +236,37 @@ namespace PhalanxChronicle.Editor
                 if (selectedNameLabel == null || !selectedNameLabel.enableAutoSizing)
                 {
                     throw new InvalidOperationException("Expected selected unit name label to use TMP auto sizing.");
+                }
+
+                object selectedUnitView = GetPrivateField<object>(battleHud, "selectedUnitView");
+                InvokeMethod(selectedUnitView, "ToggleDetails");
+                Transform detailLinesRoot = GetPrivateField<Transform>(selectedUnitView, "detailLinesRoot");
+                if (detailLinesRoot == null || detailLinesRoot.childCount == 0)
+                {
+                    throw new InvalidOperationException("Expected selected unit details to render at least one line.");
+                }
+
+                foreach (Transform child in detailLinesRoot.Cast<Transform>().Take(3))
+                {
+                    Text detailText = child.GetComponent<Text>();
+                    if (detailText == null)
+                    {
+                        continue;
+                    }
+
+                    AssertReadableText(detailText, 18f, "selected-detail");
+                }
+
+                ScrollRect alliedScroll = alliedRosterPanel.GetComponent<ScrollRect>();
+                if (alliedScroll == null || alliedScroll.viewport == null)
+                {
+                    throw new InvalidOperationException("Expected allied roster panel to expose a viewport.");
+                }
+
+                float rosterViewportMinHeight = 5f * 84f + 4f * 6f;
+                if (alliedScroll.viewport.rect.height + 0.5f < rosterViewportMinHeight)
+                {
+                    throw new InvalidOperationException("Expected overview roster viewport to fit at least five entries on first screen.");
                 }
 
                 DefeatUnit(battleManager.Simulation.Context, "enemy-yellow_turban_raider");
@@ -360,6 +396,68 @@ namespace PhalanxChronicle.Editor
             }
 
             return null;
+        }
+
+        private static void AssertActionCardReadable(ActionMenuPanel panel, string fieldName, string debugName)
+        {
+            object card = GetPrivateField<object>(panel, fieldName);
+            if (card == null)
+            {
+                throw new InvalidOperationException($"Expected action card '{debugName}' to exist.");
+            }
+
+            Text title = GetPrivateField<Text>(card, "<TitleLabel>k__BackingField");
+            Text outcome = GetPrivateField<Text>(card, "<OutcomeLabel>k__BackingField");
+            if (title == null || outcome == null)
+            {
+                throw new InvalidOperationException($"Expected action card '{debugName}' labels to be bound.");
+            }
+
+            AssertReadableText(title, 18f, $"{debugName}-title");
+            AssertReadableText(outcome, 32f, $"{debugName}-outcome");
+        }
+
+        private static void AssertReadableText(Text text, float minimumHeight, string debugName)
+        {
+            if (text == null || string.IsNullOrWhiteSpace(text.text))
+            {
+                throw new InvalidOperationException($"Expected readable text for '{debugName}'.");
+            }
+
+            float measuredHeight = RefreshMeasuredHeight(text, minimumHeight);
+            RectTransform rect = text.rectTransform;
+            if (rect == null || rect.rect.height + 0.5f < minimumHeight || measuredHeight + 0.5f < minimumHeight)
+            {
+                throw new InvalidOperationException($"Expected '{debugName}' to reserve enough height for readable text.");
+            }
+        }
+
+        private static float RefreshMeasuredHeight(Text text, float minimumHeight)
+        {
+            TextMeshProUGUI tmp = text as TextMeshProUGUI;
+            if (tmp == null)
+            {
+                return minimumHeight;
+            }
+
+            LayoutElement layout = tmp.GetComponent<LayoutElement>();
+            if (layout == null)
+            {
+                return minimumHeight;
+            }
+
+            layout.preferredHeight = -1f;
+            Canvas.ForceUpdateCanvases();
+            float availableWidth = tmp.rectTransform.rect.width;
+            if (availableWidth <= 1f)
+            {
+                availableWidth = 600f;
+            }
+
+            float measuredHeight = Mathf.Ceil(tmp.GetPreferredValues(tmp.text, availableWidth, 0f).y);
+            float finalHeight = Mathf.Max(minimumHeight, measuredHeight);
+            layout.preferredHeight = finalHeight;
+            return finalHeight;
         }
 
         private static bool ContainsAny(string text, params string[] candidates)

@@ -654,6 +654,62 @@ namespace PhalanxChronicle.Headless.Tests
             Assert.Equal(14, options.Select(option => option.ActiveSkill).Distinct().Count());
         }
 
+        [Fact]
+        public void GetEquipmentChoices_GroupsCurrentAvailableAndTransferredItems()
+        {
+            CampaignProgressionService service = new CampaignProgressionService();
+            CampaignSaveData save = service.CreateNewSave(CampaignCatalog.CreateLiuBeiLegend());
+            save.Inventory.AddItem("guangzong-rally-seal");
+            save.Inventory.AddItem("commander-lamellar");
+            save.Inventory.AddItem("yellow-turban-signet");
+            Assert.True(save.TryAddUnit(CreateCommanderUnit("player-helper", "yellow-turban-signet")));
+
+            IReadOnlyList<EquipmentChoiceDefinition> choices = service.GetEquipmentChoices(save, "player-liu-bei", ItemCategory.Armor);
+
+            Assert.Equal(4, choices.Count);
+            Assert.Equal(EquipmentChoiceStateKind.Current, choices[0].StateKind);
+            Assert.Equal("commander-travel-cloak", choices[0].ItemId);
+
+            Assert.Equal(EquipmentChoiceStateKind.Available, choices[1].StateKind);
+            Assert.Equal("guangzong-rally-seal", choices[1].ItemId);
+
+            Assert.Equal(EquipmentChoiceStateKind.Available, choices[2].StateKind);
+            Assert.Equal("commander-lamellar", choices[2].ItemId);
+
+            Assert.Equal(EquipmentChoiceStateKind.EquippedByOther, choices[3].StateKind);
+            Assert.Equal("yellow-turban-signet", choices[3].ItemId);
+            Assert.Equal("player-helper", choices[3].EquippedByUnitId);
+        }
+
+        [Fact]
+        public void TryTransferEquipment_MovesItemAndClearsSourceSlot()
+        {
+            CampaignProgressionService service = new CampaignProgressionService();
+            CampaignSaveData save = service.CreateNewSave(CampaignCatalog.CreateLiuBeiLegend());
+            save.Inventory.AddItem("yellow-turban-signet");
+            Assert.True(save.TryAddUnit(CreateCommanderUnit("player-helper", "yellow-turban-signet")));
+
+            Assert.True(service.TryTransferEquipment(save, "player-helper", "player-liu-bei", "yellow-turban-signet", ItemCategory.Armor));
+
+            Assert.Equal("yellow-turban-signet", save.GetUnit("player-liu-bei").EquipmentLoadout.ArmorId);
+            Assert.Equal(string.Empty, save.GetUnit("player-helper").EquipmentLoadout.ArmorId);
+            Assert.Equal(1, service.GetAvailableEquipmentCount(save, "commander-travel-cloak"));
+            Assert.Equal(0, service.GetAvailableEquipmentCount(save, "yellow-turban-signet"));
+        }
+
+        [Fact]
+        public void TryUnequipItem_ClearsSlotAndRestoresAvailability()
+        {
+            CampaignProgressionService service = new CampaignProgressionService();
+            CampaignSaveData save = service.CreateNewSave(CampaignCatalog.CreateLiuBeiLegend());
+
+            Assert.True(service.TryUnequipItem(save, "player-liu-bei", ItemCategory.Armor));
+
+            Assert.Equal(string.Empty, save.GetUnit("player-liu-bei").EquipmentLoadout.ArmorId);
+            Assert.Equal(1, service.GetAvailableEquipmentCount(save, "commander-travel-cloak"));
+            Assert.False(service.TryUnequipItem(save, "player-liu-bei", ItemCategory.Mount));
+        }
+
         private static BattleScenarioData CreateSingleDuelScenario()
         {
             UnitDefinitionData playerPlaceholder = new UnitDefinitionData(
@@ -743,6 +799,32 @@ namespace PhalanxChronicle.Headless.Tests
                 new BondState(unit.BondState.SupportLevel, unit.BondState.SharedBattles),
                 true);
             return new UnitRuntimeState(definition, new GridPosition(0, 0));
+        }
+
+        private static CampaignUnitState CreateCommanderUnit(string unitId, string armorId)
+        {
+            return new CampaignUnitState(
+                unitId,
+                "Helper Commander",
+                "unit.player_zhuge_liang",
+                UnitRole.Commander,
+                "role.commander",
+                PassiveSkillType.CommandAura,
+                "skill.command_aura.name",
+                "skill.command_aura.desc",
+                ActiveSkillType.ImperialAid,
+                "skill.imperial_aid.name",
+                "skill.imperial_aid.desc",
+                28,
+                8,
+                4,
+                3,
+                1,
+                20,
+                "commander",
+                "commander",
+                AiProfileType.Support,
+                new EquipmentLoadout(string.Empty, armorId));
         }
     }
 }

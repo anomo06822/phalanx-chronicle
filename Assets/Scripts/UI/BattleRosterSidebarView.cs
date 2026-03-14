@@ -45,6 +45,9 @@ namespace PhalanxChronicle.UI
         private GameObject feedTabContent;
         private string activeOverviewTab = "allies";
         private int feedLimit;
+        private RectTransform alliedTabContentRect;
+        private RectTransform enemyTabContentRect;
+        private RectTransform feedTabContentRect;
 
         public bool IsRerollVisible => rerollButtonObject != null && rerollButtonObject.activeSelf;
 
@@ -69,7 +72,7 @@ namespace PhalanxChronicle.UI
             rightRect.pivot = new Vector2(1f, 0.5f);
 
             VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 8f;
+            layout.spacing = BattlePanelHeightPolicy.OverviewSectionSpacing;
             layout.padding = new RectOffset(16, 16, 16, 16);
             layout.childControlHeight = true;
             layout.childControlWidth = true;
@@ -77,67 +80,47 @@ namespace PhalanxChronicle.UI
 
             BattleHudFactory.CreateSectionHeader(rootObject.transform, LocalizationService.Text("ui.panel.overview", "戰況總覽"));
 
-            GameObject summaryPanel = BattleHudFactory.CreateInsetPanel("OverviewSummaryPanel", rootObject.transform, 142f, BattleUiTheme.PanelInsetStrong);
+            GameObject summaryPanel = BattleHudFactory.CreateInsetPanel("OverviewSummaryPanel", rootObject.transform, BattlePanelHeightPolicy.OverviewSummaryHeight, BattleUiTheme.PanelInsetStrong);
             Transform summaryRoot = BattleHudFactory.CreateInsetContentRoot(summaryPanel.transform, 10f);
             VerticalLayoutGroup summaryLayout = summaryRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            summaryLayout.spacing = 4f;
+            summaryLayout.spacing = 2f;
             summaryLayout.childControlHeight = true;
             summaryLayout.childControlWidth = true;
             summaryLayout.childForceExpandHeight = false;
 
-            stageLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 20, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            stageLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
-            BattleHudFactory.SetOverflow(stageLabel, TextOverflowModes.Truncate, false);
-            seedLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            seedLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
-            BattleHudFactory.SetOverflow(seedLabel, TextOverflowModes.Truncate, false);
-            phaseLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            phaseLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
-            BattleHudFactory.SetOverflow(phaseLabel, TextOverflowModes.Truncate, false);
-            turnLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 13, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
-            turnLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
-            BattleHudFactory.SetOverflow(turnLabel, TextOverflowModes.Truncate, false);
+            stageLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 18, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary, BattleTextRole.SingleLineTitle);
+            seedLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 10, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold, BattleTextRole.DenseMeta);
+            phaseLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary, BattleTextRole.SingleLineTitle);
+            turnLabel = BattleHudFactory.CreateText(summaryRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary, BattleTextRole.DenseMeta);
 
             GameObject factGrid = new GameObject("FactGrid", typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
             factGrid.transform.SetParent(summaryRoot, false);
-            factGrid.GetComponent<LayoutElement>().preferredHeight = 52f;
+            factGrid.GetComponent<LayoutElement>().preferredHeight = 44f;
             GridLayoutGroup factLayout = factGrid.GetComponent<GridLayoutGroup>();
-            factLayout.cellSize = new Vector2(128f, 22f);
-            factLayout.spacing = new Vector2(6f, 6f);
+            factLayout.cellSize = new Vector2(128f, 19f);
+            factLayout.spacing = new Vector2(6f, 4f);
             factLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             factLayout.constraintCount = 2;
-            playerAliveLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.62f, 0.8f, 1f, 1f));
-            enemyAliveLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.66f, 0.58f, 1f));
-            readyLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.93f, 0.95f, 0.87f, 1f));
-            skillReadyLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            BattleHudFactory.SetOverflow(playerAliveLabel, TextOverflowModes.Truncate, false);
-            BattleHudFactory.SetOverflow(enemyAliveLabel, TextOverflowModes.Truncate, false);
-            BattleHudFactory.SetOverflow(readyLabel, TextOverflowModes.Truncate, false);
-            BattleHudFactory.SetOverflow(skillReadyLabel, TextOverflowModes.Truncate, false);
+            playerAliveLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.62f, 0.8f, 1f, 1f), BattleTextRole.DenseMeta);
+            enemyAliveLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.66f, 0.58f, 1f), BattleTextRole.DenseMeta);
+            readyLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.93f, 0.95f, 0.87f, 1f), BattleTextRole.DenseMeta);
+            skillReadyLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold, BattleTextRole.DenseMeta);
 
-            GameObject objectivePanel = BattleHudFactory.CreateInsetPanel("ObjectivePanel", rootObject.transform, 112f, BattleUiTheme.PanelCommand);
+            GameObject objectivePanel = BattleHudFactory.CreateInsetPanel("ObjectivePanel", rootObject.transform, BattlePanelHeightPolicy.OverviewObjectiveHeight, BattleUiTheme.PanelCommand);
             Transform objectiveRoot = BattleHudFactory.CreateInsetContentRoot(objectivePanel.transform, 12f);
             VerticalLayoutGroup objectiveLayout = objectiveRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            objectiveLayout.spacing = 5f;
+            objectiveLayout.spacing = 4f;
             objectiveLayout.childControlHeight = true;
             objectiveLayout.childControlWidth = true;
             objectiveLayout.childForceExpandHeight = false;
-            objectivePrimaryLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 14, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary);
-            objectivePrimaryLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
-            BattleHudFactory.SetOverflow(objectivePrimaryLabel, TextOverflowModes.Truncate, true);
-            objectiveFailureLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
-            objectiveFailureLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
-            BattleHudFactory.SetOverflow(objectiveFailureLabel, TextOverflowModes.Truncate, true);
-            instructionLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            instructionLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
-            BattleHudFactory.SetOverflow(instructionLabel, TextOverflowModes.Truncate, true);
-            secondaryInstructionLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.78f, 0.88f, 0.98f, 1f));
-            secondaryInstructionLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
-            BattleHudFactory.SetOverflow(secondaryInstructionLabel, TextOverflowModes.Truncate, true);
+            objectivePrimaryLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 14, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextPrimary, BattleTextRole.TwoLineSummary);
+            objectiveFailureLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextWarning, BattleTextRole.DenseMeta);
+            instructionLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary, BattleTextRole.TwoLineSummary);
+            secondaryInstructionLabel = BattleHudFactory.CreateText(objectiveRoot, string.Empty, 12, FontStyle.Italic, TextAnchor.UpperLeft, new Color(0.78f, 0.88f, 0.98f, 1f), BattleTextRole.DenseMeta);
 
             GameObject commandRow = new GameObject("CommandRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             commandRow.transform.SetParent(rootObject.transform, false);
-            commandRow.GetComponent<LayoutElement>().preferredHeight = 46f;
+            commandRow.GetComponent<LayoutElement>().preferredHeight = BattlePanelHeightPolicy.OverviewCommandHeight;
             HorizontalLayoutGroup commandLayout = commandRow.GetComponent<HorizontalLayoutGroup>();
             commandLayout.spacing = 10f;
             commandLayout.childAlignment = TextAnchor.MiddleRight;
@@ -168,6 +151,9 @@ namespace PhalanxChronicle.UI
             GameObject contentPanel = BattleHudFactory.CreateInsetPanel("OverviewContentPanel", rootObject.transform, 0f, new Color(0.11f, 0.12f, 0.14f, 0.92f));
             LayoutElement contentPanelLayout = contentPanel.GetComponent<LayoutElement>();
             contentPanelLayout.flexibleHeight = 1f;
+            float contentHeight = BattlePanelHeightPolicy.CalculateOverviewContentTargetHeight(panelHeight);
+            contentPanelLayout.minHeight = contentHeight;
+            contentPanelLayout.preferredHeight = contentHeight;
             Transform contentRoot = BattleHudFactory.CreateInsetContentRoot(contentPanel.transform, 10f);
             VerticalLayoutGroup contentLayout = contentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             contentLayout.spacing = 8f;
@@ -177,7 +163,7 @@ namespace PhalanxChronicle.UI
 
             GameObject tabRow = new GameObject("TabRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             tabRow.transform.SetParent(contentRoot, false);
-            tabRow.GetComponent<LayoutElement>().preferredHeight = 28f;
+            tabRow.GetComponent<LayoutElement>().preferredHeight = BattlePanelHeightPolicy.OverviewTabHeight;
             HorizontalLayoutGroup tabLayout = tabRow.GetComponent<HorizontalLayoutGroup>();
             tabLayout.spacing = 8f;
             tabLayout.childControlHeight = true;
@@ -194,11 +180,12 @@ namespace PhalanxChronicle.UI
             alliedTabContent = BuildTabContent(contentRoot, "AlliedRosterPanel", out alliedRosterRoot);
             enemyTabContent = BuildTabContent(contentRoot, "EnemyRosterPanel", out enemyRosterRoot);
             feedTabContent = BuildTabContent(contentRoot, "FeedPanel", out Transform feedRoot);
+            alliedTabContentRect = alliedTabContent.GetComponent<RectTransform>();
+            enemyTabContentRect = enemyTabContent.GetComponent<RectTransform>();
+            feedTabContentRect = feedTabContent.GetComponent<RectTransform>();
             for (int index = 0; index < this.feedLimit; index++)
             {
-                Text feedLabel = BattleHudFactory.CreateText(feedRoot, index == 0 ? LocalizationService.Text("ui.feed.empty", "目前還沒有新的戰場紀錄。") : string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-                feedLabel.GetComponent<LayoutElement>().preferredHeight = 28f;
-                BattleHudFactory.SetOverflow(feedLabel, TextOverflowModes.Truncate, true);
+                Text feedLabel = BattleHudFactory.CreateText(feedRoot, index == 0 ? LocalizationService.Text("ui.feed.empty", "目前還沒有新的戰場紀錄。") : string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary, BattleTextRole.TwoLineSummary);
                 feedLabels.Add(feedLabel);
             }
 
@@ -229,6 +216,10 @@ namespace PhalanxChronicle.UI
             instructionLabel.text = overview.InstructionText;
             secondaryInstructionLabel.text = overview.SecondaryInstructionText;
             secondaryInstructionLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(overview.SecondaryInstructionText));
+            BattleHudFactory.RefreshTextRole(objectivePrimaryLabel, BattleTextRole.TwoLineSummary, 34f);
+            BattleHudFactory.RefreshTextRole(objectiveFailureLabel, BattleTextRole.DenseMeta, 16f);
+            BattleHudFactory.RefreshTextRole(instructionLabel, BattleTextRole.TwoLineSummary, 32f);
+            BattleHudFactory.RefreshTextRole(secondaryInstructionLabel, BattleTextRole.DenseMeta, 16f);
         }
 
         public void BindRoster(
@@ -240,6 +231,7 @@ namespace PhalanxChronicle.UI
             BindRosterGroup(alliedRosterRoot, alliedRosterViews, alliedRoster);
             BindRosterGroup(enemyRosterRoot, enemyRosterViews, enemyRoster);
             UpdateOverviewTabLabels(alliedRoster != null ? alliedRoster.Count : 0, enemyRoster != null ? enemyRoster.Count : 0);
+            RefreshTabLayouts();
         }
 
         public void BindFeed(IReadOnlyList<string> entries)
@@ -252,6 +244,8 @@ namespace PhalanxChronicle.UI
                         ? LocalizationService.Text("ui.feed.empty", "目前還沒有新的戰場紀錄。")
                         : string.Empty;
             }
+
+            RefreshTabLayouts();
         }
 
         public void SetEndTurnEnabled(bool enabled)
@@ -350,6 +344,7 @@ namespace PhalanxChronicle.UI
             RefreshTabView(alliedTabView, string.Equals(activeOverviewTab, "allies", StringComparison.Ordinal));
             RefreshTabView(enemyTabView, string.Equals(activeOverviewTab, "enemies", StringComparison.Ordinal));
             RefreshTabView(feedTabView, string.Equals(activeOverviewTab, "feed", StringComparison.Ordinal));
+            RefreshTabLayouts();
         }
 
         private void UpdateOverviewTabLabels(int alliedCount, int enemyCount)
@@ -392,11 +387,49 @@ namespace PhalanxChronicle.UI
             }
         }
 
+        private void RefreshTabLayouts()
+        {
+            Canvas.ForceUpdateCanvases();
+            RefreshTabLayout(alliedTabContentRect);
+            RefreshTabLayout(enemyTabContentRect);
+            RefreshTabLayout(feedTabContentRect);
+            RectTransform rootRect = rootObject != null ? rootObject.GetComponent<RectTransform>() : null;
+            if (rootRect != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(rootRect);
+            }
+        }
+
+        private static void RefreshTabLayout(RectTransform tabRect)
+        {
+            if (tabRect == null)
+            {
+                return;
+            }
+
+            LayoutElement layout = tabRect.GetComponent<LayoutElement>();
+            if (layout != null)
+            {
+                layout.minHeight = Mathf.Max(layout.minHeight, BattlePanelHeightPolicy.CalculateOverviewRosterViewportMinHeight());
+            }
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(tabRect);
+            ScrollRect scrollRect = tabRect.GetComponent<ScrollRect>();
+            if (scrollRect != null && scrollRect.content != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(scrollRect.content);
+                scrollRect.verticalNormalizedPosition = 1f;
+            }
+        }
+
         private void BindRosterEntry(RosterEntryView view, BattleRosterEntryModel model)
         {
             view.UnitId = model.UnitId;
-            view.NameLabel.text = model.DisplayName;
-            view.RoleLabel.text = model.RoleShortLabel;
+            view.NameLabel.text = string.IsNullOrWhiteSpace(model.RoleShortLabel)
+                ? model.DisplayName
+                : string.Concat(model.DisplayName, "  ", model.RoleShortLabel);
+            view.RoleLabel.text = string.Empty;
+            view.RoleLabel.gameObject.SetActive(false);
             view.PositionLabel.text = model.PositionLabel;
             view.HpLabel.text = model.IsAlive
                 ? LocalizationService.Format("ui.label.hp_value", "HP {0}/{1}", model.CurrentHp, model.MaxHp)
@@ -409,6 +442,9 @@ namespace PhalanxChronicle.UI
                         ? new Color(0.91f, 0.74f, 0.22f, 1f)
                         : new Color(0.88f, 0.35f, 0.28f, 1f))
                 : new Color(0.42f, 0.42f, 0.45f, 1f);
+            view.NameLabel.color = model.IsAlive
+                ? new Color(0.96f, 0.95f, 0.91f, 1f)
+                : BattleUiTheme.TextMuted;
             view.RoleLabel.color = model.Faction == UnitFaction.Player
                 ? new Color(0.95f, 0.88f, 0.62f, 1f)
                 : new Color(0.99f, 0.78f, 0.58f, 1f);
@@ -519,10 +555,10 @@ namespace PhalanxChronicle.UI
                 Vector2.zero,
                 Vector2.one,
                 Vector2.zero,
-                new Vector2(0f, 76f),
+                new Vector2(0f, BattlePanelHeightPolicy.OverviewRosterEntryHeight),
                 new Color(0.14f, 0.16f, 0.2f, 0.94f));
             LayoutElement rootLayout = rootObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = 76f;
+            rootLayout.preferredHeight = BattlePanelHeightPolicy.OverviewRosterEntryHeight;
 
             Button button = rootObject.AddComponent<Button>();
             ColorBlock colors = button.colors;
@@ -551,8 +587,8 @@ namespace PhalanxChronicle.UI
             RectTransform contentRect = contentRoot.GetComponent<RectTransform>();
             contentRect.anchorMin = Vector2.zero;
             contentRect.anchorMax = Vector2.one;
-            contentRect.offsetMin = new Vector2(10f, 8f);
-            contentRect.offsetMax = new Vector2(-10f, -8f);
+            contentRect.offsetMin = new Vector2(10f, 9f);
+            contentRect.offsetMax = new Vector2(-10f, -9f);
             HorizontalLayoutGroup contentLayout = contentRoot.GetComponent<HorizontalLayoutGroup>();
             contentLayout.spacing = 10f;
             contentLayout.childAlignment = TextAnchor.MiddleLeft;
@@ -565,7 +601,7 @@ namespace PhalanxChronicle.UI
             textColumn.transform.SetParent(contentRoot.transform, false);
             textColumn.GetComponent<LayoutElement>().flexibleWidth = 1f;
             VerticalLayoutGroup textLayout = textColumn.GetComponent<VerticalLayoutGroup>();
-            textLayout.spacing = 3f;
+            textLayout.spacing = 2f;
             textLayout.childControlHeight = true;
             textLayout.childControlWidth = true;
             textLayout.childForceExpandHeight = false;
@@ -578,22 +614,21 @@ namespace PhalanxChronicle.UI
             topLayout.childControlHeight = true;
             topLayout.childControlWidth = true;
             topLayout.childForceExpandHeight = false;
-            topLayout.childForceExpandWidth = false;
+            topLayout.childForceExpandWidth = true;
 
-            Text nameLabel = BattleHudFactory.CreateText(topRow.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            nameLabel.GetComponent<LayoutElement>().flexibleWidth = 1f;
-            BattleHudFactory.SetOverflow(nameLabel, TextOverflowModes.Truncate, false);
-            Text roleLabel = BattleHudFactory.CreateText(topRow.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextGold);
-            roleLabel.GetComponent<LayoutElement>().preferredWidth = 56f;
-            BattleHudFactory.SetOverflow(roleLabel, TextOverflowModes.Truncate, false);
+            Text nameLabel = BattleHudFactory.CreateText(topRow.transform, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary, BattleTextRole.SingleLineTitle);
+            LayoutElement nameLayout = nameLabel.GetComponent<LayoutElement>();
+            nameLayout.minWidth = 104f;
+            nameLayout.flexibleWidth = 1f;
+            Text roleLabel = BattleHudFactory.CreateText(topRow.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextGold, BattleTextRole.DenseMeta);
+            LayoutElement roleLayout = roleLabel.GetComponent<LayoutElement>();
+            roleLayout.preferredWidth = 56f;
 
-            Text positionLabel = BattleHudFactory.CreateText(textColumn.transform, string.Empty, 11, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary);
-            positionLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
-            BattleHudFactory.SetOverflow(positionLabel, TextOverflowModes.Truncate, false);
+            Text positionLabel = BattleHudFactory.CreateText(textColumn.transform, string.Empty, 11, FontStyle.Normal, TextAnchor.MiddleLeft, BattleUiTheme.TextSecondary, BattleTextRole.DenseMeta);
 
             GameObject tagRow = new GameObject("TagRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             tagRow.transform.SetParent(textColumn.transform, false);
-            tagRow.GetComponent<LayoutElement>().preferredHeight = 22f;
+            tagRow.GetComponent<LayoutElement>().preferredHeight = 18f;
             HorizontalLayoutGroup tagLayout = tagRow.GetComponent<HorizontalLayoutGroup>();
             tagLayout.spacing = 6f;
             tagLayout.childControlHeight = true;
@@ -605,7 +640,7 @@ namespace PhalanxChronicle.UI
 
             GameObject hpColumn = new GameObject("HpColumn", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
             hpColumn.transform.SetParent(contentRoot.transform, false);
-            hpColumn.GetComponent<LayoutElement>().preferredWidth = 92f;
+            hpColumn.GetComponent<LayoutElement>().preferredWidth = 84f;
             VerticalLayoutGroup hpLayout = hpColumn.GetComponent<VerticalLayoutGroup>();
             hpLayout.spacing = 4f;
             hpLayout.childControlHeight = true;
@@ -613,9 +648,7 @@ namespace PhalanxChronicle.UI
             hpLayout.childForceExpandHeight = false;
             hpLayout.childForceExpandWidth = true;
 
-            Text hpLabel = BattleHudFactory.CreateText(hpColumn.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextPrimary);
-            hpLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
-            BattleHudFactory.SetOverflow(hpLabel, TextOverflowModes.Truncate, false);
+            Text hpLabel = BattleHudFactory.CreateText(hpColumn.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextPrimary, BattleTextRole.DenseMeta);
             GameObject hpBarRoot = new GameObject("HpBarRoot", typeof(RectTransform), typeof(LayoutElement));
             hpBarRoot.transform.SetParent(hpColumn.transform, false);
             hpBarRoot.GetComponent<LayoutElement>().preferredHeight = 12f;
@@ -629,13 +662,12 @@ namespace PhalanxChronicle.UI
             GameObject root = BattleHudFactory.CreateInsetPanel("TagChip", parent, 20f, BattleUiTheme.ChipNeutral);
             LayoutElement layout = root.GetComponent<LayoutElement>();
             layout.preferredWidth = 86f;
-            Text label = BattleHudFactory.CreateText(root.transform, string.Empty, 10, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextPrimary);
+            Text label = BattleHudFactory.CreateText(root.transform, string.Empty, 10, FontStyle.Bold, TextAnchor.MiddleCenter, BattleUiTheme.TextPrimary, BattleTextRole.ChipText);
             RectTransform textRect = label.GetComponent<RectTransform>();
             textRect.anchorMin = Vector2.zero;
             textRect.anchorMax = Vector2.one;
             textRect.offsetMin = new Vector2(6f, 2f);
             textRect.offsetMax = new Vector2(-6f, -2f);
-            BattleHudFactory.SetOverflow(label, TextOverflowModes.Truncate, false);
             return new TagChipView(root, root.GetComponent<Image>(), label);
         }
     }

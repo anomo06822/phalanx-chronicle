@@ -32,8 +32,9 @@ namespace PhalanxChronicle.UI
         private Text detailHeaderLabel;
         private Text detailToggleLabel;
         private Transform detailLinesRoot;
-        private GameObject detailContent;
+        private GameObject detailScrollRoot;
         private Button detailToggleButton;
+        private LayoutElement detailPanelLayout;
         private bool detailsExpanded;
         private string lastBoundUnitId = string.Empty;
 
@@ -56,7 +57,7 @@ namespace PhalanxChronicle.UI
             rootRect.pivot = new Vector2(0f, 0.5f);
 
             VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 8f;
+            layout.spacing = 6f;
             layout.padding = new RectOffset(16, 16, 16, 16);
             layout.childControlHeight = true;
             layout.childControlWidth = true;
@@ -106,17 +107,14 @@ namespace PhalanxChronicle.UI
             textLayout.childControlWidth = true;
             textLayout.childForceExpandHeight = false;
 
-            nameLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 22, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            nameLabel.GetComponent<LayoutElement>().preferredHeight = 26f;
+            nameLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 22, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary, BattleTextRole.SingleLineTitle);
             BattleHudFactory.EnableBestFit(nameLabel, 16, 22, true);
-            roleLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            roleLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
-            positionLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextMuted);
-            positionLabel.GetComponent<LayoutElement>().preferredHeight = 38f;
+            roleLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold, BattleTextRole.DenseMeta);
+            positionLabel = BattleHudFactory.CreateText(textRoot.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextMuted, BattleTextRole.TwoLineSummary);
 
             GameObject identityFacts = new GameObject("IdentityFacts", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             identityFacts.transform.SetParent(textRoot.transform, false);
-            identityFacts.GetComponent<LayoutElement>().preferredHeight = 24f;
+            identityFacts.GetComponent<LayoutElement>().preferredHeight = 22f;
             HorizontalLayoutGroup identityFactsLayout = identityFacts.GetComponent<HorizontalLayoutGroup>();
             identityFactsLayout.spacing = 6f;
             identityFactsLayout.childControlHeight = true;
@@ -134,14 +132,14 @@ namespace PhalanxChronicle.UI
             vitalLayout.childForceExpandHeight = false;
 
             hpLabel = BattleHudFactory.CreateText(vitalRoot, string.Empty, 15, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            hpLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
+            BattleHudFactory.ApplyTextRole(hpLabel, BattleTextRole.DenseMeta);
             GameObject hpBarRoot = new GameObject("HpBarRoot", typeof(RectTransform), typeof(LayoutElement));
             hpBarRoot.transform.SetParent(vitalRoot, false);
             hpBarRoot.GetComponent<LayoutElement>().preferredHeight = 14f;
             BattleHudFactory.CreateStretchUiBar(hpBarRoot.transform, out hpFill);
 
             manaLabel = BattleHudFactory.CreateText(vitalRoot, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            manaLabel.GetComponent<LayoutElement>().preferredHeight = 18f;
+            BattleHudFactory.ApplyTextRole(manaLabel, BattleTextRole.DenseMeta);
             GameObject manaBarRoot = new GameObject("ManaBarRoot", typeof(RectTransform), typeof(LayoutElement));
             manaBarRoot.transform.SetParent(vitalRoot, false);
             manaBarRoot.GetComponent<LayoutElement>().preferredHeight = 12f;
@@ -155,8 +153,7 @@ namespace PhalanxChronicle.UI
             factLayout.childControlWidth = true;
             factLayout.childForceExpandHeight = false;
 
-            Text primaryHeader = BattleHudFactory.CreateText(factsContent, LocalizationService.Text("ui.selected.primary_header", "首屏決策"), 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            primaryHeader.GetComponent<LayoutElement>().preferredHeight = 18f;
+            Text primaryHeader = BattleHudFactory.CreateText(factsContent, LocalizationService.Text("ui.selected.primary_header", "首屏決策"), 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold, BattleTextRole.SingleLineTitle);
 
             GameObject factsGrid = new GameObject("FactsGrid", typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
             factsGrid.transform.SetParent(factsContent, false);
@@ -198,16 +195,16 @@ namespace PhalanxChronicle.UI
             threatChipLayout.childForceExpandWidth = false;
             threatChipRoot = threatChipRow.transform;
 
-            threatLineLabel = BattleHudFactory.CreateText(threatRoot, string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextThreat);
-            threatLineLabel.GetComponent<LayoutElement>().preferredHeight = 42f;
+            threatLineLabel = BattleHudFactory.CreateText(threatRoot, string.Empty, 13, FontStyle.Bold, TextAnchor.UpperLeft, BattleUiTheme.TextThreat, BattleTextRole.TwoLineSummary);
 
-            equipmentSummaryLabel = BattleHudFactory.CreateText(threatRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            equipmentSummaryLabel.GetComponent<LayoutElement>().preferredHeight = 42f;
+            equipmentSummaryLabel = BattleHudFactory.CreateText(threatRoot, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary, BattleTextRole.TwoLineSummary);
 
-            GameObject detailPanel = BattleHudFactory.CreateInsetPanel("DetailPanel", rootObject.transform, 174f, BattleUiTheme.PanelInsetStrong);
+            GameObject detailPanel = BattleHudFactory.CreateInsetPanel("DetailPanel", rootObject.transform, BattlePanelHeightPolicy.SelectedDetailCollapsedHeight, BattleUiTheme.PanelInsetStrong);
+            detailPanelLayout = detailPanel.GetComponent<LayoutElement>();
+            detailPanelLayout.minHeight = BattlePanelHeightPolicy.SelectedDetailCollapsedHeight;
             Transform detailRoot = BattleHudFactory.CreateInsetContentRoot(detailPanel.transform, 12f);
             VerticalLayoutGroup detailLayout = detailRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            detailLayout.spacing = 8f;
+            detailLayout.spacing = 6f;
             detailLayout.childControlHeight = true;
             detailLayout.childControlWidth = true;
             detailLayout.childForceExpandHeight = false;
@@ -222,24 +219,15 @@ namespace PhalanxChronicle.UI
             detailHeaderLayout.childForceExpandHeight = false;
             detailHeaderLayout.childForceExpandWidth = false;
 
-            detailHeaderLabel = BattleHudFactory.CreateText(detailHeaderRow.transform, string.Empty, 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
+            detailHeaderLabel = BattleHudFactory.CreateText(detailHeaderRow.transform, string.Empty, 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold, BattleTextRole.SingleLineTitle);
             detailHeaderLabel.GetComponent<LayoutElement>().flexibleWidth = 1f;
-            detailHeaderLabel.GetComponent<LayoutElement>().preferredHeight = 20f;
             detailToggleButton = BattleHudFactory.CreateButton(detailHeaderRow.transform, LocalizationService.Text("ui.selected.details_expand", "展開"), false);
             detailToggleButton.GetComponent<LayoutElement>().preferredWidth = 92f;
             detailToggleButton.GetComponent<LayoutElement>().preferredHeight = 28f;
             detailToggleButton.onClick.AddListener(ToggleDetails);
             detailToggleLabel = detailToggleButton.GetComponentInChildren<Text>();
 
-            detailContent = new GameObject("DetailContent", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
-            detailContent.transform.SetParent(detailRoot, false);
-            detailContent.GetComponent<LayoutElement>().preferredHeight = 126f;
-            VerticalLayoutGroup detailContentLayout = detailContent.GetComponent<VerticalLayoutGroup>();
-            detailContentLayout.spacing = 6f;
-            detailContentLayout.childControlHeight = true;
-            detailContentLayout.childControlWidth = true;
-            detailContentLayout.childForceExpandHeight = false;
-            detailLinesRoot = detailContent.transform;
+            detailScrollRoot = BuildScrollableDetailContent(detailRoot, out detailLinesRoot);
 
             SetDetailsExpanded(false);
             Bind(new BattleSelectedUnitModel());
@@ -313,6 +301,9 @@ namespace PhalanxChronicle.UI
                     : new Color(0.52f, 0.42f, 0.85f, 1f);
             threatLineLabel.text = selected.ThreatLine;
             equipmentSummaryLabel.text = selected.EquipmentSummary;
+            BattleHudFactory.RefreshTextRole(positionLabel, BattleTextRole.TwoLineSummary, 32f);
+            BattleHudFactory.RefreshTextRole(threatLineLabel, BattleTextRole.TwoLineSummary, 34f);
+            BattleHudFactory.RefreshTextRole(equipmentSummaryLabel, BattleTextRole.TwoLineSummary, 30f);
             detailHeaderLabel.text = string.IsNullOrWhiteSpace(selected.DetailHeader)
                 ? LocalizationService.Text("ui.selected.details_header", "武裝與技能")
                 : selected.DetailHeader;
@@ -329,9 +320,66 @@ namespace PhalanxChronicle.UI
             BattleHudFactory.DestroyChildren(detailLinesRoot);
             foreach (string line in (selected.DetailLines ?? Array.Empty<string>()).Where(line => !string.IsNullOrWhiteSpace(line)))
             {
-                Text detailLabel = BattleHudFactory.CreateText(detailLinesRoot, line, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-                detailLabel.GetComponent<LayoutElement>().preferredHeight = 24f;
+                Text detailLabel = BattleHudFactory.CreateText(detailLinesRoot, line, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary, BattleTextRole.BodyAuto);
+                BattleHudFactory.RefreshTextRole(detailLabel, BattleTextRole.BodyAuto, 18f);
             }
+        }
+
+        private static GameObject BuildScrollableDetailContent(Transform parent, out Transform contentRoot)
+        {
+            GameObject scrollRoot = new GameObject("DetailScrollRoot", typeof(RectTransform), typeof(Image), typeof(ScrollRect), typeof(LayoutElement));
+            scrollRoot.transform.SetParent(parent, false);
+            LayoutElement layout = scrollRoot.GetComponent<LayoutElement>();
+            layout.flexibleHeight = 1f;
+            layout.minHeight = BattlePanelHeightPolicy.SelectedDetailScrollMinHeight;
+            layout.preferredHeight = BattlePanelHeightPolicy.SelectedDetailScrollMinHeight;
+
+            Image rootImage = scrollRoot.GetComponent<Image>();
+            rootImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            rootImage.color = new Color(1f, 1f, 1f, 0.01f);
+
+            ScrollRect scrollRect = scrollRoot.GetComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.scrollSensitivity = 24f;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+
+            GameObject viewport = new GameObject("Viewport", typeof(RectTransform), typeof(Image), typeof(Mask));
+            viewport.transform.SetParent(scrollRoot.transform, false);
+            RectTransform viewportRect = viewport.GetComponent<RectTransform>();
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.offsetMin = Vector2.zero;
+            viewportRect.offsetMax = Vector2.zero;
+            Image viewportImage = viewport.GetComponent<Image>();
+            viewportImage.sprite = RuntimeSpriteLibrary.WhiteSprite;
+            viewportImage.color = new Color(1f, 1f, 1f, 0.01f);
+            viewport.GetComponent<Mask>().showMaskGraphic = false;
+
+            GameObject content = new GameObject("ContentRoot", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            content.transform.SetParent(viewport.transform, false);
+            RectTransform contentRect = content.GetComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.offsetMin = Vector2.zero;
+            contentRect.offsetMax = Vector2.zero;
+
+            VerticalLayoutGroup contentLayout = content.GetComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 4f;
+            contentLayout.childControlHeight = true;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childForceExpandWidth = true;
+
+            ContentSizeFitter fitter = content.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scrollRect.viewport = viewportRect;
+            scrollRect.content = contentRect;
+            contentRoot = content.transform;
+            return scrollRoot;
         }
 
         private static void RebuildFacts(Transform root, IReadOnlyList<HudFactModel> facts, float width, float height)
@@ -370,9 +418,25 @@ namespace PhalanxChronicle.UI
         private void SetDetailsExpanded(bool expanded)
         {
             detailsExpanded = expanded;
-            if (detailContent != null)
+            if (detailScrollRoot != null)
             {
-                detailContent.SetActive(expanded);
+                detailScrollRoot.SetActive(expanded);
+            }
+
+            if (detailPanelLayout != null)
+            {
+                if (expanded)
+                {
+                    detailPanelLayout.minHeight = BattlePanelHeightPolicy.SelectedDetailExpandedMinHeight;
+                    detailPanelLayout.preferredHeight = BattlePanelHeightPolicy.SelectedDetailExpandedMinHeight;
+                    detailPanelLayout.flexibleHeight = 1f;
+                }
+                else
+                {
+                    detailPanelLayout.minHeight = BattlePanelHeightPolicy.SelectedDetailCollapsedHeight;
+                    detailPanelLayout.preferredHeight = BattlePanelHeightPolicy.SelectedDetailCollapsedHeight;
+                    detailPanelLayout.flexibleHeight = 0f;
+                }
             }
 
             if (detailToggleLabel != null)
