@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -61,6 +62,7 @@ namespace PhalanxChronicle.Editor
                 }
 
                 InvokeLifecycle(gameManager, "Awake");
+                InvokeLifecycle(gameManager, "Start");
 
                 BattleManager battleManager = gameManager.GetComponentInChildren<BattleManager>();
                 if (battleManager == null)
@@ -105,12 +107,34 @@ namespace PhalanxChronicle.Editor
                 Text campaignBodyLabel = GetPrivateField<Text>(battleHud, "campaignBodyLabel");
                 Button campaignPrimaryButton = GetPrivateField<Button>(battleHud, "campaignPrimaryButton");
                 if (campaignBodyLabel == null ||
-                    !ContainsAny(campaignBodyLabel.text, "15-20", "15-20 分鐘", "15-20 minutes"))
+                    !ContainsAny(campaignBodyLabel.text, "本機存檔", "local save slot", "Select a slot"))
                 {
-                    throw new InvalidOperationException("Expected first-launch intro copy to describe the first-session length.");
+                    throw new InvalidOperationException("Expected the slot launcher overlay to appear before campaign start.");
                 }
 
+                IReadOnlyList<CampaignSaveSlotSummary> launchSlotSummaries = GetPrivateField<IReadOnlyList<CampaignSaveSlotSummary>>(gameManager, "launchSlotSummaries");
+                CampaignSaveSlotSummary emptySlot = launchSlotSummaries?.FirstOrDefault(summary => summary != null && !summary.HasSave);
+                if (emptySlot == null)
+                {
+                    throw new InvalidOperationException("Runtime smoke check requires at least one empty local save slot.");
+                }
+
+                InvokeMethod(gameManager, "HandleLaunchSlotSelected", $"launch_slot:{emptySlot.SlotIndex}");
                 Text primaryButtonLabel = campaignPrimaryButton != null ? campaignPrimaryButton.GetComponentInChildren<Text>(true) : null;
+                if (primaryButtonLabel == null ||
+                    !ContainsAny(primaryButtonLabel.text, "重新開局", "New Game"))
+                {
+                    throw new InvalidOperationException("Expected selecting an empty slot to expose the new-game CTA.");
+                }
+
+                InvokeMethod(gameManager, "StartNewCampaign");
+                if (campaignBodyLabel == null ||
+                    !ContainsAny(campaignBodyLabel.text, "15-20", "15-20 分鐘", "15-20 minutes"))
+                {
+                    throw new InvalidOperationException("Expected first-launch intro copy to describe the first-session length after creating a new slot.");
+                }
+
+                primaryButtonLabel = campaignPrimaryButton != null ? campaignPrimaryButton.GetComponentInChildren<Text>(true) : null;
                 if (primaryButtonLabel == null ||
                     !ContainsAny(primaryButtonLabel.text, "開始首場戰鬥", "Start First Battle"))
                 {

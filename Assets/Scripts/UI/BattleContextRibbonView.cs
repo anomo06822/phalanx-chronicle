@@ -11,7 +11,9 @@ namespace PhalanxChronicle.UI
 {
     internal sealed class BattleContextRibbonView
     {
+        private BattleForecastModel currentModel = new BattleForecastModel();
         private GameObject rootObject;
+        private RectTransform rootRect;
         private Image accentImage;
         private Text headerLabel;
         private Text titleLabel;
@@ -19,6 +21,13 @@ namespace PhalanxChronicle.UI
         private Text primaryLineLabel;
         private Text secondaryLineLabel;
         private Transform chipRoot;
+        private VerticalLayoutGroup contentLayout;
+        private LayoutElement headerLayout;
+        private LayoutElement titleLayout;
+        private LayoutElement factsRowLayout;
+        private LayoutElement primaryLineLayout;
+        private LayoutElement secondaryLineLayout;
+        private LayoutElement chipRowLayout;
 
         public void Initialize(Transform canvasRoot)
         {
@@ -30,6 +39,7 @@ namespace PhalanxChronicle.UI
                 new Vector2(0f, -12f),
                 new Vector2(792f, 118f),
                 BattleUiTheme.PanelForecast);
+            rootRect = rootObject.GetComponent<RectTransform>();
             HorizontalLayoutGroup shellLayout = rootObject.AddComponent<HorizontalLayoutGroup>();
             shellLayout.spacing = 0f;
             shellLayout.padding = new RectOffset(0, 0, 0, 0);
@@ -47,7 +57,7 @@ namespace PhalanxChronicle.UI
             GameObject content = new GameObject("Content", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
             content.transform.SetParent(rootObject.transform, false);
             content.GetComponent<LayoutElement>().flexibleWidth = 1f;
-            VerticalLayoutGroup contentLayout = content.GetComponent<VerticalLayoutGroup>();
+            contentLayout = content.GetComponent<VerticalLayoutGroup>();
             contentLayout.spacing = 4f;
             contentLayout.padding = new RectOffset(14, 14, 10, 10);
             contentLayout.childControlHeight = true;
@@ -55,16 +65,19 @@ namespace PhalanxChronicle.UI
             contentLayout.childForceExpandHeight = false;
 
             headerLabel = BattleHudFactory.CreateText(content.transform, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextGold);
-            headerLabel.GetComponent<LayoutElement>().preferredHeight = 14f;
+            headerLayout = headerLabel.GetComponent<LayoutElement>();
+            headerLayout.preferredHeight = 14f;
             BattleHudFactory.SetOverflow(headerLabel, TextOverflowModes.Truncate, false);
 
             titleLabel = BattleHudFactory.CreateText(content.transform, string.Empty, 19, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            titleLabel.GetComponent<LayoutElement>().preferredHeight = 22f;
+            titleLayout = titleLabel.GetComponent<LayoutElement>();
+            titleLayout.preferredHeight = 22f;
             BattleHudFactory.SetOverflow(titleLabel, TextOverflowModes.Truncate, false);
 
             GameObject factsRow = new GameObject("FactsRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             factsRow.transform.SetParent(content.transform, false);
-            factsRow.GetComponent<LayoutElement>().preferredHeight = 24f;
+            factsRowLayout = factsRow.GetComponent<LayoutElement>();
+            factsRowLayout.preferredHeight = 24f;
             HorizontalLayoutGroup factsLayout = factsRow.GetComponent<HorizontalLayoutGroup>();
             factsLayout.spacing = 6f;
             factsLayout.childControlHeight = true;
@@ -74,16 +87,19 @@ namespace PhalanxChronicle.UI
             factRoot = factsRow.transform;
 
             primaryLineLabel = BattleHudFactory.CreateText(content.transform, string.Empty, 13, FontStyle.Bold, TextAnchor.MiddleLeft, BattleUiTheme.TextPrimary);
-            primaryLineLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            primaryLineLayout = primaryLineLabel.GetComponent<LayoutElement>();
+            primaryLineLayout.preferredHeight = 16f;
             BattleHudFactory.SetOverflow(primaryLineLabel, TextOverflowModes.Truncate, true);
 
             secondaryLineLabel = BattleHudFactory.CreateText(content.transform, string.Empty, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextSecondary);
-            secondaryLineLabel.GetComponent<LayoutElement>().preferredHeight = 16f;
+            secondaryLineLayout = secondaryLineLabel.GetComponent<LayoutElement>();
+            secondaryLineLayout.preferredHeight = 16f;
             BattleHudFactory.SetOverflow(secondaryLineLabel, TextOverflowModes.Truncate, true);
 
             GameObject chipRow = new GameObject("ChipRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             chipRow.transform.SetParent(content.transform, false);
-            chipRow.GetComponent<LayoutElement>().preferredHeight = 22f;
+            chipRowLayout = chipRow.GetComponent<LayoutElement>();
+            chipRowLayout.preferredHeight = 22f;
             HorizontalLayoutGroup chipLayout = chipRow.GetComponent<HorizontalLayoutGroup>();
             chipLayout.spacing = 6f;
             chipLayout.childControlHeight = true;
@@ -91,6 +107,30 @@ namespace PhalanxChronicle.UI
             chipLayout.childForceExpandHeight = false;
             chipLayout.childForceExpandWidth = false;
             chipRoot = chipRow.transform;
+        }
+
+        public void ApplyLayout(BattleLayoutMetrics metrics)
+        {
+            if (rootRect == null)
+            {
+                return;
+            }
+
+            rootRect.sizeDelta = new Vector2(metrics.ContextRibbonWidth, metrics.ContextRibbonHeight);
+            int horizontalPadding = Mathf.Max(10, metrics.PanelPadding - 2);
+            int verticalPadding = Mathf.Max(8, Mathf.RoundToInt(metrics.PanelPadding * 0.65f));
+            contentLayout.padding = new RectOffset(horizontalPadding, horizontalPadding, verticalPadding, verticalPadding);
+            contentLayout.spacing = Mathf.Max(3f, metrics.PanelSectionSpacing - 1f);
+
+            BattleHudFactory.ApplyResponsiveTextScale(rootObject.transform, metrics.TextScale);
+            headerLayout.preferredHeight = Mathf.Ceil(14f * metrics.TextScale);
+            titleLayout.preferredHeight = Mathf.Ceil(22f * metrics.TextScale);
+            factsRowLayout.preferredHeight = Mathf.Ceil(24f * metrics.TextScale);
+            primaryLineLayout.preferredHeight = Mathf.Ceil(16f * metrics.TextScale);
+            secondaryLineLayout.preferredHeight = Mathf.Ceil(16f * metrics.TextScale);
+            chipRowLayout.preferredHeight = Mathf.Ceil(22f * metrics.TextScale);
+
+            Bind(currentModel);
         }
 
         public void SetVisible(bool visible)
@@ -103,19 +143,19 @@ namespace PhalanxChronicle.UI
 
         public void Bind(BattleForecastModel model)
         {
-            BattleForecastModel ribbonModel = model ?? new BattleForecastModel();
-            headerLabel.text = ribbonModel.Header;
-            titleLabel.text = ribbonModel.Title;
-            primaryLineLabel.text = ribbonModel.PrimaryLine;
+            currentModel = model ?? new BattleForecastModel();
+            headerLabel.text = currentModel.Header;
+            titleLabel.text = currentModel.Title;
+            primaryLineLabel.text = currentModel.PrimaryLine;
             secondaryLineLabel.text = string.Join(
                 " · ",
-                (ribbonModel.SecondaryLines ?? Array.Empty<string>())
+                (currentModel.SecondaryLines ?? Array.Empty<string>())
                     .Where(line => !string.IsNullOrWhiteSpace(line))
                     .Take(2));
             secondaryLineLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(secondaryLineLabel.text));
-            accentImage.color = ribbonModel.AccentColor;
-            RebuildFacts(ribbonModel.OutcomeFacts);
-            RebuildChips(ribbonModel.RiskChip, ribbonModel.CommitChip);
+            accentImage.color = currentModel.AccentColor;
+            RebuildFacts(currentModel.OutcomeFacts);
+            RebuildChips(currentModel.RiskChip, currentModel.CommitChip);
         }
 
         private void RebuildFacts(IReadOnlyList<HudFactModel> facts)

@@ -30,6 +30,8 @@ namespace PhalanxChronicle.Battle
         private GridManager gridManager;
         private BattleHUD battleHUD;
         private BattleActionDockView actionMenuPanel;
+        private RectTransform battleCanvasRect;
+        private BattleLayoutMetrics currentLayoutMetrics;
         private readonly BattleActionSequencer actionSequencer = new BattleActionSequencer();
         private readonly BattleHudModelBuilder hudModelBuilder = new BattleHudModelBuilder();
         private BattlePresentationController presentationController;
@@ -62,6 +64,9 @@ namespace PhalanxChronicle.Battle
         private bool isAutoConfirmVisible;
         private Action confirmDialogPrimaryHandler;
         private Action confirmDialogSecondaryHandler;
+        private int lastScreenWidth;
+        private int lastScreenHeight;
+        private Vector2 lastCanvasSize;
 
         public bool IsDialogueVisible => battleHUD != null && battleHUD.IsDialogueVisible;
 
@@ -72,6 +77,8 @@ namespace PhalanxChronicle.Battle
         public bool IsCampaignOverlayVisible => battleHUD != null && battleHUD.IsCampaignOverlayVisible;
 
         public bool IsOnboardingVisible => battleHUD != null && battleHUD.IsOnboardingVisible;
+
+        public bool IsConfirmDialogVisible => battleHUD != null && battleHUD.IsConfirmDialogVisible;
 
         public bool IsAutoModeEnabled => isAutoModeEnabled;
 
@@ -953,6 +960,27 @@ namespace PhalanxChronicle.Battle
             ChangeState<BattleStartState>();
         }
 
+        private void Update()
+        {
+            if (battleCanvasRect == null)
+            {
+                return;
+            }
+
+            Vector2 canvasSize = battleCanvasRect.rect.size;
+            if (canvasSize.x <= 0f || canvasSize.y <= 0f)
+            {
+                return;
+            }
+
+            if (lastScreenWidth != Screen.width ||
+                lastScreenHeight != Screen.height ||
+                Vector2.Distance(lastCanvasSize, canvasSize) > 0.5f)
+            {
+                ApplyResponsiveLayout(force: true);
+            }
+        }
+
         private void BuildRuntimeObjects()
         {
             GameObject gridRoot = new GameObject("GridManager");
@@ -964,6 +992,7 @@ namespace PhalanxChronicle.Battle
             Canvas canvas = canvasObject.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.pixelPerfect = true;
+            battleCanvasRect = canvasObject.GetComponent<RectTransform>();
 
             CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -990,6 +1019,8 @@ namespace PhalanxChronicle.Battle
             actionMenuObject.transform.SetParent(canvasObject.transform, false);
             actionMenuPanel = actionMenuObject.AddComponent<ActionMenuPanel>();
             actionMenuPanel.Initialize(canvasObject.transform);
+
+            ApplyResponsiveLayout(force: true);
         }
 
         private void CreateUnits()
@@ -1032,10 +1063,10 @@ namespace PhalanxChronicle.Battle
             }
         }
 
-        private void ConfigureCamera()
+        private void ConfigureCamera(BattleLayoutMetrics layoutMetrics)
         {
             Camera mainCamera = Camera.main;
-            if (mainCamera == null)
+            if (mainCamera == null || simulation == null || simulation.Context == null)
             {
                 return;
             }
@@ -1044,21 +1075,6 @@ namespace PhalanxChronicle.Battle
             mainCamera.clearFlags = CameraClearFlags.SolidColor;
             mainCamera.orthographic = true;
             mainCamera.backgroundColor = stageVisual.SkyTopColor;
-            float largeBoardFactor = Mathf.Clamp01((Mathf.Max(simulation.Context.Width, simulation.Context.Height) - 12f) / 6f);
-            float boardWidth = simulation.Context.Width + Mathf.Lerp(2f, 1.4f, largeBoardFactor);
-            float boardHeight = simulation.Context.Height + Mathf.Lerp(2.1f, 1.5f, largeBoardFactor);
-            float aspect = Mathf.Max(0.1f, mainCamera.aspect);
-            float leftHudReserve = Mathf.Lerp(0.2f, 0.17f, largeBoardFactor);
-            float rightHudReserve = Mathf.Lerp(0.21f, 0.17f, largeBoardFactor);
-            float topHudReserve = Mathf.Lerp(0.12f, 0.09f, largeBoardFactor);
-            float bottomHudReserve = Mathf.Lerp(0.08f, 0.07f, largeBoardFactor);
-            float usableWidth = Mathf.Max(0.2f, 1f - leftHudReserve - rightHudReserve);
-            float usableHeight = Mathf.Max(0.2f, 1f - topHudReserve - bottomHudReserve);
-            float orthographicSizeForHeight = (boardHeight * 0.5f) / usableHeight;
-            float orthographicSizeForWidth = (boardWidth * 0.5f) / (aspect * usableWidth);
-            float orthographicSize = Mathf.Max(orthographicSizeForHeight, orthographicSizeForWidth);
-            orthographicSize = Mathf.Ceil(orthographicSize * 16f) / 16f;
-            float verticalOffset = (topHudReserve - bottomHudReserve) * orthographicSize * 0.24f;
 
             PixelPerfectCamera pixelPerfectCamera = mainCamera.GetComponent<PixelPerfectCamera>();
             if (pixelPerfectCamera != null)
@@ -1066,8 +1082,8 @@ namespace PhalanxChronicle.Battle
                 pixelPerfectCamera.assetsPPU = 64;
             }
 
-            mainCamera.transform.position = SnapToPixelGrid(new Vector3(0f, verticalOffset, -10f), 64f);
-            mainCamera.orthographicSize = orthographicSize;
+            mainCamera.transform.position = SnapToPixelGrid(new Vector3(0f, layoutMetrics.CameraVerticalOffset, -10f), 64f);
+            mainCamera.orthographicSize = layoutMetrics.CameraOrthographicSize;
         }
 
         private static Vector3 SnapToPixelGrid(Vector3 position, float assetsPpu)
@@ -1841,7 +1857,7 @@ namespace PhalanxChronicle.Battle
             scenarioDirector = new ScenarioDirector(scenarioData);
             gridManager.BuildGrid(simulation.Context, OnCellClicked, OnCellHoverChanged);
             CreateUnits();
-            ConfigureCamera();
+            ApplyResponsiveLayout(force: true);
             battleHUD.SetRerollEnabled(simulation.Context.IsRandomMap);
             RefreshAllVisuals();
         }
@@ -2072,7 +2088,7 @@ namespace PhalanxChronicle.Battle
             if (result.BattlefieldChanged)
             {
                 gridManager.BuildGrid(simulation.Context, OnCellClicked, OnCellHoverChanged);
-                ConfigureCamera();
+                ApplyResponsiveLayout(force: true);
                 RefreshAllVisuals();
             }
             else if (result.SpawnedUnitIds.Count > 0)
@@ -2081,6 +2097,47 @@ namespace PhalanxChronicle.Battle
             }
 
             return result;
+        }
+
+        private void ApplyResponsiveLayout(bool force)
+        {
+            if (battleCanvasRect == null)
+            {
+                return;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            Vector2 canvasSize = battleCanvasRect.rect.size;
+            if (canvasSize.x <= 0f || canvasSize.y <= 0f)
+            {
+                return;
+            }
+
+            Vector2 boardPresentationSize = GetBoardPresentationSize();
+            currentLayoutMetrics = BattleHudLayoutPolicy.Evaluate(battleCanvasRect, boardPresentationSize.x, boardPresentationSize.y);
+            lastScreenWidth = Screen.width;
+            lastScreenHeight = Screen.height;
+            lastCanvasSize = canvasSize;
+
+            battleHUD?.ApplyLayout(currentLayoutMetrics);
+            actionMenuPanel?.ApplyLayout(currentLayoutMetrics);
+            if (simulation != null && simulation.Context != null)
+            {
+                ConfigureCamera(currentLayoutMetrics);
+            }
+        }
+
+        private Vector2 GetBoardPresentationSize()
+        {
+            if (simulation == null || simulation.Context == null)
+            {
+                return new Vector2(14f, 14f);
+            }
+
+            float largeBoardFactor = Mathf.Clamp01((Mathf.Max(simulation.Context.Width, simulation.Context.Height) - 12f) / 6f);
+            float boardWidth = simulation.Context.Width + Mathf.Lerp(2f, 1.4f, largeBoardFactor);
+            float boardHeight = simulation.Context.Height + Mathf.Lerp(2.1f, 1.5f, largeBoardFactor);
+            return new Vector2(boardWidth, boardHeight);
         }
 
         private bool TryEnterScenarioDialogue(Type resumeStateType)

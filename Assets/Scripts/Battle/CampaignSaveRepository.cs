@@ -7,15 +7,113 @@ using UnityEngine;
 
 namespace PhalanxChronicle.Battle
 {
+    public sealed class CampaignSaveSlotSummary
+    {
+        public CampaignSaveSlotSummary(int slotIndex, string filePath, bool hasSave, CampaignSaveData saveData)
+        {
+            SlotIndex = slotIndex;
+            FilePath = filePath ?? string.Empty;
+            HasSave = hasSave;
+            SaveData = saveData;
+        }
+
+        public int SlotIndex { get; }
+
+        public string FilePath { get; }
+
+        public bool HasSave { get; }
+
+        public CampaignSaveData SaveData { get; }
+    }
+
     public sealed class CampaignSaveRepository
     {
+        public const int SlotCount = 3;
+        public const string LegacyFileName = "phalanx-chronicle-save.json";
+
+        private const string SlotFileNameFormat = "phalanx-chronicle-save-slot{0}.json";
+
         private readonly CampaignProgressionService progressionService;
         private readonly string savePath;
 
-        public CampaignSaveRepository(CampaignProgressionService progressionService, string fileName = "phalanx-chronicle-save.json")
+        public CampaignSaveRepository(CampaignProgressionService progressionService, string fileName = LegacyFileName)
+            : this(progressionService, fileName, null)
+        {
+        }
+
+        private CampaignSaveRepository(CampaignProgressionService progressionService, string fileName, string persistentDataPath)
         {
             this.progressionService = progressionService ?? throw new ArgumentNullException(nameof(progressionService));
-            savePath = Path.Combine(Application.persistentDataPath, fileName);
+            savePath = Path.Combine(ResolvePersistentDataPath(persistentDataPath), fileName);
+        }
+
+        public string SavePath => savePath;
+
+        public static CampaignSaveRepository CreateForSlot(CampaignProgressionService progressionService, int slotIndex)
+        {
+            return new CampaignSaveRepository(progressionService, GetSlotFileName(slotIndex));
+        }
+
+        public static IReadOnlyList<CampaignSaveSlotSummary> GetSlotSummaries(
+            CampaignProgressionService progressionService,
+            string expectedCampaignId)
+        {
+            if (progressionService == null)
+            {
+                throw new ArgumentNullException(nameof(progressionService));
+            }
+
+            List<CampaignSaveSlotSummary> summaries = new List<CampaignSaveSlotSummary>(SlotCount);
+            for (int slotIndex = 1; slotIndex <= SlotCount; slotIndex++)
+            {
+                CampaignSaveRepository repository = CreateForSlot(progressionService, slotIndex);
+                bool hasSave = repository.TryLoad(expectedCampaignId, out CampaignSaveData saveData);
+                summaries.Add(new CampaignSaveSlotSummary(slotIndex, repository.SavePath, hasSave, saveData));
+            }
+
+            return summaries;
+        }
+
+        public static bool TryMigrateLegacySaveToSlotOne()
+        {
+            string legacyPath = Path.Combine(ResolvePersistentDataPath(null), LegacyFileName);
+            string slotOnePath = GetSlotSavePath(1);
+            if (!File.Exists(legacyPath) || File.Exists(slotOnePath))
+            {
+                return false;
+            }
+
+            try
+            {
+                string directoryPath = Path.GetDirectoryName(slotOnePath);
+                if (!string.IsNullOrWhiteSpace(directoryPath))
+                {
+                    Directory.CreateDirectory(directoryPath);
+                }
+
+                File.Move(legacyPath, slotOnePath);
+                return true;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning($"Failed to migrate legacy campaign save from {legacyPath} to {slotOnePath}: {exception.Message}");
+                return false;
+            }
+        }
+
+        public static string GetSlotFileName(int slotIndex)
+        {
+            if (slotIndex < 1 || slotIndex > SlotCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(slotIndex), $"Slot index must be between 1 and {SlotCount}.");
+            }
+
+            return string.Format(SlotFileNameFormat, slotIndex);
+        }
+
+        public static string GetSlotSavePath(int slotIndex)
+        {
+            return Path.Combine(ResolvePersistentDataPath(null), GetSlotFileName(slotIndex));
         }
 
         public bool TryLoad(string expectedCampaignId, out CampaignSaveData saveData)
@@ -88,6 +186,13 @@ namespace PhalanxChronicle.Battle
             {
                 File.Delete(savePath);
             }
+        }
+
+        private static string ResolvePersistentDataPath(string persistentDataPath)
+        {
+            return string.IsNullOrWhiteSpace(persistentDataPath)
+                ? Application.persistentDataPath
+                : persistentDataPath;
         }
 
         private static CampaignSaveData ToModel(CampaignSaveFileDto dto)

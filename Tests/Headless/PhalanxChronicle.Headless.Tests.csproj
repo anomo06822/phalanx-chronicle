@@ -26,6 +26,8 @@
     <Compile Include="..\..\Assets\Scripts\Presentation\RoleLoadoutCatalog.cs" Link="Presentation\RoleLoadoutCatalog.cs" />
     <Compile Include="..\..\Assets\Scripts\UI\BattleHudModels.cs" Link="UI\BattleHudModels.cs" />
     <Compile Include="..\..\Assets\Scripts\Battle\CampaignPromotionPreviewBuilder.cs" Link="Battle\CampaignPromotionPreviewBuilder.cs" />
+    <Compile Include="..\..\Assets\Scripts\Battle\AppVersionComparer.cs" Link="Battle\AppVersionComparer.cs" />
+    <Compile Include="..\..\Assets\Scripts\Battle\CampaignSaveRepository.cs" Link="Battle\CampaignSaveRepository.cs" />
     <Compile Include="..\..\Assets\Scripts\Battle\BattleHudModelBuilder.cs" Link="Battle\BattleHudModelBuilder.cs" />
     <Compile Include="..\..\Assets\Scripts\Battle\FirstBattleOnboardingController.cs" Link="Battle\FirstBattleOnboardingController.cs" />
     <Compile Include="..\..\Assets\Scripts\Battle\Effects\BattleActionSequencer.cs" Link="Battle\Effects\BattleActionSequencer.cs" />

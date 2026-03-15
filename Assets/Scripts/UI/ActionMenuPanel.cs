@@ -14,6 +14,7 @@ namespace PhalanxChronicle.UI
     {
         private const float MaxDockWidth = 1120f;
         private const float MinDockWidth = 540f;
+        private const float ActionDockBottomMargin = 14f;
         private static readonly Color DockHeaderTextColor = new Color(0.94f, 0.88f, 0.74f, 1f);
         private static readonly Color CardPrimaryTextColor = new Color(0.98f, 0.97f, 0.94f, 1f);
         private static readonly Color CardSecondaryTextColor = new Color(0.94f, 0.96f, 0.99f, 1f);
@@ -25,9 +26,22 @@ namespace PhalanxChronicle.UI
         private static readonly Color CardSecondaryRiskColor = new Color(1f, 0.86f, 0.69f, 1f);
 
         protected GameObject rootObject;
+        protected RectTransform rootRect;
         protected Text modeLabel;
         protected Text contextHintLabel;
 
+        private BattleActionMenuModel currentModel = new BattleActionMenuModel();
+        private BattleLayoutMetrics currentLayoutMetrics;
+        private Action onAttackHandler;
+        private Action onSkillHandler;
+        private Action onWaitHandler;
+        private Action onBackHandler;
+        private VerticalLayoutGroup rootLayout;
+        private LayoutElement headerRowLayout;
+        private HorizontalLayoutGroup headerLayout;
+        private LayoutElement modePanelLayout;
+        private LayoutElement primaryRowLayout;
+        private LayoutElement secondaryRowLayout;
         private ActionCardView attackButtonView;
         private ActionCardView skillButtonView;
         private ActionCardView waitButtonView;
@@ -43,37 +57,33 @@ namespace PhalanxChronicle.UI
 
         public void Initialize(Transform canvasRoot)
         {
-            float dockWidth = MaxDockWidth;
-            RectTransform canvasRect = canvasRoot as RectTransform;
-            if (canvasRect != null && canvasRect.rect.width > 0f)
-            {
-                float reservedWidth = BattleHudLayoutPolicy.SelectedPanelWidth +
-                                      BattleHudLayoutPolicy.RosterSidebarWidth +
-                                      BattleHudLayoutPolicy.ActionDockHorizontalReserve;
-                dockWidth = Mathf.Clamp(canvasRect.rect.width - reservedWidth, MinDockWidth, MaxDockWidth);
-            }
+            BattleLayoutMetrics layoutMetrics = BattleHudLayoutPolicy.Evaluate(canvasRoot as RectTransform, 12f, 12f);
+            currentLayoutMetrics = layoutMetrics;
+            float dockWidth = Mathf.Clamp(layoutMetrics.ActionDockWidth, MinDockWidth, MaxDockWidth);
 
             rootObject = CreatePanel(
                 "ActionDock",
                 canvasRoot,
                 new Vector2(0.5f, 0f),
                 new Vector2(0.5f, 0f),
-                new Vector2(0f, BattleHudLayoutPolicy.ActionDockBottomMargin),
-                new Vector2(dockWidth, BattleHudLayoutPolicy.ActionDockHeight));
+                new Vector2(0f, ActionDockBottomMargin),
+                new Vector2(dockWidth, layoutMetrics.ActionDockHeight));
+            rootRect = rootObject.GetComponent<RectTransform>();
 
-            VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = BattleUiTheme.Space8;
-            layout.padding = new RectOffset(14, 14, 12, 12);
-            layout.childAlignment = TextAnchor.UpperCenter;
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
+            rootLayout = rootObject.AddComponent<VerticalLayoutGroup>();
+            rootLayout.spacing = BattleUiTheme.Space8;
+            rootLayout.padding = new RectOffset(14, 14, 12, 12);
+            rootLayout.childAlignment = TextAnchor.UpperCenter;
+            rootLayout.childControlHeight = true;
+            rootLayout.childControlWidth = true;
+            rootLayout.childForceExpandHeight = false;
+            rootLayout.childForceExpandWidth = true;
 
             GameObject headerRow = new GameObject("HeaderRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             headerRow.transform.SetParent(rootObject.transform, false);
-            headerRow.GetComponent<LayoutElement>().preferredHeight = 34f;
-            HorizontalLayoutGroup headerLayout = headerRow.GetComponent<HorizontalLayoutGroup>();
+            headerRowLayout = headerRow.GetComponent<LayoutElement>();
+            headerRowLayout.preferredHeight = 34f;
+            headerLayout = headerRow.GetComponent<HorizontalLayoutGroup>();
             headerLayout.spacing = BattleUiTheme.Space8;
             headerLayout.childAlignment = TextAnchor.MiddleLeft;
             headerLayout.childControlHeight = true;
@@ -82,7 +92,8 @@ namespace PhalanxChronicle.UI
             headerLayout.childForceExpandWidth = false;
 
             GameObject modePanel = CreateInsetPanel("ActionModePanel", headerRow.transform, 30f, BattleUiTheme.PanelInsetStrong);
-            modePanel.GetComponent<LayoutElement>().preferredWidth = 152f;
+            modePanelLayout = modePanel.GetComponent<LayoutElement>();
+            modePanelLayout.preferredWidth = 152f;
             modeLabel = CreateText(modePanel.transform, string.Empty, 14, FontStyle.Bold, TextAnchor.MiddleCenter, DockHeaderTextColor);
             BattleHudFactory.ApplyTextRole(modeLabel, BattleTextRole.SingleLineTitle);
             RectTransform modeRect = modeLabel.GetComponent<RectTransform>();
@@ -97,13 +108,50 @@ namespace PhalanxChronicle.UI
             BattleHudFactory.ApplyTextRole(contextHintLabel, BattleTextRole.TwoLineSummary);
 
             GameObject actionRow = CreateRow("PrimaryActionRow", rootObject.transform, 128f);
+            primaryRowLayout = actionRow.GetComponent<LayoutElement>();
             attackButtonView = CreateCard(actionRow.transform, true);
             skillButtonView = CreateCard(actionRow.transform, true);
             GameObject secondaryRow = CreateRow("SecondaryActionRow", rootObject.transform, 128f);
+            secondaryRowLayout = secondaryRow.GetComponent<LayoutElement>();
             waitButtonView = CreateCard(secondaryRow.transform, false);
             backButtonView = CreateCard(secondaryRow.transform, false);
 
+            ApplyLayout(layoutMetrics);
             Hide();
+        }
+
+        internal void ApplyLayout(BattleLayoutMetrics metrics)
+        {
+            currentLayoutMetrics = metrics;
+            if (rootRect == null)
+            {
+                return;
+            }
+
+            rootRect.anchoredPosition = new Vector2(0f, ActionDockBottomMargin);
+            rootRect.sizeDelta = new Vector2(Mathf.Clamp(metrics.ActionDockWidth, MinDockWidth, MaxDockWidth), metrics.ActionDockHeight);
+            int horizontalPadding = Mathf.RoundToInt(14f * metrics.TextScale);
+            int verticalPadding = Mathf.RoundToInt(12f * metrics.TextScale);
+            rootLayout.padding = new RectOffset(horizontalPadding, horizontalPadding, verticalPadding, verticalPadding);
+            rootLayout.spacing = Mathf.Ceil(BattleUiTheme.Space8 * metrics.TextScale);
+            headerRowLayout.preferredHeight = Mathf.Ceil(34f * metrics.TextScale);
+            headerLayout.spacing = Mathf.Ceil(BattleUiTheme.Space8 * metrics.TextScale);
+            modePanelLayout.preferredWidth = Mathf.Ceil(152f * metrics.TextScale);
+
+            float remainingHeight = metrics.ActionDockHeight -
+                                    rootLayout.padding.top -
+                                    rootLayout.padding.bottom -
+                                    rootLayout.spacing * 2f -
+                                    headerRowLayout.preferredHeight;
+            float rowHeight = Mathf.Max(104f, remainingHeight * 0.5f);
+            primaryRowLayout.preferredHeight = rowHeight;
+            secondaryRowLayout.preferredHeight = rowHeight;
+
+            BattleHudFactory.ApplyResponsiveTextScale(rootObject.transform, metrics.TextScale);
+            if (currentModel != null)
+            {
+                Show(currentModel, onAttackHandler, onSkillHandler, onWaitHandler, onBackHandler);
+            }
         }
 
         public void Show(
@@ -118,29 +166,34 @@ namespace PhalanxChronicle.UI
                 return;
             }
 
+            currentModel = model ?? new BattleActionMenuModel();
+            onAttackHandler = onAttack;
+            onSkillHandler = onSkill;
+            onWaitHandler = onWait;
+            onBackHandler = onBack;
             rootObject.SetActive(true);
-            modeLabel.text = model != null ? model.ModeLabel : string.Empty;
-            contextHintLabel.text = model != null ? model.ContextHint : string.Empty;
+            modeLabel.text = currentModel.ModeLabel;
+            contextHintLabel.text = currentModel.ContextHint;
             contextHintLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(contextHintLabel.text));
 
             BindCard(
                 attackButtonView,
-                GetAction(model, BattleActionDescriptorType.Attack),
+                GetAction(currentModel, BattleActionDescriptorType.Attack),
                 LocalizationService.Text("ui.button.attack", "攻擊"),
                 onAttack);
             BindCard(
                 skillButtonView,
-                GetAction(model, BattleActionDescriptorType.Skill),
+                GetAction(currentModel, BattleActionDescriptorType.Skill),
                 LocalizationService.Text("ui.button.skill", "技能"),
                 onSkill);
             BindCard(
                 waitButtonView,
-                GetAction(model, BattleActionDescriptorType.Wait),
+                GetAction(currentModel, BattleActionDescriptorType.Wait),
                 LocalizationService.Text("ui.button.wait", "待命"),
                 onWait);
             BindCard(
                 backButtonView,
-                GetAction(model, BattleActionDescriptorType.Back),
+                GetAction(currentModel, BattleActionDescriptorType.Back),
                 LocalizationService.Text("ui.button.back", "返回"),
                 onBack);
         }

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using PhalanxChronicle.Core;
@@ -14,6 +15,8 @@ namespace PhalanxChronicle.Battle
 {
     public sealed class GameManager : MonoBehaviour
     {
+        private const string LaunchSlotOptionPrefix = "launch_slot:";
+
         private static GameManager instance;
 
         [SerializeField] private BattleScenarioDefinition scenarioDefinition;
@@ -25,9 +28,14 @@ namespace PhalanxChronicle.Battle
         private CampaignProgressionService campaignProgressionService;
         private CampaignSaveRepository campaignSaveRepository;
         private CampaignSaveData campaignSaveData;
+        private readonly AppUpdateService appUpdateService = new AppUpdateService();
+        private IReadOnlyList<CampaignSaveSlotSummary> launchSlotSummaries = Array.Empty<CampaignSaveSlotSummary>();
         private readonly CampaignPromotionPreviewBuilder promotionPreviewBuilder = new CampaignPromotionPreviewBuilder();
         private readonly HashSet<string> expandedPromotionIntroUnits = new HashSet<string>(StringComparer.Ordinal);
         private string currentCampMessage = string.Empty;
+        private int selectedLaunchSlotIndex;
+        private int activeSaveSlotIndex;
+        private bool startupUpdateCheckStarted;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureExists()
@@ -51,6 +59,7 @@ namespace PhalanxChronicle.Battle
 
             instance = this;
             LocalizationService.SetLocale(initialLocale);
+            ApplyDesktopDisplayDefaults();
             EnsureCamera();
             EnsureEventSystem();
             EnsureBattleManager();
@@ -64,15 +73,12 @@ namespace PhalanxChronicle.Battle
             }
 
             InitializeCampaignSystems();
-            if (campaignSaveRepository.TryLoad(campaignDefinition.CampaignId, out CampaignSaveData loadedSave))
-            {
-                campaignSaveData = loadedSave;
-                campaignDirector = new CampaignDirector(campaignDefinition, campaignSaveData.Progress);
-                ShowContinueOrNewGame();
-                return;
-            }
-
-            StartNewCampaign();
+            bool migratedLegacySave = CampaignSaveRepository.TryMigrateLegacySaveToSlotOne();
+            ShowSaveSlotLauncher(
+                migratedLegacySave
+                    ? LocalizationService.Text("campaign.slot.legacy_imported", "已將舊版單檔存檔自動匯入 Slot 1。")
+                    : null);
+            BeginStartupUpdateCheck();
         }
 
         private void InitializeCampaignSystems()
@@ -84,7 +90,77 @@ namespace PhalanxChronicle.Battle
 
             campaignDefinition = CampaignCatalog.CreateLiuBeiLegend();
             campaignProgressionService = new CampaignProgressionService();
-            campaignSaveRepository = new CampaignSaveRepository(campaignProgressionService);
+            campaignSaveRepository = null;
+        }
+
+        private void BeginStartupUpdateCheck()
+        {
+            if (startupUpdateCheckStarted || !ShouldRunStartupUpdateCheck())
+            {
+                return;
+            }
+
+            startupUpdateCheckStarted = true;
+            StartCoroutine(CheckForStartupUpdate());
+        }
+
+        private bool ShouldRunStartupUpdateCheck()
+        {
+#if UNITY_STANDALONE_OSX || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+            return !Application.isEditor && scenarioDefinition == null;
+#else
+            return false;
+#endif
+        }
+
+        private IEnumerator CheckForStartupUpdate()
+        {
+            yield return appUpdateService.CheckForAvailableUpdate(HandleStartupUpdateCheckCompleted);
+        }
+
+        private void HandleStartupUpdateCheckCompleted(AppUpdateCheckResult result)
+        {
+            if (result == null ||
+                !result.HasUpdate ||
+                battleManager == null ||
+                battleManager.Simulation != null ||
+                battleManager.IsConfirmDialogVisible)
+            {
+                return;
+            }
+
+            ShowAppUpdatePrompt(result);
+        }
+
+        private void ShowAppUpdatePrompt(AppUpdateCheckResult result)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
+            battleManager.ShowConfirmDialog(
+                new BattleConfirmDialogModel
+                {
+                    Title = LocalizationService.Text("update.available.title", "有新版本可更新"),
+                    Body = LocalizationService.Format(
+                        "update.available.body",
+                        "目前版本：{0}\n最新版本：{1}\n\n按下「立即更新」會開啟 GitHub Release 頁面下載新版。",
+                        string.IsNullOrWhiteSpace(result.CurrentVersion) ? LocalizationService.Text("campaign.summary.none", "無") : result.CurrentVersion,
+                        result.LatestTag),
+                    ConfirmLabel = LocalizationService.Text("ui.button.update_now", "立即更新"),
+                    CancelLabel = LocalizationService.Text("ui.button.later", "稍後提醒"),
+                },
+                () =>
+                {
+                    battleManager.HideConfirmDialog();
+                    Application.OpenURL(result.ReleasePageUrl);
+                },
+                () =>
+                {
+                    appUpdateService.MarkDismissed(result.LatestTag);
+                    battleManager.HideConfirmDialog();
+                });
         }
 
         private void EnsureCamera()
@@ -111,6 +187,28 @@ namespace PhalanxChronicle.Battle
             pixelPerfect.cropFrameY = false;
             pixelPerfect.upscaleRT = false;
             pixelPerfect.pixelSnapping = true;
+        }
+
+        private static void ApplyDesktopDisplayDefaults()
+        {
+#if UNITY_STANDALONE_OSX || UNITY_STANDALONE_WIN || UNITY_STANDALONE_LINUX
+            if (Application.isEditor)
+            {
+                return;
+            }
+
+            Resolution currentResolution = Screen.currentResolution;
+            int width = currentResolution.width > 0 ? currentResolution.width : Display.main.systemWidth;
+            int height = currentResolution.height > 0 ? currentResolution.height : Display.main.systemHeight;
+            if (width > 0 && height > 0)
+            {
+                Screen.SetResolution(width, height, FullScreenMode.FullScreenWindow);
+            }
+            else
+            {
+                Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
+            }
+#endif
         }
 
         private void EnsureEventSystem()
@@ -166,27 +264,60 @@ namespace PhalanxChronicle.Battle
             battleManager.StartScenario(scenario);
         }
 
-        private void ShowContinueOrNewGame()
+        private void ShowSaveSlotLauncher(string message = null)
         {
+            launchSlotSummaries = CampaignSaveRepository.GetSlotSummaries(campaignProgressionService, campaignDefinition.CampaignId);
+            if (selectedLaunchSlotIndex < 1 || selectedLaunchSlotIndex > CampaignSaveRepository.SlotCount)
+            {
+                selectedLaunchSlotIndex = 0;
+            }
+
+            CampaignSaveSlotSummary selectedSummary = GetSelectedLaunchSlotSummary();
             CampaignOptionListModel model = new CampaignOptionListModel
             {
+                Eyebrow = LocalizationService.Text("campaign.shell.eyebrow", "戰役路線"),
                 Title = LocalizationService.Text(campaignDefinition.CampaignNameKey, campaignDefinition.CampaignNameFallback),
                 Body = string.Join(
                     "\n\n",
-                    LocalizationService.Text("campaign.save_found", "已找到自動存檔。"),
-                    BuildCampaignProgressSnapshot(),
-                    LocalizationService.Text("campaign.launch.continue_hint", "可直接延續目前戰役，或重新開始一次帶引導的首戰流程。")),
-                Options = BuildContinueOptionEntries(),
-                PrimaryActionLabel = LocalizationService.Text("ui.button.continue", "繼續"),
-                SecondaryActionLabel = LocalizationService.Text("ui.button.new_game", "重新開局"),
+                    new[]
+                    {
+                        message,
+                        LocalizationService.Text("campaign.slot.launch_body", "請選擇一個本機存檔槽。每個槽位都會寫入這台電腦上的獨立 JSON 檔。"),
+                        LocalizationService.Text("campaign.slot.launch_hint", "先選一個槽位，再決定要續玩還是開始新遊戲。"),
+                    }.Where(text => !string.IsNullOrWhiteSpace(text))),
+                ProgressLabel = selectedSummary != null && selectedSummary.HasSave
+                    ? BuildCampaignProgressSnapshot(selectedSummary.SaveData)
+                    : string.Empty,
+                HighlightLabel = selectedSummary != null
+                    ? LocalizationService.Format("campaign.slot.launch_selected", "目前選擇：Slot {0}", selectedSummary.SlotIndex)
+                    : string.Empty,
+                DeckTitle = LocalizationService.Text("campaign.section.progress", "戰役快照"),
+                Options = BuildLaunchSlotEntries(),
+                PrimaryActionLabel = selectedSummary == null
+                    ? string.Empty
+                    : (selectedSummary.HasSave
+                        ? LocalizationService.Text("ui.button.continue_slot", "繼續此槽")
+                        : LocalizationService.Text("ui.button.new_game", "重新開局")),
+                SecondaryActionLabel = selectedSummary != null && selectedSummary.HasSave
+                    ? LocalizationService.Text("ui.button.restart_slot", "重新開局")
+                    : string.Empty,
             };
 
-            battleManager.ShowCampaignOptionList(model, null, ContinueCampaign, StartNewCampaign);
+            battleManager.ShowCampaignOptionList(
+                model,
+                HandleLaunchSlotSelected,
+                selectedSummary == null ? null : (Action)(selectedSummary.HasSave ? ContinueCampaign : StartNewCampaign),
+                selectedSummary != null && selectedSummary.HasSave ? ConfirmRestartSelectedSlot : null);
         }
 
         private void StartNewCampaign()
         {
             InitializeCampaignSystems();
+            if (!ActivateCampaignSlot(selectedLaunchSlotIndex))
+            {
+                return;
+            }
+
             campaignSaveData = campaignSaveRepository.CreateNew(campaignDefinition);
             campaignDirector = new CampaignDirector(campaignDefinition, campaignSaveData.Progress);
             ShowFirstLaunchIntro();
@@ -194,7 +325,154 @@ namespace PhalanxChronicle.Battle
 
         private void ContinueCampaign()
         {
+            if (!TryLoadCampaignSlot(selectedLaunchSlotIndex))
+            {
+                ShowSaveSlotLauncher(LocalizationService.Text("campaign.slot.load_failed", "無法讀取所選槽位。請改選其他槽位，或直接重開這個槽位。"));
+                return;
+            }
+
             ShowCampHub(LocalizationService.Text(campaignDefinition.CampaignOverviewKey, campaignDefinition.CampaignOverviewFallback));
+        }
+
+        private void HandleLaunchSlotSelected(string optionId)
+        {
+            if (string.IsNullOrWhiteSpace(optionId) || !optionId.StartsWith(LaunchSlotOptionPrefix, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (!int.TryParse(optionId.Substring(LaunchSlotOptionPrefix.Length), out int slotIndex) ||
+                slotIndex < 1 ||
+                slotIndex > CampaignSaveRepository.SlotCount)
+            {
+                return;
+            }
+
+            selectedLaunchSlotIndex = slotIndex;
+            ShowSaveSlotLauncher();
+        }
+
+        private void ConfirmRestartSelectedSlot()
+        {
+            CampaignSaveSlotSummary selectedSummary = GetSelectedLaunchSlotSummary();
+            if (selectedSummary == null || !selectedSummary.HasSave)
+            {
+                return;
+            }
+
+            battleManager.ShowConfirmDialog(
+                new BattleConfirmDialogModel
+                {
+                    Title = LocalizationService.Text("campaign.slot.overwrite.title", "要覆寫這個槽位嗎？"),
+                    Body = LocalizationService.Format(
+                        "campaign.slot.overwrite.body",
+                        "Slot {0} 已經有戰役紀錄。\n\n確認後會用全新戰役覆蓋這個槽位。\n\n檔案：{1}",
+                        selectedSummary.SlotIndex,
+                        selectedSummary.FilePath),
+                    ConfirmLabel = LocalizationService.Text("campaign.slot.overwrite.confirm", "覆寫槽位"),
+                    CancelLabel = LocalizationService.Text("ui.button.cancel", "取消"),
+                },
+                () =>
+                {
+                    battleManager.HideConfirmDialog();
+                    StartNewCampaign();
+                },
+                battleManager.HideConfirmDialog);
+        }
+
+        private CampaignSaveSlotSummary GetSelectedLaunchSlotSummary()
+        {
+            return launchSlotSummaries.FirstOrDefault(summary => summary != null && summary.SlotIndex == selectedLaunchSlotIndex);
+        }
+
+        private List<CampaignOptionEntryModel> BuildLaunchSlotEntries()
+        {
+            return launchSlotSummaries
+                .Where(summary => summary != null)
+                .OrderBy(summary => summary.SlotIndex)
+                .Select(BuildLaunchSlotEntry)
+                .ToList();
+        }
+
+        private CampaignOptionEntryModel BuildLaunchSlotEntry(CampaignSaveSlotSummary summary)
+        {
+            bool hasSave = summary != null && summary.HasSave && summary.SaveData != null;
+            return new CampaignOptionEntryModel
+            {
+                OptionId = summary != null ? LaunchSlotOptionPrefix + summary.SlotIndex : string.Empty,
+                IconGlyph = hasSave ? "存" : "空",
+                Title = LocalizationService.Format("campaign.slot.title", "Slot {0}", summary != null ? summary.SlotIndex : 0),
+                Status = hasSave
+                    ? LocalizationService.Text("campaign.slot.occupied", "已有紀錄")
+                    : LocalizationService.Text("campaign.slot.empty", "空槽"),
+                MetricLine = hasSave
+                    ? BuildLaunchSlotMetricLine(summary.SaveData)
+                    : LocalizationService.Text("campaign.slot.empty_metric", "尚未開始任何戰役"),
+                Description = hasSave
+                    ? LocalizationService.Text("campaign.slot.resume_body", "你可以續玩這個槽位，或在確認後把它重開成全新戰役。")
+                    : LocalizationService.Text("campaign.slot.empty_body", "選擇這個槽位後，會在這台電腦建立一份新的本機戰役紀錄。"),
+                DetailLines = new[]
+                {
+                    LocalizationService.Format(
+                        "campaign.slot.path",
+                        "存檔路徑：{0}",
+                        summary != null ? summary.FilePath : string.Empty),
+                },
+                RecommendedReason = hasSave ? BuildLaunchSlotRecommendedReason(summary.SaveData) : string.Empty,
+                SortWeight = summary != null ? summary.SlotIndex : 0,
+                IsEnabled = true,
+                IsEmphasized = summary != null && summary.SlotIndex == selectedLaunchSlotIndex,
+            };
+        }
+
+        private string BuildLaunchSlotMetricLine(CampaignSaveData saveData)
+        {
+            CampaignDirector director = CreateCampaignDirector(saveData);
+            if (saveData == null || director == null)
+            {
+                return string.Empty;
+            }
+
+            return LocalizationService.Format(
+                "campaign.launch.progress_metric",
+                "已解鎖章節 {0}/{1}  |  軍資 {2}  聲望 {3}",
+                director.Progress.UnlockedStageIndex + 1,
+                director.StageCount,
+                saveData.Inventory.Supplies,
+                saveData.Inventory.Renown);
+        }
+
+        private string BuildLaunchSlotRecommendedReason(CampaignSaveData saveData)
+        {
+            string recommended = BuildRecommendedStageSummary(saveData);
+            return !string.IsNullOrWhiteSpace(recommended)
+                ? recommended
+                : BuildLastBattleSnapshot(saveData);
+        }
+
+        private bool ActivateCampaignSlot(int slotIndex)
+        {
+            if (slotIndex < 1 || slotIndex > CampaignSaveRepository.SlotCount)
+            {
+                return false;
+            }
+
+            activeSaveSlotIndex = slotIndex;
+            campaignSaveRepository = CampaignSaveRepository.CreateForSlot(campaignProgressionService, slotIndex);
+            return true;
+        }
+
+        private bool TryLoadCampaignSlot(int slotIndex)
+        {
+            if (!ActivateCampaignSlot(slotIndex) ||
+                !campaignSaveRepository.TryLoad(campaignDefinition.CampaignId, out CampaignSaveData loadedSave))
+            {
+                return false;
+            }
+
+            campaignSaveData = loadedSave;
+            campaignDirector = new CampaignDirector(campaignDefinition, campaignSaveData.Progress);
+            return true;
         }
 
         private void ShowFirstLaunchIntro()
@@ -895,13 +1173,28 @@ namespace PhalanxChronicle.Battle
 
         private string BuildCampaignProgressSnapshot()
         {
+            return BuildCampaignProgressSnapshot(campaignSaveData, campaignDirector);
+        }
+
+        private string BuildCampaignProgressSnapshot(CampaignSaveData saveData)
+        {
+            return BuildCampaignProgressSnapshot(saveData, CreateCampaignDirector(saveData));
+        }
+
+        private string BuildCampaignProgressSnapshot(CampaignSaveData saveData, CampaignDirector director)
+        {
+            if (saveData == null || director == null)
+            {
+                return string.Empty;
+            }
+
             return string.Join(
                 "\n",
                 new[]
                 {
-                    LocalizationService.Format("campaign.snapshot.chapters", "已解鎖章節 {0}/{1}", campaignDirector.Progress.UnlockedStageIndex + 1, campaignDirector.StageCount),
-                    BuildLastBattleSnapshot(),
-                    LocalizationService.Format("camp.resources", "軍資 {0}  聲望 {1}", campaignSaveData.Inventory.Supplies, campaignSaveData.Inventory.Renown),
+                    LocalizationService.Format("campaign.snapshot.chapters", "已解鎖章節 {0}/{1}", director.Progress.UnlockedStageIndex + 1, director.StageCount),
+                    BuildLastBattleSnapshot(saveData),
+                    LocalizationService.Format("camp.resources", "軍資 {0}  聲望 {1}", saveData.Inventory.Supplies, saveData.Inventory.Renown),
                 }.Where(text => !string.IsNullOrWhiteSpace(text)));
         }
 
@@ -1859,7 +2152,24 @@ namespace PhalanxChronicle.Battle
 
         private string BuildRecommendedStageSummary(int stageIndex)
         {
-            CampaignStageDefinition stage = stageIndex >= 0 ? campaignDirector.GetStage(stageIndex) : null;
+            return BuildRecommendedStageSummary(campaignSaveData, campaignDirector, stageIndex);
+        }
+
+        private string BuildRecommendedStageSummary(CampaignSaveData saveData)
+        {
+            CampaignDirector director = CreateCampaignDirector(saveData);
+            int recommendedStageIndex = director != null ? director.GetRecommendedStageIndex() : -1;
+            return BuildRecommendedStageSummary(saveData, director, recommendedStageIndex);
+        }
+
+        private string BuildRecommendedStageSummary(CampaignSaveData saveData, CampaignDirector director, int stageIndex)
+        {
+            if (saveData == null || director == null)
+            {
+                return string.Empty;
+            }
+
+            CampaignStageDefinition stage = stageIndex >= 0 ? director.GetStage(stageIndex) : null;
             if (stage == null)
             {
                 return string.Empty;
@@ -1867,7 +2177,7 @@ namespace PhalanxChronicle.Battle
 
             BattleScenarioData scenario = campaignProgressionService.PrepareScenario(
                 BattleScenarioCatalog.CreateScenario(stage.ScenarioId),
-                campaignSaveData);
+                saveData);
             return LocalizationService.Format(
                 "campaign.camp.recommended_summary",
                 "推薦下一戰：{0} | 建議等級 {1} | {2}",
@@ -1955,7 +2265,12 @@ namespace PhalanxChronicle.Battle
 
         private string BuildLastBattleSnapshot()
         {
-            BattleResultSummary summary = campaignSaveData != null ? campaignSaveData.Progress.LastBattleResult : null;
+            return BuildLastBattleSnapshot(campaignSaveData);
+        }
+
+        private string BuildLastBattleSnapshot(CampaignSaveData saveData)
+        {
+            BattleResultSummary summary = saveData != null ? saveData.Progress.LastBattleResult : null;
             if (summary == null || string.IsNullOrWhiteSpace(summary.ScenarioId))
             {
                 return string.Empty;
@@ -1966,6 +2281,13 @@ namespace PhalanxChronicle.Battle
                 ? LocalizationService.Text(scenario.ScenarioNameKey, scenario.ScenarioName)
                 : summary.ScenarioId;
             return LocalizationService.Format("campaign.snapshot.last_battle", "Last battle: {0}", scenarioName);
+        }
+
+        private CampaignDirector CreateCampaignDirector(CampaignSaveData saveData)
+        {
+            return saveData != null && campaignDefinition != null
+                ? new CampaignDirector(campaignDefinition, saveData.Progress)
+                : null;
         }
 
         private string BuildFirstBattleFeedbackPrompt()

@@ -574,7 +574,8 @@ namespace PhalanxChronicle.UI
             GameObject root = BattleHudFactory.CreateInsetPanel("CampaignOptionEntry", parent, 0f, model.IsEnabled ? (model.IsEmphasized ? BattleUiTheme.PanelCommand : BattleUiTheme.PanelInset) : BattleUiTheme.PanelGhost);
             LayoutElement rootLayout = root.GetComponent<LayoutElement>();
             bool hasSupportingLine = !string.IsNullOrWhiteSpace(model.RecommendedReason) || !string.IsNullOrWhiteSpace(model.AvailabilityReason);
-            rootLayout.preferredHeight = hasSupportingLine || model.IsPromotionOption ? 124f : 98f;
+            bool hasDetailLines = (model.DetailLines ?? Array.Empty<string>()).Any(line => !string.IsNullOrWhiteSpace(line));
+            rootLayout.preferredHeight = hasDetailLines ? 132f : (hasSupportingLine || model.IsPromotionOption ? 124f : 98f);
             rootLayout.flexibleHeight = 0f;
             Button button = root.AddComponent<Button>();
             button.interactable = model.IsEnabled;
@@ -657,6 +658,17 @@ namespace PhalanxChronicle.UI
             {
                 Text availability = BattleHudFactory.CreateText(textColumn.transform, model.AvailabilityReason, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
                 ClampText(availability, 18f, TextOverflowModes.Truncate);
+            }
+
+            if (hasDetailLines)
+            {
+                foreach (string line in model.DetailLines.Where(line => !string.IsNullOrWhiteSpace(line)))
+                {
+                    Text detailLabel = BattleHudFactory.CreateText(textColumn.transform, line, 11, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextMuted);
+                    BattleHudFactory.EnableAutoHeight(detailLabel, 18f);
+                }
+
+                FinalizeDynamicEntryHeight(root, 132f);
             }
         }
 

@@ -17,7 +17,23 @@ namespace PhalanxChronicle.UI
         private readonly List<RosterEntryView> enemyRosterViews = new List<RosterEntryView>();
         private readonly List<Text> feedLabels = new List<Text>();
 
+        private BattleOverviewModel currentOverview = new BattleOverviewModel();
+        private IReadOnlyList<BattleRosterEntryModel> currentAlliedRoster = Array.Empty<BattleRosterEntryModel>();
+        private IReadOnlyList<BattleRosterEntryModel> currentEnemyRoster = Array.Empty<BattleRosterEntryModel>();
+        private IReadOnlyList<string> currentFeedEntries = Array.Empty<string>();
+        private BattleLayoutMetrics currentLayoutMetrics;
         private GameObject rootObject;
+        private RectTransform rootRect;
+        private VerticalLayoutGroup rootLayout;
+        private VerticalLayoutGroup summaryLayout;
+        private GridLayoutGroup overviewFactGrid;
+        private VerticalLayoutGroup objectiveLayout;
+        private LayoutElement commandRowLayout;
+        private HorizontalLayoutGroup commandLayout;
+        private LayoutElement contentPanelLayout;
+        private VerticalLayoutGroup contentLayout;
+        private LayoutElement tabRowLayout;
+        private HorizontalLayoutGroup tabLayout;
         private Action<string> rosterSelectionHandler;
         private Text stageLabel;
         private Text seedLabel;
@@ -57,32 +73,31 @@ namespace PhalanxChronicle.UI
         {
             this.feedLimit = Mathf.Max(1, feedLimit);
 
-            RectTransform canvasRect = canvasRoot as RectTransform;
-            float panelHeight = BattleHudLayoutPolicy.CalculatePanelHeight(canvasRect);
-            float anchoredY = BattleHudLayoutPolicy.CalculateSafeAnchoredY(canvasRect, panelHeight);
+            BattleLayoutMetrics layoutMetrics = BattleHudLayoutPolicy.Evaluate(canvasRoot as RectTransform, 12f, 12f);
+            currentLayoutMetrics = layoutMetrics;
             rootObject = BattleHudFactory.CreatePanel(
                 "OverviewPanel",
                 canvasRoot,
                 new Vector2(1f, 0.5f),
                 new Vector2(1f, 0.5f),
-                new Vector2(-18f, anchoredY),
-                new Vector2(BattleHudLayoutPolicy.RosterSidebarWidth, panelHeight),
+                new Vector2(-layoutMetrics.PanelOuterMargin, layoutMetrics.SidePanelAnchoredY),
+                new Vector2(layoutMetrics.RosterPanelWidth, layoutMetrics.SidePanelHeight),
                 BattleUiTheme.PanelSurface);
-            RectTransform rightRect = rootObject.GetComponent<RectTransform>();
-            rightRect.pivot = new Vector2(1f, 0.5f);
+            rootRect = rootObject.GetComponent<RectTransform>();
+            rootRect.pivot = new Vector2(1f, 0.5f);
 
-            VerticalLayoutGroup layout = rootObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = BattlePanelHeightPolicy.OverviewSectionSpacing;
-            layout.padding = new RectOffset(16, 16, 16, 16);
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
+            rootLayout = rootObject.AddComponent<VerticalLayoutGroup>();
+            rootLayout.spacing = layoutMetrics.PanelSectionSpacing;
+            rootLayout.padding = new RectOffset(layoutMetrics.PanelPadding, layoutMetrics.PanelPadding, layoutMetrics.PanelPadding, layoutMetrics.PanelPadding);
+            rootLayout.childControlHeight = true;
+            rootLayout.childControlWidth = true;
+            rootLayout.childForceExpandHeight = false;
 
             BattleHudFactory.CreateSectionHeader(rootObject.transform, LocalizationService.Text("ui.panel.overview", "戰況總覽"));
 
             GameObject summaryPanel = BattleHudFactory.CreateInsetPanel("OverviewSummaryPanel", rootObject.transform, BattlePanelHeightPolicy.OverviewSummaryHeight, BattleUiTheme.PanelInsetStrong);
             Transform summaryRoot = BattleHudFactory.CreateInsetContentRoot(summaryPanel.transform, 10f);
-            VerticalLayoutGroup summaryLayout = summaryRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            summaryLayout = summaryRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             summaryLayout.spacing = 2f;
             summaryLayout.childControlHeight = true;
             summaryLayout.childControlWidth = true;
@@ -96,11 +111,11 @@ namespace PhalanxChronicle.UI
             GameObject factGrid = new GameObject("FactGrid", typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
             factGrid.transform.SetParent(summaryRoot, false);
             factGrid.GetComponent<LayoutElement>().preferredHeight = 44f;
-            GridLayoutGroup factLayout = factGrid.GetComponent<GridLayoutGroup>();
-            factLayout.cellSize = new Vector2(128f, 19f);
-            factLayout.spacing = new Vector2(6f, 4f);
-            factLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            factLayout.constraintCount = 2;
+            overviewFactGrid = factGrid.GetComponent<GridLayoutGroup>();
+            overviewFactGrid.cellSize = new Vector2(128f, 19f);
+            overviewFactGrid.spacing = new Vector2(6f, 4f);
+            overviewFactGrid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            overviewFactGrid.constraintCount = 2;
             playerAliveLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.62f, 0.8f, 1f, 1f), BattleTextRole.DenseMeta);
             enemyAliveLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(1f, 0.66f, 0.58f, 1f), BattleTextRole.DenseMeta);
             readyLabel = BattleHudFactory.CreateText(factGrid.transform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft, new Color(0.93f, 0.95f, 0.87f, 1f), BattleTextRole.DenseMeta);
@@ -108,7 +123,7 @@ namespace PhalanxChronicle.UI
 
             GameObject objectivePanel = BattleHudFactory.CreateInsetPanel("ObjectivePanel", rootObject.transform, BattlePanelHeightPolicy.OverviewObjectiveHeight, BattleUiTheme.PanelCommand);
             Transform objectiveRoot = BattleHudFactory.CreateInsetContentRoot(objectivePanel.transform, 12f);
-            VerticalLayoutGroup objectiveLayout = objectiveRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            objectiveLayout = objectiveRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             objectiveLayout.spacing = 4f;
             objectiveLayout.childControlHeight = true;
             objectiveLayout.childControlWidth = true;
@@ -120,8 +135,9 @@ namespace PhalanxChronicle.UI
 
             GameObject commandRow = new GameObject("CommandRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             commandRow.transform.SetParent(rootObject.transform, false);
-            commandRow.GetComponent<LayoutElement>().preferredHeight = BattlePanelHeightPolicy.OverviewCommandHeight;
-            HorizontalLayoutGroup commandLayout = commandRow.GetComponent<HorizontalLayoutGroup>();
+            commandRowLayout = commandRow.GetComponent<LayoutElement>();
+            commandRowLayout.preferredHeight = BattlePanelHeightPolicy.OverviewCommandHeight;
+            commandLayout = commandRow.GetComponent<HorizontalLayoutGroup>();
             commandLayout.spacing = 10f;
             commandLayout.childAlignment = TextAnchor.MiddleRight;
             commandLayout.childControlHeight = true;
@@ -149,13 +165,13 @@ namespace PhalanxChronicle.UI
             autoModeLayout.flexibleWidth = 1f;
 
             GameObject contentPanel = BattleHudFactory.CreateInsetPanel("OverviewContentPanel", rootObject.transform, 0f, new Color(0.11f, 0.12f, 0.14f, 0.92f));
-            LayoutElement contentPanelLayout = contentPanel.GetComponent<LayoutElement>();
+            contentPanelLayout = contentPanel.GetComponent<LayoutElement>();
             contentPanelLayout.flexibleHeight = 1f;
-            float contentHeight = BattlePanelHeightPolicy.CalculateOverviewContentTargetHeight(panelHeight);
+            float contentHeight = BattlePanelHeightPolicy.CalculateOverviewContentTargetHeight(layoutMetrics.SidePanelHeight, layoutMetrics.TextScale, layoutMetrics.PanelSectionSpacing);
             contentPanelLayout.minHeight = contentHeight;
             contentPanelLayout.preferredHeight = contentHeight;
             Transform contentRoot = BattleHudFactory.CreateInsetContentRoot(contentPanel.transform, 10f);
-            VerticalLayoutGroup contentLayout = contentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            contentLayout = contentRoot.gameObject.AddComponent<VerticalLayoutGroup>();
             contentLayout.spacing = 8f;
             contentLayout.childControlHeight = true;
             contentLayout.childControlWidth = true;
@@ -163,8 +179,9 @@ namespace PhalanxChronicle.UI
 
             GameObject tabRow = new GameObject("TabRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             tabRow.transform.SetParent(contentRoot, false);
-            tabRow.GetComponent<LayoutElement>().preferredHeight = BattlePanelHeightPolicy.OverviewTabHeight;
-            HorizontalLayoutGroup tabLayout = tabRow.GetComponent<HorizontalLayoutGroup>();
+            tabRowLayout = tabRow.GetComponent<LayoutElement>();
+            tabRowLayout.preferredHeight = BattlePanelHeightPolicy.OverviewTabHeight;
+            tabLayout = tabRow.GetComponent<HorizontalLayoutGroup>();
             tabLayout.spacing = 8f;
             tabLayout.childControlHeight = true;
             tabLayout.childControlWidth = true;
@@ -192,6 +209,36 @@ namespace PhalanxChronicle.UI
             SetOverviewTab("allies");
         }
 
+        public void ApplyLayout(BattleLayoutMetrics metrics)
+        {
+            currentLayoutMetrics = metrics;
+            if (rootRect == null)
+            {
+                return;
+            }
+
+            rootRect.anchoredPosition = new Vector2(-metrics.PanelOuterMargin, metrics.SidePanelAnchoredY);
+            rootRect.sizeDelta = new Vector2(metrics.RosterPanelWidth, metrics.SidePanelHeight);
+            rootLayout.spacing = metrics.PanelSectionSpacing;
+            rootLayout.padding = new RectOffset(metrics.PanelPadding, metrics.PanelPadding, metrics.PanelPadding, metrics.PanelPadding);
+            summaryLayout.spacing = Mathf.Max(1f, metrics.PanelSectionSpacing - 3f);
+            objectiveLayout.spacing = Mathf.Max(3f, metrics.PanelSectionSpacing - 2f);
+            commandRowLayout.preferredHeight = ScaleValue(BattlePanelHeightPolicy.OverviewCommandHeight);
+            commandLayout.spacing = ScaleValue(10f);
+            contentPanelLayout.minHeight = BattlePanelHeightPolicy.CalculateOverviewContentTargetHeight(metrics.SidePanelHeight, metrics.TextScale, metrics.PanelSectionSpacing);
+            contentPanelLayout.preferredHeight = contentPanelLayout.minHeight;
+            contentLayout.spacing = ScaleValue(8f);
+            tabRowLayout.preferredHeight = ScaleValue(BattlePanelHeightPolicy.OverviewTabHeight);
+            tabLayout.spacing = ScaleValue(8f);
+            overviewFactGrid.cellSize = new Vector2(GetFactCellWidth(metrics), ScaleValue(19f));
+            overviewFactGrid.spacing = new Vector2(ScaleValue(6f), ScaleValue(4f));
+
+            BattleHudFactory.ApplyResponsiveTextScale(rootObject.transform, metrics.TextScale);
+            BindOverview(currentOverview);
+            BindRoster(currentAlliedRoster, currentEnemyRoster, rosterSelectionHandler);
+            BindFeed(currentFeedEntries);
+        }
+
         public void SetVisible(bool visible)
         {
             if (rootObject != null)
@@ -202,24 +249,24 @@ namespace PhalanxChronicle.UI
 
         public void BindOverview(BattleOverviewModel model)
         {
-            BattleOverviewModel overview = model ?? new BattleOverviewModel();
-            stageLabel.text = overview.StageLabel;
-            seedLabel.text = overview.SeedLabel;
-            phaseLabel.text = overview.PhaseLabel;
-            turnLabel.text = overview.TurnLabel;
-            playerAliveLabel.text = overview.PlayerAliveLabel;
-            enemyAliveLabel.text = overview.EnemyAliveLabel;
-            readyLabel.text = overview.ReadyLabel;
-            skillReadyLabel.text = overview.SkillReadyLabel;
-            objectivePrimaryLabel.text = overview.ObjectivePrimary;
-            objectiveFailureLabel.text = overview.ObjectiveFailure;
-            instructionLabel.text = overview.InstructionText;
-            secondaryInstructionLabel.text = overview.SecondaryInstructionText;
-            secondaryInstructionLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(overview.SecondaryInstructionText));
-            BattleHudFactory.RefreshTextRole(objectivePrimaryLabel, BattleTextRole.TwoLineSummary, 34f);
-            BattleHudFactory.RefreshTextRole(objectiveFailureLabel, BattleTextRole.DenseMeta, 16f);
-            BattleHudFactory.RefreshTextRole(instructionLabel, BattleTextRole.TwoLineSummary, 32f);
-            BattleHudFactory.RefreshTextRole(secondaryInstructionLabel, BattleTextRole.DenseMeta, 16f);
+            currentOverview = model ?? new BattleOverviewModel();
+            stageLabel.text = currentOverview.StageLabel;
+            seedLabel.text = currentOverview.SeedLabel;
+            phaseLabel.text = currentOverview.PhaseLabel;
+            turnLabel.text = currentOverview.TurnLabel;
+            playerAliveLabel.text = currentOverview.PlayerAliveLabel;
+            enemyAliveLabel.text = currentOverview.EnemyAliveLabel;
+            readyLabel.text = currentOverview.ReadyLabel;
+            skillReadyLabel.text = currentOverview.SkillReadyLabel;
+            objectivePrimaryLabel.text = currentOverview.ObjectivePrimary;
+            objectiveFailureLabel.text = currentOverview.ObjectiveFailure;
+            instructionLabel.text = currentOverview.InstructionText;
+            secondaryInstructionLabel.text = currentOverview.SecondaryInstructionText;
+            secondaryInstructionLabel.gameObject.SetActive(!string.IsNullOrWhiteSpace(currentOverview.SecondaryInstructionText));
+            BattleHudFactory.RefreshTextRole(objectivePrimaryLabel, BattleTextRole.TwoLineSummary, ScaleValue(34f));
+            BattleHudFactory.RefreshTextRole(objectiveFailureLabel, BattleTextRole.DenseMeta, ScaleValue(16f));
+            BattleHudFactory.RefreshTextRole(instructionLabel, BattleTextRole.TwoLineSummary, ScaleValue(32f));
+            BattleHudFactory.RefreshTextRole(secondaryInstructionLabel, BattleTextRole.DenseMeta, ScaleValue(16f));
         }
 
         public void BindRoster(
@@ -227,19 +274,22 @@ namespace PhalanxChronicle.UI
             IReadOnlyList<BattleRosterEntryModel> enemyRoster,
             Action<string> onRosterSelected)
         {
+            currentAlliedRoster = alliedRoster ?? Array.Empty<BattleRosterEntryModel>();
+            currentEnemyRoster = enemyRoster ?? Array.Empty<BattleRosterEntryModel>();
             rosterSelectionHandler = onRosterSelected;
-            BindRosterGroup(alliedRosterRoot, alliedRosterViews, alliedRoster);
-            BindRosterGroup(enemyRosterRoot, enemyRosterViews, enemyRoster);
-            UpdateOverviewTabLabels(alliedRoster != null ? alliedRoster.Count : 0, enemyRoster != null ? enemyRoster.Count : 0);
+            BindRosterGroup(alliedRosterRoot, alliedRosterViews, currentAlliedRoster);
+            BindRosterGroup(enemyRosterRoot, enemyRosterViews, currentEnemyRoster);
+            UpdateOverviewTabLabels(currentAlliedRoster.Count, currentEnemyRoster.Count);
             RefreshTabLayouts();
         }
 
         public void BindFeed(IReadOnlyList<string> entries)
         {
+            currentFeedEntries = entries ?? Array.Empty<string>();
             for (int index = 0; index < feedLabels.Count; index++)
             {
-                feedLabels[index].text = entries != null && index < entries.Count
-                    ? entries[index]
+                feedLabels[index].text = index < currentFeedEntries.Count
+                    ? currentFeedEntries[index]
                     : index == 0
                         ? LocalizationService.Text("ui.feed.empty", "目前還沒有新的戰場紀錄。")
                         : string.Empty;
@@ -390,9 +440,9 @@ namespace PhalanxChronicle.UI
         private void RefreshTabLayouts()
         {
             Canvas.ForceUpdateCanvases();
-            RefreshTabLayout(alliedTabContentRect);
-            RefreshTabLayout(enemyTabContentRect);
-            RefreshTabLayout(feedTabContentRect);
+            RefreshTabLayout(alliedTabContentRect, GetTextScale());
+            RefreshTabLayout(enemyTabContentRect, GetTextScale());
+            RefreshTabLayout(feedTabContentRect, GetTextScale());
             RectTransform rootRect = rootObject != null ? rootObject.GetComponent<RectTransform>() : null;
             if (rootRect != null)
             {
@@ -400,7 +450,7 @@ namespace PhalanxChronicle.UI
             }
         }
 
-        private static void RefreshTabLayout(RectTransform tabRect)
+        private static void RefreshTabLayout(RectTransform tabRect, float textScale)
         {
             if (tabRect == null)
             {
@@ -410,7 +460,7 @@ namespace PhalanxChronicle.UI
             LayoutElement layout = tabRect.GetComponent<LayoutElement>();
             if (layout != null)
             {
-                layout.minHeight = Mathf.Max(layout.minHeight, BattlePanelHeightPolicy.CalculateOverviewRosterViewportMinHeight());
+                layout.minHeight = Mathf.Max(layout.minHeight, BattlePanelHeightPolicy.CalculateOverviewRosterViewportMinHeight(textScale));
             }
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(tabRect);
@@ -669,6 +719,21 @@ namespace PhalanxChronicle.UI
             textRect.offsetMin = new Vector2(6f, 2f);
             textRect.offsetMax = new Vector2(-6f, -2f);
             return new TagChipView(root, root.GetComponent<Image>(), label);
+        }
+
+        private float GetTextScale()
+        {
+            return currentLayoutMetrics.TextScale > 0f ? currentLayoutMetrics.TextScale : 1f;
+        }
+
+        private float ScaleValue(float value)
+        {
+            return Mathf.Ceil(value * GetTextScale());
+        }
+
+        private static float GetFactCellWidth(BattleLayoutMetrics metrics)
+        {
+            return Mathf.Max(104f, (metrics.RosterPanelWidth - metrics.PanelPadding * 2f - 32f - Mathf.Ceil(6f * metrics.TextScale)) * 0.5f);
         }
     }
 }

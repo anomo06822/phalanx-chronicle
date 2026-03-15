@@ -220,6 +220,13 @@ namespace PhalanxChronicle.UI
             rosterSidebarView?.SetAutoModeState(enabled);
         }
 
+        internal void ApplyLayout(BattleLayoutMetrics metrics)
+        {
+            selectedUnitView?.ApplyLayout(metrics);
+            rosterSidebarView?.ApplyLayout(metrics);
+            contextRibbonView?.ApplyLayout(metrics);
+        }
+
         public void ShowResult(BattleResultModel model)
         {
             resultPanel.SetActive(true);
@@ -2144,7 +2151,8 @@ namespace PhalanxChronicle.UI
             GameObject root = BattleHudFactory.CreateInsetPanel("CampaignOptionEntry", parent, 0f, model.IsEnabled ? (model.IsEmphasized ? BattleUiTheme.PanelCommand : BattleUiTheme.PanelInset) : BattleUiTheme.PanelGhost);
             LayoutElement rootLayout = root.GetComponent<LayoutElement>();
             bool hasSupportingLine = !string.IsNullOrWhiteSpace(model.RecommendedReason) || !string.IsNullOrWhiteSpace(model.AvailabilityReason);
-            rootLayout.preferredHeight = hasSupportingLine || model.IsPromotionOption ? 124f : 98f;
+            bool hasDetailLines = (model.DetailLines ?? Array.Empty<string>()).Any(line => !string.IsNullOrWhiteSpace(line));
+            rootLayout.preferredHeight = hasDetailLines ? 132f : (hasSupportingLine || model.IsPromotionOption ? 124f : 98f);
             rootLayout.flexibleHeight = 0f;
             Button button = root.AddComponent<Button>();
             button.interactable = model.IsEnabled;
@@ -2232,6 +2240,17 @@ namespace PhalanxChronicle.UI
                 Text availability = BattleHudFactory.CreateText(textColumn.transform, model.AvailabilityReason, 12, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextWarning);
                 ClampText(availability, 18f, VerticalWrapMode.Truncate);
             }
+
+            if (hasDetailLines)
+            {
+                foreach (string line in model.DetailLines.Where(line => !string.IsNullOrWhiteSpace(line)))
+                {
+                    Text detailLabel = BattleHudFactory.CreateText(textColumn.transform, line, 11, FontStyle.Normal, TextAnchor.UpperLeft, BattleUiTheme.TextMuted);
+                    BattleHudFactory.EnableAutoHeight(detailLabel, 18f);
+                }
+
+                FinalizeDynamicEntryHeight(root, 132f);
+            }
         }
 
         private void ShowOverlay()
@@ -2265,6 +2284,24 @@ namespace PhalanxChronicle.UI
             }
 
             text.verticalOverflow = verticalMode;
+        }
+
+        private static void FinalizeDynamicEntryHeight(GameObject root, float minimumHeight)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            LayoutElement rootLayout = root.GetComponent<LayoutElement>();
+            if (rootLayout == null)
+            {
+                return;
+            }
+
+            float preferredHeight = LayoutUtility.GetPreferredHeight(root.transform as RectTransform);
+            rootLayout.preferredHeight = Mathf.Max(minimumHeight, preferredHeight);
         }
 
         private static void CreateListSectionHeader(Transform parent, string label)
@@ -2462,26 +2499,46 @@ namespace PhalanxChronicle.UI
         public const float SelectedDetailExpandedMinHeight = 188f;
         public const float SelectedDetailScrollMinHeight = 132f;
 
-        public static float CalculateOverviewRosterViewportMinHeight()
+        public static float CalculateOverviewRosterViewportMinHeight(float scale = 1f)
         {
-            return OverviewVisibleEntryCount * OverviewRosterEntryHeight +
-                   (OverviewVisibleEntryCount - 1f) * OverviewRosterEntrySpacing;
+            return OverviewVisibleEntryCount * ScaleValue(OverviewRosterEntryHeight, scale) +
+                   (OverviewVisibleEntryCount - 1f) * ScaleValue(OverviewRosterEntrySpacing, scale);
         }
 
-        public static float CalculateOverviewContentTargetHeight(float panelHeight)
+        public static float CalculateOverviewContentTargetHeight(float panelHeight, float scale = 1f, float sectionSpacing = OverviewSectionSpacing)
         {
             float consumedHeight = 32f +
                                    18f +
-                                   OverviewSummaryHeight +
-                                   OverviewObjectiveHeight +
-                                   OverviewCommandHeight +
-                                   OverviewSectionSpacing * 4f;
+                                   ScaleValue(OverviewSummaryHeight, scale) +
+                                   ScaleValue(OverviewObjectiveHeight, scale) +
+                                   ScaleValue(OverviewCommandHeight, scale) +
+                                   sectionSpacing * 4f;
             float available = Mathf.Max(320f, panelHeight - consumedHeight);
-            float requiredForFiveRows = OverviewContentInset +
-                                        OverviewTabHeight +
-                                        OverviewContentSpacing +
-                                        CalculateOverviewRosterViewportMinHeight();
+            float requiredForFiveRows = ScaleValue(OverviewContentInset, scale) +
+                                        ScaleValue(OverviewTabHeight, scale) +
+                                        ScaleValue(OverviewContentSpacing, scale) +
+                                        CalculateOverviewRosterViewportMinHeight(scale);
             return Mathf.Min(available, Mathf.Max(320f, requiredForFiveRows));
+        }
+
+        public static float GetSelectedDetailCollapsedHeight(float scale = 1f)
+        {
+            return ScaleValue(SelectedDetailCollapsedHeight, scale);
+        }
+
+        public static float GetSelectedDetailExpandedMinHeight(float scale = 1f)
+        {
+            return ScaleValue(SelectedDetailExpandedMinHeight, scale);
+        }
+
+        public static float GetSelectedDetailScrollMinHeight(float scale = 1f)
+        {
+            return ScaleValue(SelectedDetailScrollMinHeight, scale);
+        }
+
+        private static float ScaleValue(float value, float scale)
+        {
+            return Mathf.Ceil(value * Mathf.Max(0.8f, scale));
         }
     }
 
@@ -2782,12 +2839,46 @@ namespace PhalanxChronicle.UI
 
         public static void ApplyTextRole(Text text, BattleTextRole role)
         {
+            EnsureTextRoleBinding(text, role);
             BattleTextLayoutPolicy.Apply(text, role);
         }
 
         public static float RefreshTextRole(Text text, BattleTextRole role, float minHeight = 0f)
         {
+            EnsureTextRoleBinding(text, role);
             return BattleTextLayoutPolicy.Refresh(text, role, minHeight);
+        }
+
+        public static void ApplyResponsiveTextScale(Transform root, float scale)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            float safeScale = Mathf.Clamp(scale, 0.82f, 1f);
+            foreach (Text text in root.GetComponentsInChildren<Text>(true))
+            {
+                if (text == null)
+                {
+                    continue;
+                }
+
+                BattleTextScaleState scaleState = text.GetComponent<BattleTextScaleState>();
+                if (scaleState == null)
+                {
+                    scaleState = text.gameObject.AddComponent<BattleTextScaleState>();
+                }
+
+                scaleState.Capture(text);
+                scaleState.Apply(text, safeScale);
+
+                BattleTextRoleBinding roleBinding = text.GetComponent<BattleTextRoleBinding>();
+                if (roleBinding != null)
+                {
+                    BattleTextLayoutPolicy.Apply(text, roleBinding.Role);
+                }
+            }
         }
 
         public static float RefreshAutoHeight(Text text, float minHeight = 0f)
@@ -2968,6 +3059,68 @@ namespace PhalanxChronicle.UI
                 default:
                     return TextAlignmentOptions.TopLeft;
             }
+        }
+
+        private static void EnsureTextRoleBinding(Text text, BattleTextRole role)
+        {
+            if (text == null)
+            {
+                return;
+            }
+
+            BattleTextRoleBinding binding = text.GetComponent<BattleTextRoleBinding>();
+            if (binding == null)
+            {
+                binding = text.gameObject.AddComponent<BattleTextRoleBinding>();
+            }
+
+            binding.Role = role;
+        }
+    }
+
+    internal sealed class BattleTextRoleBinding : MonoBehaviour
+    {
+        public BattleTextRole Role;
+    }
+
+    internal sealed class BattleTextScaleState : MonoBehaviour
+    {
+        private bool captured;
+        private float baseFontSize;
+        private float baseFontSizeMin;
+        private float baseFontSizeMax;
+        private bool autoSizing;
+
+        public void Capture(Text text)
+        {
+            if (captured || text == null)
+            {
+                return;
+            }
+
+            baseFontSize = text.fontSize;
+            baseFontSizeMin = text.fontSizeMin;
+            baseFontSizeMax = text.fontSizeMax;
+            autoSizing = text.enableAutoSizing;
+            captured = true;
+        }
+
+        public void Apply(Text text, float scale)
+        {
+            if (!captured || text == null)
+            {
+                return;
+            }
+
+            float safeScale = Mathf.Clamp(scale, 0.82f, 1f);
+            text.fontSize = Mathf.Max(8f, Mathf.Round(baseFontSize * safeScale));
+            if (!autoSizing)
+            {
+                return;
+            }
+
+            text.fontSizeMin = Mathf.Max(7f, Mathf.Round(baseFontSizeMin * safeScale));
+            text.fontSizeMax = Mathf.Max(text.fontSizeMin, Mathf.Round(baseFontSizeMax * safeScale));
         }
     }
 

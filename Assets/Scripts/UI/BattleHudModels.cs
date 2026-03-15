@@ -497,6 +497,8 @@ namespace PhalanxChronicle.UI
 
         public string Description { get; set; } = string.Empty;
 
+        public IReadOnlyList<string> DetailLines { get; set; } = Array.Empty<string>();
+
         public string IconGlyph { get; set; } = string.Empty;
 
         public string IconItemId { get; set; } = string.Empty;
