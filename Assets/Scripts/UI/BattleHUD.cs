@@ -2295,13 +2295,27 @@ namespace PhalanxChronicle.UI
 
             Canvas.ForceUpdateCanvases();
             LayoutElement rootLayout = root.GetComponent<LayoutElement>();
-            if (rootLayout == null)
+            RectTransform rect = root.GetComponent<RectTransform>();
+            if (rootLayout == null || rect == null)
             {
                 return;
             }
 
-            float preferredHeight = LayoutUtility.GetPreferredHeight(root.transform as RectTransform);
-            rootLayout.preferredHeight = Mathf.Max(minimumHeight, preferredHeight);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
+            float preferredHeight = LayoutUtility.GetPreferredHeight(rect);
+            RectTransform contentRect = root.transform
+                .Cast<Transform>()
+                .Select(child => child as RectTransform)
+                .FirstOrDefault(child => child != null);
+
+            if (contentRect != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+                float contentPadding = Mathf.Abs(contentRect.offsetMin.y) + Mathf.Abs(contentRect.offsetMax.y);
+                preferredHeight = Mathf.Max(preferredHeight, LayoutUtility.GetPreferredHeight(contentRect) + contentPadding);
+            }
+
+            rootLayout.preferredHeight = Mathf.Max(minimumHeight, preferredHeight + 4f);
         }
 
         private static void CreateListSectionHeader(Transform parent, string label)

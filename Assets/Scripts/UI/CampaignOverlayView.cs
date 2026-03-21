@@ -685,8 +685,19 @@ namespace PhalanxChronicle.UI
             contentLayout.childControlWidth = true;
             contentLayout.childForceExpandHeight = false;
 
+            GameObject headerStack = new GameObject("PromotionPreviewHeaderStack", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
+            headerStack.transform.SetParent(content, false);
+            LayoutElement headerStackLayout = headerStack.GetComponent<LayoutElement>();
+            headerStackLayout.flexibleHeight = 0f;
+            VerticalLayoutGroup headerStackGroup = headerStack.GetComponent<VerticalLayoutGroup>();
+            headerStackGroup.spacing = 8f;
+            headerStackGroup.childControlHeight = true;
+            headerStackGroup.childControlWidth = true;
+            headerStackGroup.childForceExpandHeight = false;
+            headerStackGroup.childForceExpandWidth = true;
+
             GameObject headerRow = new GameObject("PromotionPreviewHeaderRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
-            headerRow.transform.SetParent(content, false);
+            headerRow.transform.SetParent(headerStack.transform, false);
             headerRow.GetComponent<LayoutElement>().preferredHeight = 40f;
             HorizontalLayoutGroup headerLayout = headerRow.GetComponent<HorizontalLayoutGroup>();
             headerLayout.spacing = 10f;
@@ -711,13 +722,32 @@ namespace PhalanxChronicle.UI
 
             Text stageBadge = BattleHudFactory.CreateText(headerRow.transform, model.PromotionPreview.CurrentStageLabel, 12, FontStyle.Bold, TextAnchor.MiddleRight, BattleUiTheme.TextGold);
             LayoutElement stageLayout = stageBadge.GetComponent<LayoutElement>();
-            stageLayout.preferredWidth = 92f;
+            stageLayout.minWidth = 68f;
+            stageLayout.preferredWidth = 84f;
             stageLayout.flexibleWidth = 0f;
             ClampText(stageBadge, 20f, TextOverflowModes.Truncate);
 
-            Button toggleButton = BattleHudFactory.CreateButton(headerRow.transform, model.PromotionPreview.ToggleLabel, false);
+            GameObject actionRow = new GameObject("PromotionPreviewActionRow", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            actionRow.transform.SetParent(headerStack.transform, false);
+            actionRow.GetComponent<LayoutElement>().preferredHeight = 40f;
+            HorizontalLayoutGroup actionLayout = actionRow.GetComponent<HorizontalLayoutGroup>();
+            actionLayout.spacing = 10f;
+            actionLayout.childAlignment = TextAnchor.MiddleRight;
+            actionLayout.childControlHeight = true;
+            actionLayout.childControlWidth = true;
+            actionLayout.childForceExpandHeight = false;
+            actionLayout.childForceExpandWidth = false;
+
+            GameObject actionSpacer = new GameObject("PromotionPreviewActionSpacer", typeof(RectTransform), typeof(LayoutElement));
+            actionSpacer.transform.SetParent(actionRow.transform, false);
+            LayoutElement actionSpacerLayout = actionSpacer.GetComponent<LayoutElement>();
+            actionSpacerLayout.flexibleWidth = 1f;
+            actionSpacerLayout.flexibleHeight = 0f;
+
+            Button toggleButton = BattleHudFactory.CreateButton(actionRow.transform, model.PromotionPreview.ToggleLabel, false);
             LayoutElement toggleLayout = toggleButton.GetComponent<LayoutElement>();
-            toggleLayout.preferredWidth = 150f;
+            toggleLayout.minWidth = 156f;
+            toggleLayout.preferredWidth = 176f;
             toggleLayout.flexibleWidth = 0f;
             toggleButton.onClick.RemoveAllListeners();
             toggleButton.onClick.AddListener(() => optionSelectionHandler?.Invoke(model.OptionId));
@@ -990,16 +1020,29 @@ namespace PhalanxChronicle.UI
                 return;
             }
 
-            RectTransform rect = root.GetComponent<RectTransform>();
             LayoutElement layout = root.GetComponent<LayoutElement>();
-            if (rect == null || layout == null)
+            RectTransform rect = root.GetComponent<RectTransform>();
+            if (layout == null || rect == null)
             {
                 return;
             }
 
             Canvas.ForceUpdateCanvases();
             LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
-            layout.preferredHeight = Mathf.Max(minimumHeight, LayoutUtility.GetPreferredHeight(rect) + 4f);
+            float preferredHeight = LayoutUtility.GetPreferredHeight(rect);
+            RectTransform contentRect = root.transform
+                .Cast<Transform>()
+                .Select(child => child as RectTransform)
+                .FirstOrDefault(child => child != null);
+
+            if (contentRect != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+                float contentPadding = Mathf.Abs(contentRect.offsetMin.y) + Mathf.Abs(contentRect.offsetMax.y);
+                preferredHeight = Mathf.Max(preferredHeight, LayoutUtility.GetPreferredHeight(contentRect) + contentPadding);
+            }
+
+            layout.preferredHeight = Mathf.Max(minimumHeight, preferredHeight + 4f);
         }
 
         private void CreateEquipmentSlotRow(Transform parent, IReadOnlyList<CampaignEquipmentSlotCardModel> slotCards)

@@ -37,6 +37,23 @@
 - 英文與繁體中文文本表，預設使用繁體中文
 - 可用 `dotnet test` 驗證的純 C# 核心規則層與戰役 / UI model / localization 測試
 
+## 技術總覽
+| 領域 | 目前技術與做法 |
+| --- | --- |
+| 遊戲引擎 | `Unity 2022.3.21f1`，主體以 `C#` 撰寫戰鬥、戰役、存檔、UI 與演出流程 |
+| 核心 UI | Unity `UGUI` + `TextMeshPro`，主要畫面由自製 `BattleHUD`、`CampaignOverlayView`、軍營 / 整備 / 升階面板組成 |
+| 2D 顯示 | `com.unity.2d.pixel-perfect` 用於像素對齊與 2D 相機呈現；桌面版另有 responsive battle layout 與 aspect-aware HUD framing |
+| 戰鬥與戰役邏輯 | `Assets/Scripts/Core/` 負責戰鬥模擬、AI、技能、狀態效果、地形、招募、裝備、升階與戰役推進 |
+| 人像管線 | 目前人像不是外部 pixel character pack；是用 `python3 scripts/generate_character_art.py` 生成 `SVG` source，再轉成 Unity 使用的 `PNG` |
+| 戰場角色管線 | 戰場小人是 `128x128` 的 SRPG pixel 風 sprite，目前由 `python3 scripts/generate_srpg_battle_art.py` 生成 |
+| 地形管線 | 地形與 props 目前可用 `python3 scripts/generate_terrain_art.py` 生成 `SVG -> PNG`；文件仍保留未來手工像素美術接手的空間 |
+| 存檔 | 使用 Unity `Application.persistentDataPath`，目前為固定三槽 JSON：`phalanx-chronicle-save-slot1/2/3.json` |
+| 本機偏好設定 | 非戰役資料，例如 GitHub release 升級提示的「稍後提醒」狀態，使用 `PlayerPrefs` 保存，不混進 campaign save |
+| 升級提示 | 桌面版啟動時會非阻塞查 GitHub Releases 最新正式版；若有新版本，使用現有 confirm dialog 提示並直接開啟 release 頁面 |
+| CI / 測試 | `dotnet test Tests/Headless/PhalanxChronicle.Headless.Tests.csproj` 驗證純 C# 規則層；GitHub Actions `ci.yml` 會在 `push` / `pull_request` 自動執行 |
+| 發版 | `release.yml` 會建置 macOS player、封裝 zip 並上傳 GitHub Release；可選接入 Apple `codesign`、`notarytool`、`stapler` |
+| 本機執行平台 | 目前已實測與包版主軸是 `macOS`；若要給 Windows 使用者，需另外建立 Windows player |
+
 ## 主要結構
 - `Assets/Scripts/Core/`：戰鬥模擬、AI、技能、地形、戰役進度、招募、裝備、商店與升階規則
 - `Assets/Scripts/Battle/`：`GameManager`、`BattleManager`、狀態機、存檔、戰鬥演出與 HUD model builder
@@ -51,9 +68,26 @@
 
 ## 如何啟動
 1. 用 Unity 開啟這個目錄。
-2. 直接進 Play Mode；若已有戰役存檔，會先看到「繼續 / 重新開局」。
-3. 預設會進入劉備傳戰役流程，可從軍營進入章節、整備、商店與倉庫。
-4. 如果想建立固定戰場場景，使用 Unity 選單 `Phalanx Chronicle/Create Battle Scene` 產生 `Assets/Scenes/Battle.unity`。
+2. 直接進 Play Mode；戰役模式會先顯示 `Slot 1 / 2 / 3` 的本機存檔槽選擇。
+3. 空槽可直接開始新遊戲，已有紀錄的槽可續玩或覆寫重開。
+4. 預設會進入劉備傳戰役流程，可從軍營進入章節、整備、商店與倉庫。
+5. 桌面版啟動時若 GitHub Release 有較新正式版，會跳出可略過的升級提示。
+6. 如果想建立固定戰場場景，使用 Unity 選單 `Phalanx Chronicle/Create Battle Scene` 產生 `Assets/Scenes/Battle.unity`。
+
+## 存檔與本機資料
+- 戰役存檔放在 Unity `Application.persistentDataPath`，不會寫回 repo，也不會跟 release 壓縮包綁在一起。
+- 目前固定三槽：
+  - `phalanx-chronicle-save-slot1.json`
+  - `phalanx-chronicle-save-slot2.json`
+  - `phalanx-chronicle-save-slot3.json`
+- macOS 實際路徑通常是：
+
+```text
+~/Library/Application Support/Jarvis Studio/Phalanx Chronicle/
+```
+
+- 舊版單檔 `phalanx-chronicle-save.json` 若存在，首次啟動時會安全遷移到 `Slot 1`，但不會覆寫已存在的 `slot1`。
+- 裝置級偏好設定，例如升級提示略過狀態，使用 `PlayerPrefs` 管理。
 
 ## 驗證
 - Headless 規則測試：
@@ -124,9 +158,10 @@ git push origin v0.1.0
 - `Docs/character-asset-manifest.csv`
 - `Docs/templates/character-visual-brief-template.md`
 - Unity 選單：`Phalanx Chronicle/Visuals/Prepare Character Art Pipeline`
-- 角色美術生成器：`python3 scripts/generate_character_art.py`
+- 角色立繪生成器：`python3 scripts/generate_character_art.py`
 - SRPG 戰場像素角色：`python3 scripts/generate_srpg_battle_art.py`
 - 地形像素資產生成器：`python3 scripts/generate_terrain_art.py`
+- 目前 repo 中的人像 / 戰場角色 / 武器 icon 都有對應的 `ArtSource/Generated/*.svg` source 與 Unity runtime `PNG` 輸出
 
 ## GitHub 協作
 - 已補上 `.gitignore`，可避免 Unity 產生檔進版控
